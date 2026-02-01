@@ -1,4 +1,6 @@
-﻿const faqs = [
+import ScrollReveal from "@/components/ScrollReveal";
+
+const faqs = [
   {
     question: "How long does a custom build take?",
     answer: "Custom builds take 4-8 weeks depending on movement complexity and hand-finishing requirements.",
@@ -24,26 +26,27 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
   return (
     <section className="px-6">
       <div className="mx-auto max-w-5xl space-y-10">
-        <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">FAQ</p>
-          <h1 className="mt-4 text-4xl">
-            {isFr ? "Questions detaillees." : "Questions answered in full."}
-          </h1>
-          <p className="mt-4 text-foreground/70">
-            {isFr
-              ? "Si vous avez besoin de plus de details, ecrivez-nous et nous repondrons rapidement."
-              : "If you need more detail, email us and we will respond within one business day."}
-          </p>
-        </div>
+        <ScrollReveal>
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">FAQ</p>
+            <h1 className="mt-4 text-4xl">
+              {isFr ? "Questions detaillees." : "Questions answered in full."}
+            </h1>
+            <p className="mt-4 text-foreground/70">
+              {isFr
+                ? "Si vous avez besoin de plus de details, ecrivez-nous et nous repondrons rapidement."
+                : "If you need more detail, email us and we will respond within one business day."}
+            </p>
+          </div>
+        </ScrollReveal>
         <div className="space-y-4">
           {faqs.map((faq) => (
-            <div
-              key={faq.question}
-              className="rounded-[26px] border border-white/70 bg-white/80 p-6 shadow-[0_20px_70px_rgba(15,20,23,0.1)]"
-            >
-              <h2 className="text-xl">{faq.question}</h2>
-              <p className="mt-3 text-foreground/70">{faq.answer}</p>
-            </div>
+            <ScrollReveal key={faq.question}>
+              <div className="rounded-[26px] border border-white/70 bg-white/80 p-6 shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
+                <h2 className="text-xl">{faq.question}</h2>
+                <p className="mt-3 text-foreground/70">{faq.answer}</p>
+              </div>
+            </ScrollReveal>
           ))}
         </div>
       </div>
