@@ -1,9 +1,11 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { localeLabels, locales } from "@/lib/i18n";
+import { createBrowserClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 type NavLabels = {
   home: string;
@@ -12,6 +14,9 @@ type NavLabels = {
   blog: string;
   faq: string;
   account: string;
+  signIn: string;
+  createAccount: string;
+  logout: string;
 };
 
 const navItems = [
@@ -23,27 +28,30 @@ const navItems = [
 ];
 
 export default function NavBar({ locale, labels }: { locale: string; labels: NavLabels }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const activeLocale = locale || pathname.split("/").filter(Boolean)[0] || "en";
   const [hidden, setHidden] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    let lastY = window.scrollY;
-    let ticking = false;
-
-    const onScroll = () => {
-      const currentY = window.scrollY;
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          setHidden(currentY > lastY && currentY > 80);
-          lastY = currentY;
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const supabase = createBrowserClient();
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      setUser(u ?? null);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
+
+  const handleLogout = async () => {
+    const supabase = createBrowserClient();
+    await supabase.auth.signOut();
+    router.push(`/${activeLocale}`);
+  };
 
   return (
     <header
@@ -51,7 +59,7 @@ export default function NavBar({ locale, labels }: { locale: string; labels: Nav
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link
-          href={`/${locale}`}
+          href={`/${activeLocale}`}
           className="text-lg font-semibold tracking-[0.3em] uppercase text-foreground"
         >
           Civaglia
@@ -60,7 +68,7 @@ export default function NavBar({ locale, labels }: { locale: string; labels: Nav
           {navItems.map((item) => (
             <Link
               key={item.key}
-              href={`/${locale}/${item.href}`}
+              href={`/${activeLocale}/${item.href}`}
               className="text-foreground/80 transition hover:text-foreground"
             >
               {labels[item.key as keyof NavLabels]}
@@ -68,13 +76,45 @@ export default function NavBar({ locale, labels }: { locale: string; labels: Nav
           ))}
         </nav>
         <div className="flex items-center gap-4">
-          <Link
-            href={`/${locale}/account/login`}
-            className="rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
-          >
-            {labels.account}
-          </Link>
-          <LocaleSwitcher currentLocale={locale} />
+          {user ? (
+              <>
+                <Link
+                  href={`/${activeLocale}/account/manage`}
+                  className="rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                >
+                  {labels.account}
+                </Link>
+                <Link
+                  href={`/${activeLocale}/account/admin`}
+                  className="rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                >
+                  Admin
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                >
+                  {labels.logout}
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href={`/${activeLocale}/account/login`}
+                  className="rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                >
+                  {labels.signIn}
+                </Link>
+                <Link
+                  href={`/${activeLocale}/account/sign-up`}
+                  className="rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                >
+                  {labels.createAccount}
+                </Link>
+              </>
+            )}
+          <LocaleSwitcher currentLocale={activeLocale} />
         </div>
       </div>
       <div className="glass mx-6 rounded-full border border-white/50"></div>

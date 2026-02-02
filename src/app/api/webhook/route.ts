@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { sendOrderEmails } from "@/lib/email";
 import { createServerClient } from "@/lib/supabase/server";
@@ -37,10 +37,37 @@ export async function POST(request: NextRequest) {
     const supabase = createServerClient();
 
     if (configurationId) {
+      const { data: config } = await supabase
+        .from("configurations")
+        .select("type, options")
+        .eq("id", configurationId)
+        .single();
+
       await supabase
         .from("configurations")
         .update({ status: "paid" })
         .eq("id", configurationId);
+
+      if (config?.type === "built" && config.options?.product_id) {
+        const productId = config.options.product_id as string;
+        const { data: product } = await supabase
+          .from("products")
+          .select("stock")
+          .eq("id", productId)
+          .single();
+
+        const currentStock = product?.stock ?? 0;
+        if (currentStock > 0) {
+          await supabase
+            .from("products")
+            .update({
+              stock: currentStock - 1,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", productId)
+            .gt("stock", 0);
+        }
+      }
     }
 
     await supabase.from("orders").insert({

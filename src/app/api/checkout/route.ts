@@ -1,19 +1,24 @@
-﻿import { NextRequest, NextResponse } from "next/server";
-import { builtWatches } from "@/data/watches";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getSiteUrl, getStripe } from "@/lib/stripe";
 
 export async function POST(request: NextRequest) {
-  const payload = await request.json();
-  const { locale, type, userId } = payload as {
-    locale: string;
-    type: "custom" | "built";
-    userId?: string | null;
-    configuration?: Record<string, string | number>;
-    productId?: string;
-  };
+  try {
+    const payload = await request.json();
+    const { locale, type, userId } = payload as {
+      locale: string;
+      type: "custom" | "built";
+      userId?: string | null;
+      configuration?: Record<string, string | number>;
+      productId?: string;
+    };
 
-  const supabase = createServerClient();
+    // Validate type
+    if (type !== "custom" && type !== "built") {
+      return NextResponse.json({ error: "Invalid checkout type" }, { status: 400 });
+    }
+
+    const supabase = createServerClient();
 
   let summary = "Civaglia timepiece";
   let amount = 0;
@@ -43,19 +48,30 @@ export async function POST(request: NextRequest) {
   }
 
   if (type === "built" && payload.productId) {
-    const watch = builtWatches.find((item) => item.id === payload.productId);
-    if (!watch) {
+    const { data: product, error: productError } = await supabase
+      .from("products")
+      .select("id, name, price, stock")
+      .eq("id", payload.productId)
+      .eq("active", true)
+      .single();
+
+    if (productError || !product) {
       return NextResponse.json({ error: "Unknown product" }, { status: 404 });
     }
 
-    summary = `Built watch · ${watch.name}`;
-    amount = watch.price;
+    const stock = product.stock ?? 0;
+    if (stock < 1) {
+      return NextResponse.json({ error: "Out of stock" }, { status: 400 });
+    }
+
+    summary = `Built watch · ${product.name}`;
+    amount = Number(product.price);
 
     const { data, error } = await supabase
       .from("configurations")
       .insert({
         type: "built",
-        options: { product_id: watch.id, title: watch.name },
+        options: { product_id: product.id, title: product.name },
         status: "pending",
         price: amount,
         user_id: userId ?? null,
@@ -100,4 +116,11 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ url: session.url });
+  } catch (error) {
+    console.error("Checkout error:", error);
+    return NextResponse.json(
+      { error: "Failed to create checkout session" },
+      { status: 500 }
+    );
+  }
 }

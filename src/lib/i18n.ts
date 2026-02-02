@@ -1,4 +1,4 @@
-﻿export const locales = ["en", "fr"] as const;
+export const locales = ["en", "fr"] as const;
 export type Locale = (typeof locales)[number];
 
 export const localeLabels: Record<Locale, string> = {
@@ -15,6 +15,9 @@ export const dictionaries = {
       blog: "Journal",
       faq: "FAQ",
       account: "Account",
+      signIn: "Sign In",
+      createAccount: "Create Account",
+      logout: "Logout",
     },
     hero: {
       title: "Civaglia Timepieces",
@@ -31,6 +34,9 @@ export const dictionaries = {
       blog: "Journal",
       faq: "FAQ",
       account: "Compte",
+      signIn: "Connexion",
+      createAccount: "Creer un compte",
+      logout: "Deconnexion",
     },
     hero: {
       title: "Civaglia Timepieces",

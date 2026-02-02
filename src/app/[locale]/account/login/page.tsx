@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { use } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-export default function LoginPage({ params }: { params: Promise<{ locale: string }> }) {
-  const { locale } = use(params);
+export default function LoginPage() {
+  const params = useParams<{ locale?: string | string[] }>();
+  const locale = Array.isArray(params.locale) ? params.locale[0] : params.locale ?? "en";
   const router = useRouter();
   const isFr = locale === "fr";
   const [email, setEmail] = useState("");

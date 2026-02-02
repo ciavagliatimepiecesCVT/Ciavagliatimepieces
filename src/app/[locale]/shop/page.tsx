@@ -1,11 +1,26 @@
 import ShopGrid from "@/components/ShopGrid";
 import ScrollReveal from "@/components/ScrollReveal";
-import { builtWatches } from "@/data/watches";
+import { createServerClient } from "@/lib/supabase/server";
 import { Locale } from "@/lib/i18n";
 
 export default async function ShopPage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
   const isFr = locale === "fr";
+  const supabase = createServerClient();
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, description, price, image, stock")
+    .eq("active", true)
+    .order("created_at", { ascending: false });
+
+  const watches = (products ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description ?? "",
+    price: Number(p.price),
+    image: p.image ?? "/images/hero-1.svg",
+    stock: p.stock ?? 0,
+  }));
 
   return (
     <section className="px-6">
@@ -26,7 +41,7 @@ export default async function ShopPage({ params }: { params: Promise<{ locale: L
           </div>
         </ScrollReveal>
         <ScrollReveal>
-          <ShopGrid watches={builtWatches} locale={locale} />
+          <ShopGrid watches={watches} locale={locale} />
         </ScrollReveal>
       </div>
     </section>
