@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 const navItems = [
+  { href: "orders", labelEn: "Orders", labelFr: "Commandes" },
   { href: "products", labelEn: "Products", labelFr: "Produits" },
   { href: "categories", labelEn: "Categories", labelFr: "Catégories" },
   { href: "featured", labelEn: "Featured", labelFr: "À la une" },
@@ -43,7 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const base = `/${locale}/account/admin`;
-  const pathSegment = pathname?.replace(base, "").split("/").filter(Boolean)[0] ?? "products";
+  const pathSegment = pathname?.replace(base, "").split("/").filter(Boolean)[0] ?? "orders";
 
   return (
     <section className="px-6">

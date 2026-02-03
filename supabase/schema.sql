@@ -31,6 +31,14 @@ create table if not exists orders (
   status text,
   summary text,
   stripe_session_id text,
+  customer_email text,
+  shipping_name text,
+  shipping_line1 text,
+  shipping_line2 text,
+  shipping_city text,
+  shipping_state text,
+  shipping_postal_code text,
+  shipping_country text,
   created_at timestamptz default now()
 );
 

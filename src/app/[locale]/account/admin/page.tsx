@@ -9,7 +9,7 @@ export default function AdminPage() {
   const locale = Array.isArray(params.locale) ? params.locale[0] : params.locale ?? "en";
 
   useEffect(() => {
-    router.replace(`/${locale}/account/admin/products`);
+    router.replace(`/${locale}/account/admin/orders`);
   }, [locale, router]);
 
   return (

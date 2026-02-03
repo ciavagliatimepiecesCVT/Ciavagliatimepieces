@@ -750,3 +750,34 @@ export async function setConfiguratorAddonOptions(addonId: string, optionIds: st
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
 }
+
+// ——— Orders (admin: view orders + shipping addresses for labels) ———
+export type OrderRow = {
+  id: string;
+  configuration_id: string | null;
+  user_id: string | null;
+  total: number;
+  status: string | null;
+  summary: string | null;
+  stripe_session_id: string | null;
+  customer_email: string | null;
+  shipping_name: string | null;
+  shipping_line1: string | null;
+  shipping_line2: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
+  shipping_postal_code: string | null;
+  shipping_country: string | null;
+  created_at: string;
+};
+
+export async function getAdminOrders(): Promise<OrderRow[]> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .select("id, configuration_id, user_id, total, status, summary, stripe_session_id, customer_email, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, created_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}

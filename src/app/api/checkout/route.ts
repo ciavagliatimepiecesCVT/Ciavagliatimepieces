@@ -202,6 +202,7 @@ export async function POST(request: NextRequest) {
       user_id: userId ?? "",
     },
     billing_address_collection: "required",
+    shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "FR", "DE", "IT", "ES", "CH", "AU", "JP"] },
     allow_promotion_codes: true,
     });
 

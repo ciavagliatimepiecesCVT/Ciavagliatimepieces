@@ -47,6 +47,16 @@ export async function POST(request: NextRequest) {
       const total = (session.amount_total ?? 0) / 100;
       const customerEmail = session.customer_details?.email || session.customer_email;
 
+      const shipping = session.collected_information?.shipping_details ?? (session as { shipping_details?: { address?: { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string }; name?: string } }).shipping_details;
+      const addr = shipping?.address;
+      const shippingName = shipping?.name ?? session.customer_details?.name ?? null;
+      const shippingLine1 = (addr as { line1?: string } | null)?.line1 ?? null;
+      const shippingLine2 = (addr as { line2?: string } | null)?.line2 ?? null;
+      const shippingCity = (addr as { city?: string } | null)?.city ?? null;
+      const shippingState = (addr as { state?: string } | null)?.state ?? null;
+      const shippingPostalCode = (addr as { postal_code?: string } | null)?.postal_code ?? null;
+      const shippingCountry = (addr as { country?: string } | null)?.country ?? null;
+
       const supabase = createServerClient();
 
       const { data: existingOrder } = await supabase
@@ -108,6 +118,14 @@ export async function POST(request: NextRequest) {
         status: "paid",
         summary,
         stripe_session_id: session.id,
+        customer_email: customerEmail ?? null,
+        shipping_name: shippingName,
+        shipping_line1: shippingLine1,
+        shipping_line2: shippingLine2,
+        shipping_city: shippingCity,
+        shipping_state: shippingState,
+        shipping_postal_code: shippingPostalCode,
+        shipping_country: shippingCountry,
       });
 
       if (insertOrderError) {
