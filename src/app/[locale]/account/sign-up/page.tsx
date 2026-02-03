@@ -86,12 +86,12 @@ export default function SignUpPage() {
               {isFr ? "Creer un compte" : "Create account"}
             </p>
             <h1 className="mt-4 text-3xl">
-              {isFr ? "Rejoignez l'atelier Ciavaglia." : "Join the Ciavaglia atelier."}
+              {isFr ? "Rejoignez Ciavaglia." : "Join Ciavaglia."}
             </h1>
             <p className="mt-4 text-foreground/70">
               {isFr
                 ? "Renseignez vos coordonnees pour un service sur mesure."
-                : "Fill in your details for bespoke service, shipping preferences, and concierge updates."}
+                : "Fill in your details for custom service, shipping preferences, and concierge updates."}
             </p>
             <form onSubmit={handleSubmit} className="mt-8 space-y-4">
               <div>

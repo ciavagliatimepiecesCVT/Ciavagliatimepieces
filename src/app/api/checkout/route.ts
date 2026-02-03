@@ -25,8 +25,9 @@ export async function POST(request: NextRequest) {
   let configurationId: string | null = null;
 
   if (type === "custom" && payload.configuration) {
-    summary = `Custom build · ${payload.configuration.case} / ${payload.configuration.dial} / ${payload.configuration.strap}`;
-    amount = Number(payload.configuration.price ?? 0);
+    const cfg = payload.configuration as Record<string, unknown>;
+    amount = Number(cfg.price ?? 0);
+    summary = "Custom build";
 
     const { data, error } = await supabase
       .from("configurations")

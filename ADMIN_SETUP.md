@@ -4,11 +4,23 @@ Your friend can manage products, prices, and stock from the **Admin** page after
 
 ## 1. Run the Supabase migration
 
-Apply the updated schema (adds `products` table and seeds initial watches):
+Apply the updated schema (adds `products` table with `category` for watch styles, and seeds initial watches):
 
 ```bash
 # In Supabase Dashboard: SQL Editor → paste supabase/schema.sql → Run
 # Or via CLI: supabase db push
+```
+
+If you already have the `products` table, add the category column if needed:
+
+```sql
+alter table products add column if not exists category text;
+```
+
+If you had the previous seed (Obsidian Atelier, Aria Chrono, Vento GMT) and want to switch to the new models (Stealth, Chronograph, Sub/GMT), run the full schema seed; then remove the old products in Supabase Dashboard → Table Editor → products, or run:
+
+```sql
+delete from products where id in ('obsidian-atelier','aria-chrono','vento-gmt');
 ```
 
 ## 2. Add your friend as admin
@@ -37,6 +49,14 @@ Ensure these are set (you likely already have them):
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `ADMIN_USER_IDS` (new)
+
+## Journal (blog)
+
+Admins can add, edit, and delete journal posts from the **Admin** page. Scroll to the **Journal** section below products. Each post has a title, excerpt, optional body, and locale (en/fr). The public **Journal** page (`/en/blog` or `/fr/blog`) shows posts for the current locale. Run the full schema in Supabase to create the `journal_posts` table and seed three sample posts.
+
+## Product images (upload)
+
+Admins can **upload their own images** when adding or editing products. Use "Choose file" in the Image field (or paste an image URL). Images are stored in Supabase Storage in a bucket named `product-images`. The bucket is created automatically on first upload; if you prefer to create it manually, in Supabase Dashboard go to **Storage** → **New bucket** → name `product-images`, set to **Public**. Max file size 5MB; formats JPEG, PNG, WebP, GIF.
 
 ## How it works
 

@@ -17,8 +17,8 @@ export default async function CheckoutSuccess({ params }: { params: Promise<{ lo
           </h1>
           <p className="mt-4 text-foreground/70">
             {isFr
-              ? "Un e-mail de confirmation arrive. L'atelier prepare votre piece."
-              : "A confirmation email is on the way. The atelier has been notified and will begin your build."}
+              ? "Un e-mail de confirmation arrive. Votre piece est en preparation."
+              : "A confirmation email is on the way. We have been notified and will begin your build."}
           </p>
           <div className="mt-8 flex justify-center gap-4">
             <Link

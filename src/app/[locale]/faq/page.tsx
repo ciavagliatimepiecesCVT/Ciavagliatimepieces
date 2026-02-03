@@ -11,11 +11,7 @@ const faqs = [
   },
   {
     question: "Can I update my configuration after payment?",
-    answer: "Minor adjustments are possible within 48 hours of purchase. Contact the atelier support team immediately.",
-  },
-  {
-    question: "Is there a warranty?",
-    answer: "Every Ciavaglia timepiece includes a 5-year warranty and service dossier.",
+    answer: "Minor adjustments are possible within 48 hours of purchase. Contact our support team immediately.",
   },
 ];
 

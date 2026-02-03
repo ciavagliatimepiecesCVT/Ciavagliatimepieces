@@ -35,8 +35,8 @@ export default async function ShopPage({ params }: { params: Promise<{ locale: L
             </h1>
             <p className="mt-4 text-foreground/70">
               {isFr
-                ? "Chaque piece est assemblee dans l'atelier Ciavaglia et disponible en quantite limitee."
-                : "Each piece is built in the Ciavaglia atelier and available in limited quantities. Add to cart or checkout instantly."}
+                ? "Chaque piece est assemblee par Ciavaglia et disponible en quantite limitee."
+                : "Each piece is built by Ciavaglia and available in limited quantities. Add to cart or checkout instantly."}
             </p>
           </div>
         </ScrollReveal>

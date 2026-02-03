@@ -14,7 +14,7 @@ const bodyFont = Manrope({
 
 export const metadata: Metadata = {
   title: "Ciavaglia Timepieces",
-  description: "Artisan watchmaking and bespoke configurations.",
+  description: "Artisan watchmaking and custom configurations.",
 };
 
 export default function RootLayout({

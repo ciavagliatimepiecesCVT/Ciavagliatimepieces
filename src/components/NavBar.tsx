@@ -1,16 +1,19 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { localeLabels, locales } from "@/lib/i18n";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import type { WatchCategory } from "@/lib/watch-categories";
 
 type NavLabels = {
   home: string;
   shop: string;
   configurator: string;
+  allWatches: string;
   contact: string;
   blog: string;
   account: string;
@@ -27,10 +30,21 @@ const navItems = [
   { key: "blog", href: "blog" },
 ];
 
-export default function NavBar({ locale, labels }: { locale: string; labels: NavLabels }) {
+export default function NavBar({
+  locale,
+  labels,
+  isAdmin = false,
+  watchCategories = [],
+}: {
+  locale: string;
+  labels: NavLabels;
+  isAdmin?: boolean;
+  watchCategories?: WatchCategory[];
+}) {
   const pathname = usePathname();
   const router = useRouter();
-  const activeLocale = locale || pathname.split("/").filter(Boolean)[0] || "en";
+  const activeLocale = locale || pathname?.split("/").filter(Boolean)[0] || "en";
+  const isAdminCentre = pathname?.includes("/account/admin") ?? false;
   const [hidden, setHidden] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const lastScrollY = useRef(0);
@@ -71,14 +85,22 @@ export default function NavBar({ locale, labels }: { locale: string; labels: Nav
 
   return (
     <header
-      className={`fixed left-0 right-0 top-0 z-50 transition-transform duration-300 ${hidden ? "-translate-y-full" : "translate-y-0"}`}
+      className={`fixed left-0 right-0 top-0 z-50 bg-white transition-transform duration-300 ${hidden ? "-translate-y-full" : "translate-y-0"}`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link
           href={`/${activeLocale}`}
-          className="text-lg font-semibold tracking-[0.3em] text-foreground"
+          className="flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-foreground/30 rounded"
+          aria-label="Ciavaglia Timepieces"
         >
-          Ciavaglia Timepieces
+          <Image
+            src="/images/logo.png"
+            alt="Ciavaglia Timepieces"
+            width={160}
+            height={48}
+            className="h-10 w-auto object-contain"
+            priority
+          />
         </Link>
         <nav className="hidden items-center gap-6 text-sm uppercase tracking-[0.2em] md:flex">
           {navItems.map((item) => (
@@ -100,12 +122,14 @@ export default function NavBar({ locale, labels }: { locale: string; labels: Nav
                 >
                   {labels.account}
                 </Link>
-                <Link
-                  href={`/${activeLocale}/account/admin`}
-                  className="rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
-                >
-                  Admin
-                </Link>
+                {isAdmin && (
+                  <Link
+                    href={`/${activeLocale}/account/admin`}
+                    className="rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                  >
+                    Admin
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -133,7 +157,46 @@ export default function NavBar({ locale, labels }: { locale: string; labels: Nav
           <LocaleSwitcher currentLocale={activeLocale} />
         </div>
       </div>
-      <div className="glass mx-6 rounded-full border border-white/50"></div>
+      {!isAdminCentre && (
+        <>
+          <div className="mx-6 border-t border-foreground/10"></div>
+          {/* Watch styles row – configurator, shop, then each category from DB */}
+          <div className="border-t border-foreground/10 bg-white px-6 py-3">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-4 md:gap-6">
+              <Link
+                href={`/${activeLocale}/configurator`}
+                className="text-xs uppercase tracking-[0.2em] text-foreground/70 transition hover:text-foreground"
+              >
+                {labels.configurator}
+              </Link>
+              <Link
+                href={`/${activeLocale}/shop`}
+                className="text-xs uppercase tracking-[0.2em] text-foreground/70 transition hover:text-foreground"
+              >
+                {labels.shop}
+              </Link>
+              {watchCategories.map((cat) => {
+                const label = activeLocale === "fr" ? cat.label_fr : cat.label_en;
+                return (
+                  <Link
+                    key={cat.id}
+                    href={`/${activeLocale}/shop/${cat.slug}`}
+                    className="text-xs uppercase tracking-[0.2em] text-foreground/70 transition hover:text-foreground"
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+              <Link
+                href={`/${activeLocale}/shop`}
+                className="text-xs uppercase tracking-[0.2em] text-foreground/70 transition hover:text-foreground"
+              >
+                {labels.allWatches}
+              </Link>
+            </div>
+          </div>
+        </>
+      )}
     </header>
   );
 }
@@ -144,7 +207,7 @@ function LocaleSwitcher({ currentLocale }: { currentLocale: string }) {
   const rest = segments.slice(1).join("/");
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-foreground/20 bg-white/70 px-2 py-1 text-xs uppercase tracking-[0.2em]">
+    <div className="flex items-center gap-2 rounded-full border border-foreground/20 bg-foreground/5 px-2 py-1 text-xs uppercase tracking-[0.2em]">
       {locales.map((locale) => (
         <Link
           key={locale}

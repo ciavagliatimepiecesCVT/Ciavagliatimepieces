@@ -46,7 +46,7 @@ export default function LoginPage() {
           <div className="rounded-[32px] border border-white/70 bg-white/80 p-10 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
             <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">{isFr ? "Compte" : "Account"}</p>
             <h1 className="mt-4 text-3xl">
-              {isFr ? "Connectez-vous a votre profil." : "Sign in to your atelier profile."}
+              {isFr ? "Connectez-vous a votre profil." : "Sign in to your account."}
             </h1>
             <p className="mt-4 text-foreground/70">
               {isFr
@@ -100,7 +100,7 @@ export default function LoginPage() {
               <p className="text-xs uppercase tracking-[0.3em] text-white/60">{isFr ? "Avantages" : "Member perks"}</p>
               <ul className="mt-6 space-y-3 text-sm text-white/80">
                 <li>{isFr ? "Sauvegardez vos configurations." : "Save unlimited configurations and price snapshots."}</li>
-                <li>{isFr ? "Suivez la fabrication." : "Track build milestones with atelier updates."}</li>
+                <li>{isFr ? "Suivez la fabrication." : "Track build milestones and updates."}</li>
                 <li>{isFr ? "Acces aux editions limitees." : "Access invite-only drops and limited runs."}</li>
               </ul>
             </div>

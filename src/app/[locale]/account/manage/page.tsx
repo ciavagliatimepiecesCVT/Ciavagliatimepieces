@@ -140,7 +140,7 @@ export default function ManageAccountPage() {
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">{isFr ? "Compte" : "Account"}</p>
             <h1 className="mt-4 text-4xl">
-              {isFr ? "Votre tableau de bord." : "Your atelier dashboard."}
+              {isFr ? "Votre tableau de bord." : "Your dashboard."}
             </h1>
             <p className="mt-4 text-foreground/70">
               {isFr

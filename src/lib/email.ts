@@ -42,7 +42,7 @@ export async function sendOrderEmails({
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.6">
         <h2>Thank you for your Ciavaglia order.</h2>
-        <p>We have received your payment and the atelier is preparing your build.</p>
+        <p>We have received your payment and are preparing your build.</p>
         <p><strong>Summary:</strong> ${summary}</p>
         <p><strong>Total:</strong> $${total.toLocaleString()}</p>
       </div>

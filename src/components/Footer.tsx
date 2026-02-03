@@ -10,8 +10,8 @@ export default function Footer({ locale }: { locale: string }) {
           <p className="text-sm uppercase tracking-[0.3em] text-foreground/60">Ciavaglia Timepieces</p>
           <p className="mt-4 text-foreground/70">
             {isFr
-              ? "Design genevois, énergie milanaise, et une approche sur mesure."
-              : "Geneva-inspired design, Milanese flair, and a customer-led build process."}
+              ? "Montres sur mesure, concues a Montreal."
+              : "Custom timepieces, crafted in Montreal."}
           </p>
         </div>
         <div className="text-sm uppercase tracking-[0.2em]">
@@ -26,14 +26,14 @@ export default function Footer({ locale }: { locale: string }) {
         <div className="text-sm uppercase tracking-[0.2em]">
           <p className="text-foreground/60">{isFr ? "Contact" : "Contact"}</p>
           <div className="mt-4 flex flex-col gap-2 text-foreground/80">
-            <span>atelier@civagliatimepieces.com</span>
-            <span>+33 1 84 90 00 00</span>
-            <span>{isFr ? "Paris · Milano · Genève" : "Paris · Milano · Geneva"}</span>
+            <span>contact@ciavagliatimepieces.com</span>
+            <a href="tel:+15142432116" className="hover:text-foreground">+1 514 243 2116</a>
+            <span>{isFr ? "Montréal" : "Montreal"}</span>
           </div>
         </div>
       </div>
       <p className="mt-12 text-center text-xs uppercase tracking-[0.3em] text-foreground/40">
-        Crafted with intent · © 2026 Ciavaglia
+        © {new Date().getFullYear()} Ciavaglia Timepieces · Montreal
       </p>
     </footer>
   );
