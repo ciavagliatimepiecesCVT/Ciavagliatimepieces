@@ -90,6 +90,8 @@ export async function POST(request: NextRequest) {
   if (!locale || typeof locale !== "string") {
     return NextResponse.json({ error: "Missing locale" }, { status: 400 });
   }
+  const validLocales = ["en", "fr"];
+  const localeSegment = validLocales.includes(locale) ? locale : "en";
   if (type !== "custom" && type !== "built") {
     return NextResponse.json({ error: "Invalid checkout type" }, { status: 400 });
   }
@@ -190,8 +192,8 @@ export async function POST(request: NextRequest) {
         },
       },
     ],
-    success_url: `${siteUrl}/${locale}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${siteUrl}/${locale}/checkout/cancel`,
+    success_url: `${siteUrl}/${localeSegment}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${siteUrl}/${localeSegment}/checkout/cancel`,
     metadata: {
       configuration_id: configurationId ?? "",
       summary,
