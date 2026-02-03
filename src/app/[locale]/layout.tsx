@@ -1,11 +1,11 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import { getDictionary, Locale, locales } from "@/lib/i18n";
 
 export const metadata: Metadata = {
-  title: "Civaglia Timepieces",
+  title: "Ciavaglia Timepieces",
   description: "Bespoke watchmaking studio.",
 };
 

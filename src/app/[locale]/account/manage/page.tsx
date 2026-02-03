@@ -305,7 +305,7 @@ export default function ManageAccountPage() {
                         <p className="text-xs uppercase tracking-[0.3em] text-foreground/50">
                           {new Date(order.created_at).toLocaleDateString()}
                         </p>
-                        <p className="mt-2 text-sm text-foreground/70">{order.summary ?? "Custom Civaglia order"}</p>
+                        <p className="mt-2 text-sm text-foreground/70">{order.summary ?? "Custom Ciavaglia order"}</p>
                         <div className="mt-2 flex items-center justify-between text-sm">
                           <span className="uppercase tracking-[0.2em] text-foreground/60">{order.status}</span>
                           <span className="font-semibold">${order.total.toLocaleString()}</span>

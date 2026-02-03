@@ -1,4 +1,4 @@
-﻿import Image from "next/image";
+import Image from "next/image";
 import Link from "next/link";
 import Parallax from "@/components/Parallax";
 import ScrollReveal from "@/components/ScrollReveal";
@@ -56,7 +56,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
             <div className="relative rounded-[36px] border border-white/60 bg-white/70 p-6 shadow-[0_30px_120px_rgba(15,20,23,0.15)]">
               <Image
                 src="/images/hero-hero.svg"
-                alt="Civaglia showcase"
+                alt="Ciavaglia showcase"
                 width={520}
                 height={640}
                 className="h-[420px] w-full rounded-[28px] object-cover"
@@ -84,7 +84,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
                 />
                 <h3 className="mt-6 text-2xl">{item.title}</h3>
                 <p className="mt-2 text-sm text-foreground/70">
-                  {isFr ? "Une interpretation unique signee Civaglia." : item.subtitle}
+                  {isFr ? "Une interpretation unique signee Ciavaglia." : item.subtitle}
                 </p>
               </div>
             </ScrollReveal>
@@ -105,7 +105,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
               <p className="mt-4 text-foreground/70">
                 {isFr
                   ? "Le configurateur vous guide pour creer la piece parfaite, validee ensuite par l'atelier."
-                  : "Our configurator lets you sculpt the dial, case, movement, and strap with live pricing. Each build is reviewed by the Civaglia atelier before it ships."}
+                  : "Our configurator lets you sculpt the dial, case, movement, and strap with live pricing. Each build is reviewed by the Ciavaglia atelier before it ships."}
               </p>
               <div className="mt-8 grid gap-4 text-sm uppercase tracking-[0.3em] text-foreground/60">
                 <span>01 · {isFr ? "Consultation" : "Consultation"}</span>
@@ -120,7 +120,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
           <Parallax>
             <Image
               src="/images/workshop.svg"
-              alt="Civaglia atelier"
+              alt="Ciavaglia atelier"
               width={520}
               height={640}
               className="h-[520px] w-full rounded-[32px] object-cover shadow-[0_30px_120px_rgba(15,20,23,0.16)]"

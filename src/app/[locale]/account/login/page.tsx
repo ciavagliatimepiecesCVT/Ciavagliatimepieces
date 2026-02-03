@@ -86,7 +86,7 @@ export default function LoginPage() {
               </button>
             </form>
             <p className="mt-6 text-sm text-foreground/70">
-              {isFr ? "Nouveau chez Civaglia ?" : "New to Civaglia?"}{" "}
+              {isFr ? "Nouveau chez Ciavaglia ?" : "New to Ciavaglia?"}{" "}
               <Link href={`/${locale}/account/sign-up`} className="text-foreground underline">
                 {isFr ? "Creer un compte" : "Create an account"}
               </Link>

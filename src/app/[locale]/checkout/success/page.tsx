@@ -13,7 +13,7 @@ export default async function CheckoutSuccess({ params }: { params: Promise<{ lo
             {isFr ? "Paiement recu" : "Payment received"}
           </p>
           <h1 className="mt-4 text-3xl">
-            {isFr ? "Votre commande est confirmee." : "Your Civaglia order is confirmed."}
+            {isFr ? "Votre commande est confirmee." : "Your Ciavaglia order is confirmed."}
           </h1>
           <p className="mt-4 text-foreground/70">
             {isFr

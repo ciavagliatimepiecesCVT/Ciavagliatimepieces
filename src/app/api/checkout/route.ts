@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerClient();
 
-  let summary = "Civaglia timepiece";
+  let summary = "Ciavaglia timepiece";
   let amount = 0;
   let configurationId: string | null = null;
 

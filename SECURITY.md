@@ -1,6 +1,6 @@
 # Security Implementation
 
-This document outlines the security measures in place to protect the Civaglia Timepieces website.
+This document outlines the security measures in place to protect the Ciavaglia Timepieces website.
 
 ## ✅ Current Security Measures
 

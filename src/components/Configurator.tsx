@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
@@ -135,7 +135,7 @@ export default function Configurator({ locale }: { locale: string }) {
         <div className="rounded-[32px] border border-white/70 bg-white/80 p-8">
           <p className="text-xs uppercase tracking-[0.3em] text-foreground/60">{isFr ? "Résumé" : "Summary"}</p>
           <h2 className="mt-4 text-3xl">
-            {isFr ? "Votre configuration" : "Your Civaglia configuration"}
+            {isFr ? "Votre configuration" : "Your Ciavaglia configuration"}
           </h2>
           <div className="mt-6 space-y-2 text-sm text-foreground/70">
             <p>{isFr ? "Boîtier" : "Case"}: {caseOption.label}</p>

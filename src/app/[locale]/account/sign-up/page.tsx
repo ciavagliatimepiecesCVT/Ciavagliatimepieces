@@ -36,6 +36,9 @@ export default function SignUpPage() {
 
     try {
       const supabase = createBrowserClient();
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        (typeof window !== "undefined" ? window.location.origin : "");
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
@@ -44,6 +47,7 @@ export default function SignUpPage() {
             full_name: form.fullName,
             phone: form.phone,
           },
+          emailRedirectTo: siteUrl ? `${siteUrl.replace(/\/$/, "")}/${locale}/account/manage` : undefined,
         },
       });
 
@@ -65,6 +69,8 @@ export default function SignUpPage() {
         });
       }
 
+      // Session is set by signUp when email confirmation is disabled; refresh so the app sees it
+      router.refresh();
       router.push(`/${locale}/account/manage`);
     } finally {
       setLoading(false);
@@ -80,7 +86,7 @@ export default function SignUpPage() {
               {isFr ? "Creer un compte" : "Create account"}
             </p>
             <h1 className="mt-4 text-3xl">
-              {isFr ? "Rejoignez l'atelier Civaglia." : "Join the Civaglia atelier."}
+              {isFr ? "Rejoignez l'atelier Ciavaglia." : "Join the Ciavaglia atelier."}
             </h1>
             <p className="mt-4 text-foreground/70">
               {isFr

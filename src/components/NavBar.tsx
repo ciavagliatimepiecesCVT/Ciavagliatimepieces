@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { localeLabels, locales } from "@/lib/i18n";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
@@ -11,8 +11,8 @@ type NavLabels = {
   home: string;
   shop: string;
   configurator: string;
+  contact: string;
   blog: string;
-  faq: string;
   account: string;
   signIn: string;
   createAccount: string;
@@ -23,8 +23,8 @@ const navItems = [
   { key: "home", href: "" },
   { key: "shop", href: "shop" },
   { key: "configurator", href: "configurator" },
+  { key: "contact", href: "contact" },
   { key: "blog", href: "blog" },
-  { key: "faq", href: "faq" },
 ];
 
 export default function NavBar({ locale, labels }: { locale: string; labels: NavLabels }) {
@@ -33,6 +33,22 @@ export default function NavBar({ locale, labels }: { locale: string; labels: Nav
   const activeLocale = locale || pathname.split("/").filter(Boolean)[0] || "en";
   const [hidden, setHidden] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const lastScrollY = useRef(0);
+  const scrollThreshold = 10;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > lastScrollY.current && currentScrollY > scrollThreshold) {
+        setHidden(true);
+      } else if (currentScrollY < lastScrollY.current) {
+        setHidden(false);
+      }
+      lastScrollY.current = currentScrollY;
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     const supabase = createBrowserClient();
@@ -60,9 +76,9 @@ export default function NavBar({ locale, labels }: { locale: string; labels: Nav
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link
           href={`/${activeLocale}`}
-          className="text-lg font-semibold tracking-[0.3em] uppercase text-foreground"
+          className="text-lg font-semibold tracking-[0.3em] text-foreground"
         >
-          Civaglia
+          Ciavaglia Timepieces
         </Link>
         <nav className="hidden items-center gap-6 text-sm uppercase tracking-[0.2em] md:flex">
           {navItems.map((item) => (

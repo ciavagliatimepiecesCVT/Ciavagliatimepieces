@@ -13,7 +13,7 @@ const bodyFont = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Civaglia Timepieces",
+  title: "Ciavaglia Timepieces",
   description: "Artisan watchmaking and bespoke configurations.",
 };
 

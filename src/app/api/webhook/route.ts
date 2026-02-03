@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const configurationId = session.metadata?.configuration_id;
-    const summary = session.metadata?.summary ?? "Civaglia order";
+    const summary = session.metadata?.summary ?? "Ciavaglia order";
     const userId = session.metadata?.user_id || null;
     const total = (session.amount_total ?? 0) / 100;
     const customerEmail = session.customer_details?.email || session.customer_email;

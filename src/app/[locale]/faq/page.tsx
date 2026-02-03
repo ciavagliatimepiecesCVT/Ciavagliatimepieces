@@ -15,7 +15,7 @@ const faqs = [
   },
   {
     question: "Is there a warranty?",
-    answer: "Every Civaglia timepiece includes a 5-year warranty and service dossier.",
+    answer: "Every Ciavaglia timepiece includes a 5-year warranty and service dossier.",
   },
 ];
 

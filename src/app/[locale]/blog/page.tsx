@@ -2,7 +2,7 @@ import ScrollReveal from "@/components/ScrollReveal";
 
 const posts = [
   {
-    title: "Inside the Civaglia atelier",
+    title: "Inside the Ciavaglia atelier",
     excerpt: "A glimpse at the artisans shaping every bevel and bridge.",
     date: "Jan 12, 2026",
   },
@@ -29,7 +29,7 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">{isFr ? "Journal" : "Journal"}</p>
             <h1 className="mt-4 text-4xl">
-              {isFr ? "Histoires de l'atelier Civaglia." : "Stories from the Civaglia studio."}
+              {isFr ? "Histoires de l'atelier Ciavaglia." : "Stories from the Ciavaglia studio."}
             </h1>
             <p className="mt-4 text-foreground/70">
               {isFr

@@ -15,7 +15,7 @@ export default async function ConfiguratorPage({ params }: { params: Promise<{ l
               {isFr ? "Configurateur" : "Configurator"}
             </p>
             <h1 className="mt-4 text-4xl">
-              {isFr ? "Creez votre montre Civaglia." : "Build your own Civaglia watch."}
+              {isFr ? "Creez votre montre Ciavaglia." : "Build your own Ciavaglia watch."}
             </h1>
             <p className="mt-4 text-foreground/70">
               {isFr

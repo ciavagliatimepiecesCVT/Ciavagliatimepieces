@@ -38,10 +38,10 @@ export async function sendOrderEmails({
 
   const customerPayload: OrderEmailPayload = {
     to: customerEmail,
-    subject: "Your Civaglia order is confirmed",
+    subject: "Your Ciavaglia order is confirmed",
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.6">
-        <h2>Thank you for your Civaglia order.</h2>
+        <h2>Thank you for your Ciavaglia order.</h2>
         <p>We have received your payment and the atelier is preparing your build.</p>
         <p><strong>Summary:</strong> ${summary}</p>
         <p><strong>Total:</strong> $${total.toLocaleString()}</p>
@@ -51,7 +51,7 @@ export async function sendOrderEmails({
 
   const atelierPayload: OrderEmailPayload = {
     to: atelierEmail,
-    subject: "New Civaglia order received",
+    subject: "New Ciavaglia order received",
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.6">
         <h2>New order received</h2>
