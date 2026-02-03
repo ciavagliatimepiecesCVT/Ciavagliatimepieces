@@ -34,6 +34,9 @@ create table if not exists orders (
   created_at timestamptz default now()
 );
 
+-- One order per Stripe session (webhook creates order only after verified payment)
+create unique index if not exists orders_stripe_session_id_key on orders (stripe_session_id) where stripe_session_id is not null;
+
 -- Watch categories (nav + product grouping). Slug used in URLs and products.category.
 create table if not exists watch_categories (
   id uuid primary key default gen_random_uuid(),

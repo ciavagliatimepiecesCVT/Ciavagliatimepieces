@@ -25,6 +25,7 @@ export default function Configurator({ locale }: { locale: string }) {
   const [loading, setLoading] = useState(false);
   const [stepsLoaded, setStepsLoaded] = useState(false);
   const [totalExpanded, setTotalExpanded] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const currentStep = steps[stepIndex];
   const isExtraStep = currentStep?.label_en?.toLowerCase() === "extra";
@@ -128,6 +129,7 @@ export default function Configurator({ locale }: { locale: string }) {
   };
 
   const handleReviewOrder = async () => {
+    setCheckoutError(null);
     setLoading(true);
     try {
       const supabase = createBrowserClient();
@@ -148,7 +150,17 @@ export default function Configurator({ locale }: { locale: string }) {
         }),
       });
       const data = await res.json();
-      if (data?.url) window.location.href = data.url;
+      if (!res.ok) {
+        setCheckoutError(data?.error ?? (isFr ? "Échec du passage en caisse." : "Checkout failed. Please try again."));
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        setCheckoutError(isFr ? "Réponse inattendue. Réessayez." : "Unexpected response. Please try again.");
+      }
+    } catch {
+      setCheckoutError(isFr ? "Erreur réseau. Vérifiez votre connexion et réessayez." : "Network error. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -400,6 +412,12 @@ export default function Configurator({ locale }: { locale: string }) {
                     </div>
                   );
                 })}
+
+              {checkoutError && (
+                <div className="mt-6 rounded-[22px] border-2 border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  {checkoutError}
+                </div>
+              )}
 
               <div className="mt-10 flex items-center justify-between gap-4">
                 <button

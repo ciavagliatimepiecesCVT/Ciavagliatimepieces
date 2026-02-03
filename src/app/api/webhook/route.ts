@@ -11,81 +11,132 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing Stripe signature" }, { status: 400 });
   }
 
-  const payload = await request.text();
+  let payload: string;
+  try {
+    payload = await request.text();
+  } catch {
+    return NextResponse.json({ error: "Failed to read body" }, { status: 400 });
+  }
+
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret?.trim()) {
+    console.error("Webhook: STRIPE_WEBHOOK_SECRET is not set");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+  }
 
   let event: Stripe.Event;
-
   try {
     const stripe = getStripe();
-    event = stripe.webhooks.constructEvent(
-      payload,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET ?? ""
-    );
+    event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
   } catch (error) {
+    console.error("Webhook signature verification failed:", error);
     return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
   }
 
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    const configurationId = session.metadata?.configuration_id;
-    const summary = session.metadata?.summary ?? "Ciavaglia order";
-    const userId = session.metadata?.user_id || null;
-    const total = (session.amount_total ?? 0) / 100;
-    const customerEmail = session.customer_details?.email || session.customer_email;
+    try {
+      const session = event.data.object as Stripe.Checkout.Session;
 
-    const supabase = createServerClient();
+      if (session.payment_status !== "paid") {
+        return NextResponse.json({ received: true, skipped: "payment not paid" });
+      }
 
-    if (configurationId) {
-      const { data: config } = await supabase
-        .from("configurations")
-        .select("type, options")
-        .eq("id", configurationId)
-        .single();
+      const configurationId = session.metadata?.configuration_id;
+      const summary = session.metadata?.summary ?? "Ciavaglia order";
+      const userId = session.metadata?.user_id || null;
+      const total = (session.amount_total ?? 0) / 100;
+      const customerEmail = session.customer_details?.email || session.customer_email;
 
-      await supabase
-        .from("configurations")
-        .update({ status: "paid" })
-        .eq("id", configurationId);
+      const supabase = createServerClient();
 
-      if (config?.type === "built" && config.options?.product_id) {
-        const productId = config.options.product_id as string;
-        const { data: product } = await supabase
-          .from("products")
-          .select("stock")
-          .eq("id", productId)
+      const { data: existingOrder } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("stripe_session_id", session.id)
+        .maybeSingle();
+
+      if (existingOrder) {
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+
+      if (configurationId) {
+        const { data: config } = await supabase
+          .from("configurations")
+          .select("type, options")
+          .eq("id", configurationId)
           .single();
 
-        const currentStock = product?.stock ?? 0;
-        if (currentStock > 0) {
-          await supabase
+        const { error: updateConfigError } = await supabase
+          .from("configurations")
+          .update({ status: "paid" })
+          .eq("id", configurationId);
+
+        if (updateConfigError) {
+          console.error("Webhook: failed to update configuration", updateConfigError);
+          return NextResponse.json(
+            { error: "Failed to update configuration", received: false },
+            { status: 500 }
+          );
+        }
+
+        if (config?.type === "built" && config.options?.product_id) {
+          const productId = config.options.product_id as string;
+          const { data: product } = await supabase
             .from("products")
-            .update({
-              stock: currentStock - 1,
-              updated_at: new Date().toISOString(),
-            })
+            .select("stock")
             .eq("id", productId)
-            .gt("stock", 0);
+            .single();
+
+          const currentStock = product?.stock ?? 0;
+          if (currentStock > 0) {
+            await supabase
+              .from("products")
+              .update({
+                stock: currentStock - 1,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", productId)
+              .gt("stock", 0);
+          }
         }
       }
-    }
 
-    await supabase.from("orders").insert({
-      configuration_id: configurationId,
-      user_id: userId,
-      total,
-      status: "paid",
-      summary,
-      stripe_session_id: session.id,
-    });
-
-    if (customerEmail) {
-      await sendOrderEmails({
-        customerEmail,
-        atelierEmail: process.env.ORDER_NOTIFY_EMAIL ?? "atelier@civagliatimepieces.com",
-        summary,
+      const { error: insertOrderError } = await supabase.from("orders").insert({
+        configuration_id: configurationId,
+        user_id: userId,
         total,
+        status: "paid",
+        summary,
+        stripe_session_id: session.id,
       });
+
+      if (insertOrderError) {
+        console.error("Webhook: failed to insert order", insertOrderError);
+        return NextResponse.json(
+          { error: "Failed to create order", received: false },
+          { status: 500 }
+        );
+      }
+
+      if (customerEmail) {
+        try {
+          await sendOrderEmails({
+            customerEmail,
+            atelierEmail: process.env.ORDER_NOTIFY_EMAIL ?? "atelier@civagliatimepieces.com",
+            summary,
+            total,
+          });
+        } catch (emailError) {
+          console.error("Webhook: order emails failed (order already created)", emailError);
+          // Do not return 500; order was created successfully
+        }
+      }
+    } catch (error) {
+      console.error("Webhook: checkout.session.completed handler error", error);
+      return NextResponse.json(
+        { error: "Webhook handler failed", received: false },
+        { status: 500 }
+      );
     }
   }
 

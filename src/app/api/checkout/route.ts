@@ -3,28 +3,46 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getSiteUrl, getStripe } from "@/lib/stripe";
 
 export async function POST(request: NextRequest) {
+  let payload: unknown;
   try {
-    const payload = await request.json();
-    const { locale, type, userId } = payload as {
-      locale: string;
-      type: "custom" | "built";
-      userId?: string | null;
-      configuration?: Record<string, string | number>;
-      productId?: string;
-    };
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
-    // Validate type
-    if (type !== "custom" && type !== "built") {
-      return NextResponse.json({ error: "Invalid checkout type" }, { status: 400 });
-    }
+  if (!payload || typeof payload !== "object") {
+    return NextResponse.json({ error: "Missing or invalid body" }, { status: 400 });
+  }
 
+  const { locale, type, userId } = payload as {
+    locale?: string;
+    type?: string;
+    userId?: string | null;
+    configuration?: Record<string, string | number>;
+    productId?: string;
+  };
+
+  if (!locale || typeof locale !== "string") {
+    return NextResponse.json({ error: "Missing locale" }, { status: 400 });
+  }
+  if (type !== "custom" && type !== "built") {
+    return NextResponse.json({ error: "Invalid checkout type" }, { status: 400 });
+  }
+  if (type === "custom" && !(payload as Record<string, unknown>).configuration) {
+    return NextResponse.json({ error: "Missing configuration for custom build" }, { status: 400 });
+  }
+  if (type === "built" && !(payload as Record<string, unknown>).productId) {
+    return NextResponse.json({ error: "Missing product" }, { status: 400 });
+  }
+
+  try {
     const supabase = createServerClient();
 
-  let summary = "Ciavaglia timepiece";
-  let amount = 0;
-  let configurationId: string | null = null;
+    let summary = "Ciavaglia timepiece";
+    let amount = 0;
+    let configurationId: string | null = null;
 
-  if (type === "custom" && payload.configuration) {
+    if (type === "custom" && payload.configuration) {
     const cfg = payload.configuration as Record<string, unknown>;
     amount = Number(cfg.price ?? 0);
     summary = "Custom build";
@@ -46,9 +64,9 @@ export async function POST(request: NextRequest) {
     }
 
     configurationId = data.id;
-  }
+    }
 
-  if (type === "built" && payload.productId) {
+    if (type === "built" && payload.productId) {
     const { data: product, error: productError } = await supabase
       .from("products")
       .select("id, name, price, stock")
@@ -85,11 +103,11 @@ export async function POST(request: NextRequest) {
     }
 
     configurationId = data.id;
-  }
+    }
 
-  const siteUrl = getSiteUrl();
-  const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
+    const siteUrl = getSiteUrl();
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: [
       {
@@ -114,13 +132,17 @@ export async function POST(request: NextRequest) {
     },
     billing_address_collection: "required",
     allow_promotion_codes: true,
-  });
+    });
 
-  return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: session.url });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Checkout error:", error);
+    if (message.includes("stock") || message.includes("product")) {
+      return NextResponse.json({ error: "Product unavailable. Please refresh and try again." }, { status: 400 });
+    }
     return NextResponse.json(
-      { error: "Failed to create checkout session" },
+      { error: "Failed to create checkout session. Please try again." },
       { status: 500 }
     );
   }
