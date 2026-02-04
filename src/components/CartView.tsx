@@ -23,6 +23,7 @@ type CartLabels = {
   checkout: string;
   remove: string;
   quantity: string;
+  editBuild?: string;
 };
 
 export default function CartView({ locale, labels }: { locale: string; labels: CartLabels }) {
@@ -62,6 +63,8 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
 
   const updateQuantity = async (itemId: string, quantity: number) => {
     if (quantity < 1) return;
+    const item = items.find((i) => i.id === itemId);
+    if (item?.product_id.startsWith("custom-") && quantity > 1) return;
     const supabase = createBrowserClient();
     await supabase.from("cart_items").update({ quantity }).eq("id", itemId);
     setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity } : i)));
@@ -169,13 +172,23 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
                     </button>
                   </div>
                   <p className="w-20 text-right font-semibold">${(item.price * item.quantity).toLocaleString()}</p>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(item.id)}
-                    className="btn-hover rounded-full border border-red-200 px-3 py-1.5 text-xs text-red-600 transition hover:bg-red-50"
-                  >
-                    {labels.remove}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.product_id.startsWith("custom-") && (
+                      <Link
+                        href={`/${activeLocale}/configurator?edit=${encodeURIComponent(item.id)}`}
+                        className="btn-hover rounded-full border-2 border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/20"
+                      >
+                        {labels.editBuild ?? "Edit build"}
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item.id)}
+                      className="btn-hover rounded-full border border-red-200 px-3 py-1.5 text-xs text-red-600 transition hover:bg-red-50"
+                    >
+                      {labels.remove}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

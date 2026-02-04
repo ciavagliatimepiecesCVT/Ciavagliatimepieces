@@ -2,6 +2,76 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getSiteUrl, getStripe } from "@/lib/stripe";
 
+/** Build a human-readable list of parts for a custom build (for Stripe product description).
+ * config.steps = [functionOptionId, ...optionIds in step order].
+ * Uses label_en or label_fr based on locale.
+ */
+async function getCustomBuildPartsSummary(
+  supabase: ReturnType<typeof createServerClient>,
+  config: { steps?: unknown[]; extras?: unknown[]; addonIds?: unknown[] },
+  locale: "en" | "fr"
+): Promise<string> {
+  const stepsPayload = Array.isArray(config.steps) ? config.steps : [];
+  const extras = Array.isArray(config.extras) ? config.extras : [];
+  const addonIds = Array.isArray(config.addonIds) ? config.addonIds : [];
+  const labelKey = locale === "fr" ? "label_fr" : "label_en";
+
+  const functionOptionId = stepsPayload[0] && typeof stepsPayload[0] === "string" ? stepsPayload[0] : null;
+  if (!functionOptionId) return "Custom build";
+
+  const { data: functionStepRows } = await supabase
+    .from("configurator_function_steps")
+    .select("step_id, sort_order")
+    .eq("function_option_id", functionOptionId)
+    .order("sort_order", { ascending: true });
+  const stepIdsOrdered = (functionStepRows ?? []).map((r: { step_id: string }) => r.step_id);
+  if (!stepIdsOrdered.length) return "Custom build";
+
+  const parts: string[] = [];
+
+    const { data: functionOpt } = await supabase
+      .from("configurator_options")
+      .select("label_en, label_fr")
+      .eq("id", functionOptionId)
+      .single();
+  const functionLabel = (functionOpt as Record<string, string> | null)?.[labelKey] ?? "Function";
+  parts.push(`${locale === "fr" ? "Fonction" : "Function"}: ${functionLabel}`);
+
+  for (let i = 0; i < stepIdsOrdered.length; i++) {
+    const stepId = stepIdsOrdered[i];
+    const selectedOptionId = stepsPayload[i + 1] && typeof stepsPayload[i + 1] === "string" ? stepsPayload[i + 1] : null;
+
+    const { data: stepRow } = await supabase.from("configurator_steps").select("id, step_key, label_en, label_fr").eq("id", stepId).single();
+    const stepLabel = (stepRow as Record<string, string> | null)?.[labelKey] ?? "Step";
+    const stepKey = (stepRow as { step_key?: string } | null)?.step_key;
+
+    if (stepKey === "extra") {
+      const idsToSum = extras.length ? extras : (selectedOptionId ? [selectedOptionId] : []);
+      for (const id of idsToSum) {
+        if (typeof id !== "string" || !id) continue;
+        const { data: opt } = await supabase.from("configurator_options").select("label_en, label_fr").eq("id", id).single();
+        const optLabel = (opt as Record<string, string> | null)?.[labelKey] ?? "";
+        if (optLabel) parts.push(`${stepLabel}: ${optLabel}`);
+      }
+    } else if (selectedOptionId) {
+      const { data: opt } = await supabase.from("configurator_options").select("label_en, label_fr").eq("id", selectedOptionId).single();
+      const optLabel = (opt as Record<string, string> | null)?.[labelKey] ?? "";
+      if (optLabel) parts.push(`${stepLabel}: ${optLabel}`);
+    }
+  }
+
+  if (addonIds.length > 0) {
+    const { data: addons } = await supabase.from("configurator_addons").select("id, label_en, label_fr");
+    for (const id of addonIds) {
+      if (typeof id !== "string") continue;
+      const addon = (addons ?? []).find((a: { id: string }) => a.id === id) as Record<string, string> | undefined;
+      if (addon?.[labelKey]) parts.push(addon[labelKey]);
+    }
+  }
+
+  return parts.length ? parts.join("\n") : "Custom build";
+}
+
 /** Calculate custom build total from DB only (do not trust client price).
  * config.steps = [functionOptionId, ...optionIds in step order for that function].
  * config.extras = optional extra-step option ids; config.addonIds = addon UUIDs (e.g. Frosted Finish).
@@ -112,7 +182,14 @@ export async function POST(request: NextRequest) {
     let summary = "Ciavaglia timepiece";
     let amount = 0;
     let configurationId: string | null = null;
-    type LineItem = { quantity: number; price_data: { currency: string; product_data: { name: string }; unit_amount: number } };
+    type LineItem = {
+      quantity: number;
+      price_data: {
+        currency: string;
+        product_data: { name: string; description?: string };
+        unit_amount: number;
+      };
+    };
     const lineItems: LineItem[] = [];
 
     if (type === "custom" && body.configuration) {
@@ -122,7 +199,16 @@ export async function POST(request: NextRequest) {
         extras: Array.isArray(cfg.extras) ? cfg.extras : [],
         addonIds: Array.isArray(cfg.addonIds) ? cfg.addonIds : [],
       });
+      if (amount === 0 && typeof cfg.price === "number" && cfg.price > 0) {
+        amount = cfg.price;
+      }
       summary = "Custom build";
+
+      const partsDescription = await getCustomBuildPartsSummary(supabase, {
+        steps: Array.isArray(cfg.steps) ? cfg.steps : [],
+        extras: Array.isArray(cfg.extras) ? cfg.extras : [],
+        addonIds: Array.isArray(cfg.addonIds) ? cfg.addonIds : [],
+      }, localeSegment);
 
       const { data, error } = await supabase
         .from("configurations")
@@ -145,7 +231,10 @@ export async function POST(request: NextRequest) {
         quantity: 1,
         price_data: {
           currency: "usd",
-          product_data: { name: summary },
+          product_data: {
+            name: summary,
+            description: partsDescription,
+          },
           unit_amount: Math.round(amount * 100),
         },
       });
@@ -201,23 +290,41 @@ export async function POST(request: NextRequest) {
     if (type === "cart" && userId) {
       const { data: cartRows, error: cartError } = await supabase
         .from("cart_items")
-        .select("id, product_id, quantity, price, title")
+        .select("id, product_id, quantity, price, title, configuration")
         .eq("user_id", userId);
 
       if (cartError || !cartRows?.length) {
         return NextResponse.json({ error: "Your cart is empty" }, { status: 400 });
       }
 
-      const productIds = [...new Set(cartRows.map((r) => r.product_id))];
+      const builtProductIds = [...new Set(cartRows.filter((r) => !r.configuration).map((r) => r.product_id))];
       const { data: products } = await supabase
         .from("products")
         .select("id, name, price, stock, active")
-        .in("id", productIds);
+        .in("id", builtProductIds);
 
       const productMap = new Map((products ?? []).map((p) => [p.id, p]));
       const cartProductQuantities: { product_id: string; quantity: number }[] = [];
 
       for (const row of cartRows) {
+        const qty = Math.max(1, Number(row.quantity) || 1);
+        const isCustom = !!row.configuration || (typeof row.product_id === "string" && row.product_id.startsWith("custom-"));
+
+        if (isCustom) {
+          const unitPrice = Number(row.price) || 0;
+          if (unitPrice < 0) continue;
+          lineItems.push({
+            quantity: qty,
+            price_data: {
+              currency: "usd",
+              product_data: { name: row.title ?? "Custom Build" },
+              unit_amount: Math.round(unitPrice * 100),
+            },
+          });
+          cartProductQuantities.push({ product_id: row.product_id, quantity: qty });
+          continue;
+        }
+
         const product = productMap.get(row.product_id);
         if (!product || !product.active) {
           return NextResponse.json(
@@ -226,7 +333,6 @@ export async function POST(request: NextRequest) {
           );
         }
         const stock = product.stock ?? 0;
-        const qty = Number(row.quantity) || 1;
         if (stock < qty) {
           return NextResponse.json(
             { error: `Not enough stock for "${row.title ?? product.name}"` },

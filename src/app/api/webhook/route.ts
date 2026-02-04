@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
             for (const { product_id, quantity } of cartProductQuantities) {
               const qty = Math.max(0, Number(quantity) || 1);
               if (!product_id || qty < 1) continue;
+              if (product_id.startsWith("custom-")) continue;
               const { data: product } = await supabase
                 .from("products")
                 .select("stock")

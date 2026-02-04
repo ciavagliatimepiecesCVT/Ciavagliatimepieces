@@ -29,6 +29,7 @@ export const dictionaries = {
       checkout: "Proceed to checkout",
       remove: "Remove",
       quantity: "Quantity",
+      editBuild: "Edit build",
     },
     contact: {
       title: "Contact",
@@ -86,6 +87,7 @@ export const dictionaries = {
       checkout: "Passer la commande",
       remove: "Retirer",
       quantity: "Quantité",
+      editBuild: "Modifier le build",
     },
     contact: {
       title: "Contact",

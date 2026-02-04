@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getPublicConfiguratorData } from "@/app/[locale]/account/admin/actions";
@@ -9,10 +10,18 @@ import { getPublicConfiguratorData } from "@/app/[locale]/account/admin/actions"
 
 type StepMeta = { id: string; step_key: string | null; label_en: string; label_fr: string; optional: boolean };
 
-export default function Configurator({ locale }: { locale: string }) {
+type ConfigShape = {
+  steps?: string[];
+  extras?: string[];
+  addonIds?: string[];
+};
+
+export default function Configurator({ locale, editCartItemId }: { locale: string; editCartItemId?: string }) {
   const isFr = locale === "fr";
+  const router = useRouter();
   const [configData, setConfigData] = useState<Awaited<ReturnType<typeof getPublicConfiguratorData>>>(null);
   const [dataLoading, setDataLoading] = useState(true);
+  const [editLoadDone, setEditLoadDone] = useState(false);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [selections, setSelections] = useState<Partial<Record<string, string>>>({});
@@ -20,6 +29,8 @@ export default function Configurator({ locale }: { locale: string }) {
   const [totalExpanded, setTotalExpanded] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [addToCartLoading, setAddToCartLoading] = useState(false);
+  const [addToCartError, setAddToCartError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +44,61 @@ export default function Configurator({ locale }: { locale: string }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (editCartItemId) setEditLoadDone(false);
+  }, [editCartItemId]);
+
+  useEffect(() => {
+    if (!editCartItemId || !configData || editLoadDone) return;
+    const supabase = createBrowserClient();
+    const stepsMeta = configData.stepsMeta ?? [];
+    const functionStepsMap = configData.functionStepsMap ?? {};
+    const stepIdToMeta = new Map(stepsMeta.map((s) => [s.id, s]));
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) {
+        if (!user && editCartItemId) setEditLoadDone(true);
+        return;
+      }
+      const { data: row, error } = await supabase
+        .from("cart_items")
+        .select("configuration")
+        .eq("id", editCartItemId)
+        .eq("user_id", user.id)
+        .single();
+      if (cancelled || error || !row) {
+        setEditLoadDone(true);
+        return;
+      }
+      const config = (row.configuration ?? {}) as ConfigShape;
+      const steps = Array.isArray(config.steps) ? config.steps : [];
+      const funcId = steps[0] && typeof steps[0] === "string" ? steps[0] : "";
+      const stepIds = functionStepsMap[funcId] ?? [];
+      const stepKeys = stepIds
+        .map((sid) => stepIdToMeta.get(sid)?.step_key)
+        .filter((k): k is string => !!k);
+      const stepsForEdit = ["function", ...stepKeys];
+      const nextSelections: Partial<Record<string, string>> = { function: funcId };
+      stepsForEdit.forEach((key, i) => {
+        const val = steps[i] && typeof steps[i] === "string" ? steps[i] : "";
+        if (val && key !== "function") nextSelections[key] = val;
+      });
+      const addonIds = Array.isArray(config.addonIds) ? config.addonIds : [];
+      const nextAddons: Record<string, boolean> = {};
+      addonIds.forEach((id) => {
+        if (typeof id === "string") nextAddons[id] = true;
+      });
+      setSelections(nextSelections);
+      setAddonChecked(nextAddons);
+      setStepIndex(0);
+      setEditLoadDone(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editCartItemId, configData, editLoadDone]);
 
   const stepsMeta = configData?.stepsMeta ?? [];
   const functionOptions = configData?.functionOptions ?? [];
@@ -183,9 +249,87 @@ export default function Configurator({ locale }: { locale: string }) {
   };
 
   const handleStartOver = () => {
+    if (editCartItemId) router.replace(`/${locale}/configurator`);
     setStepIndex(0);
     setSelections({});
     setAddonChecked({});
+  };
+
+  const canAddToCart = !!selections.function && total > 0;
+  const isEditMode = !!editCartItemId;
+
+  const handleAddToCart = async () => {
+    if (!canAddToCart) return;
+    setAddToCartError(null);
+    setAddToCartLoading(true);
+    try {
+      const supabase = createBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = `/${locale}/account/login?redirect=${encodeURIComponent(`/${locale}/configurator`)}`;
+        return;
+      }
+      if (isEditMode && editCartItemId) {
+        const title = isFr ? "Montre sur mesure" : "Custom Build";
+        const { error } = await supabase
+          .from("cart_items")
+          .update({
+            price: total,
+            title,
+            configuration: {
+              steps: stepsPayload,
+              extras: stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [],
+              addonIds: addonIdsPayload,
+            },
+          })
+          .eq("id", editCartItemId)
+          .eq("user_id", user.id);
+        if (error) {
+          setAddToCartError(error.message);
+          return;
+        }
+        window.dispatchEvent(new CustomEvent("cart-updated"));
+        router.replace(`/${locale}/configurator`);
+        return;
+      }
+      const productId = `custom-${crypto.randomUUID()}`;
+      const title = isFr ? "Montre sur mesure" : "Custom Build";
+      const { data: inserted, error } = await supabase
+        .from("cart_items")
+        .insert({
+          user_id: user.id,
+          product_id: productId,
+          quantity: 1,
+          price: total,
+          title,
+          image_url: "/images/configurator.svg",
+          configuration: {
+            steps: stepsPayload,
+            extras: stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [],
+            addonIds: addonIdsPayload,
+          },
+        })
+        .select("id")
+        .single();
+      if (error) {
+        setAddToCartError(error.message);
+        return;
+      }
+      window.dispatchEvent(new CustomEvent("cart-updated"));
+      window.dispatchEvent(
+        new CustomEvent("cart-item-added", {
+          detail: {
+            type: "custom",
+            cartItemId: inserted?.id,
+            lineItems: totalLineItems,
+          },
+        })
+      );
+    } catch {
+      setAddToCartError(isFr ? "Erreur lors de l’ajout au panier." : "Failed to add to cart.");
+    } finally {
+      setAddToCartLoading(false);
+    }
   };
 
   const totalLineItems = useMemo(() => {
@@ -393,13 +537,13 @@ export default function Configurator({ locale }: { locale: string }) {
             </div>
           )}
 
-          {checkoutError && (
+          {(checkoutError || addToCartError) && (
             <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {checkoutError}
+              {checkoutError ?? addToCartError}
             </div>
           )}
 
-          <div className="mt-10 flex items-center justify-between gap-4">
+          <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
             <button
               type="button"
               onClick={() => setStepIndex((s) => Math.max(0, s - 1))}
@@ -408,14 +552,24 @@ export default function Configurator({ locale }: { locale: string }) {
             >
               ← {isFr ? "Retour" : "Back"}
             </button>
-            <button
-              type="button"
-              onClick={handleContinue}
-              disabled={!canContinue() || loading}
-              className="rounded-lg bg-foreground px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLastStep ? (isFr ? "Vérifier la commande →" : "Review Order →") : `${isFr ? "Continuer" : "Continue"} →`}
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={!canAddToCart || addToCartLoading}
+                className="rounded-lg border-2 border-[var(--accent)] bg-[var(--accent)]/10 px-5 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {addToCartLoading ? "…" : isEditMode ? (isFr ? "Mettre à jour le build" : "Update build in cart") : (isFr ? "Ajouter au panier" : "Add to cart")}
+              </button>
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={!canContinue() || loading}
+                className="rounded-lg bg-foreground px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLastStep ? (isFr ? "Vérifier la commande →" : "Review Order →") : `${isFr ? "Continuer" : "Continue"} →`}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -468,6 +622,14 @@ export default function Configurator({ locale }: { locale: string }) {
               <span>{isFr ? "Total" : "Total"}</span>
               <span>${total.toLocaleString()}</span>
             </div>
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={!canAddToCart || addToCartLoading}
+              className="mt-3 w-full rounded-lg border-2 border-[var(--accent)] bg-[var(--accent)]/10 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {addToCartLoading ? "…" : isEditMode ? (isFr ? "Mettre à jour le build" : "Update build in cart") : (isFr ? "Ajouter au panier" : "Add to cart")}
+            </button>
           </div>
         )}
       </div>
