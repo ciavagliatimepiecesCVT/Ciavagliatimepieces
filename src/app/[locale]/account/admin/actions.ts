@@ -469,7 +469,14 @@ export async function deleteFeaturedSlide(id: string) {
 }
 
 // ——— Configurator (steps + options with images) ———
-export type ConfiguratorStepRow = { id: string; label_en: string; label_fr: string; sort_order: number };
+export type ConfiguratorStepRow = {
+  id: string;
+  label_en: string;
+  label_fr: string;
+  sort_order: number;
+  step_key?: string | null;
+  optional?: boolean;
+};
 export type ConfiguratorOptionRow = {
   id: string;
   step_id: string;
@@ -483,16 +490,20 @@ export type ConfiguratorOptionRow = {
   sort_order: number;
 };
 
-/** Public: fetch steps in order. */
+/** Public: fetch steps in order (includes step_key and optional when present). */
 export async function getConfiguratorSteps(): Promise<ConfiguratorStepRow[]> {
   try {
     const supabase = createServerClient();
     const { data, error } = await supabase
       .from("configurator_steps")
-      .select("id, label_en, label_fr, sort_order")
+      .select("id, label_en, label_fr, sort_order, step_key, optional")
       .order("sort_order", { ascending: true });
     if (error) return [];
-    return data ?? [];
+    return (data ?? []).map((r) => ({
+      ...r,
+      step_key: (r as { step_key?: string }).step_key ?? null,
+      optional: (r as { optional?: boolean }).optional ?? false,
+    }));
   } catch {
     return [];
   }
@@ -525,10 +536,70 @@ export async function getAdminConfiguratorSteps(): Promise<ConfiguratorStepRow[]
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("configurator_steps")
-    .select("id, label_en, label_fr, sort_order")
+    .select("id, label_en, label_fr, sort_order, step_key, optional")
     .order("sort_order", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((r) => ({
+    ...r,
+    step_key: (r as { step_key?: string }).step_key ?? null,
+    optional: (r as { optional?: boolean }).optional ?? false,
+  }));
+}
+
+/** Get options for the Function step (watch types: Oak, Naut, etc.). */
+export async function getFunctionOptions(): Promise<ConfiguratorOptionRow[]> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data: step } = await supabase
+    .from("configurator_steps")
+    .select("id")
+    .eq("step_key", "function")
+    .maybeSingle();
+  if (!step?.id) return [];
+  const { data, error } = await supabase
+    .from("configurator_options")
+    .select("id, step_id, parent_option_id, label_en, label_fr, letter, price, image_url, preview_image_url, sort_order")
+    .eq("step_id", step.id)
+    .is("parent_option_id", null)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as ConfiguratorOptionRow[];
+}
+
+/** Get step IDs (in order) that follow for a given function option. */
+export async function getFunctionSteps(functionOptionId: string): Promise<string[]> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("configurator_function_steps")
+    .select("step_id")
+    .eq("function_option_id", functionOptionId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r: { step_id: string }) => r.step_id);
+}
+
+/** Set which steps (and order) follow for a function option. stepIds = array of configurator_steps.id. */
+export async function setFunctionSteps(functionOptionId: string, stepIds: string[]): Promise<void> {
+  await requireAdmin();
+  if (!functionOptionId) throw new Error("Function option id required");
+  const supabase = createServerClient();
+  const { error: delError } = await supabase
+    .from("configurator_function_steps")
+    .delete()
+    .eq("function_option_id", functionOptionId);
+  if (delError) throw delError;
+  if (stepIds.length > 0) {
+    const rows = stepIds.map((step_id, i) => ({
+      function_option_id: functionOptionId,
+      step_id,
+      sort_order: i,
+    }));
+    const { error: insError } = await supabase.from("configurator_function_steps").insert(rows);
+    if (insError) throw insError;
+  }
+  revalidatePath("/[locale]/configurator", "page");
+  revalidatePath("/[locale]/account/admin", "page");
 }
 
 export async function getAdminConfiguratorOptions(stepId?: string | null, parentOptionId?: string | null): Promise<ConfiguratorOptionRow[]> {
@@ -546,21 +617,33 @@ export async function getAdminConfiguratorOptions(stepId?: string | null, parent
   return data ?? [];
 }
 
-export async function createConfiguratorStep(input: { label_en: string; label_fr: string; sort_order?: number }) {
+export async function createConfiguratorStep(input: {
+  label_en: string;
+  label_fr: string;
+  sort_order?: number;
+  step_key?: string | null;
+  optional?: boolean;
+}) {
   await requireAdmin();
   if (!input.label_en?.trim()) throw new Error("Label required");
   const supabase = createServerClient();
-  const { error } = await supabase.from("configurator_steps").insert({
+  const row: Record<string, unknown> = {
     label_en: input.label_en.trim(),
     label_fr: input.label_fr?.trim() || input.label_en.trim(),
     sort_order: input.sort_order ?? 0,
-  });
+  };
+  if (input.step_key !== undefined) row.step_key = input.step_key || null;
+  if (input.optional !== undefined) row.optional = input.optional;
+  const { error } = await supabase.from("configurator_steps").insert(row);
   if (error) throw error;
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
 }
 
-export async function updateConfiguratorStep(id: string, input: { label_en?: string; label_fr?: string; sort_order?: number }) {
+export async function updateConfiguratorStep(
+  id: string,
+  input: { label_en?: string; label_fr?: string; sort_order?: number; step_key?: string | null; optional?: boolean }
+) {
   await requireAdmin();
   if (!id) throw new Error("Invalid id");
   const supabase = createServerClient();
@@ -568,6 +651,8 @@ export async function updateConfiguratorStep(id: string, input: { label_en?: str
   if (input.label_en !== undefined) updates.label_en = input.label_en;
   if (input.label_fr !== undefined) updates.label_fr = input.label_fr;
   if (input.sort_order !== undefined) updates.sort_order = input.sort_order;
+  if (input.step_key !== undefined) updates.step_key = input.step_key || null;
+  if (input.optional !== undefined) updates.optional = input.optional;
   if (Object.keys(updates).length === 0) return;
   const { error } = await supabase.from("configurator_steps").update(updates).eq("id", id);
   if (error) throw error;
@@ -787,6 +872,102 @@ export async function setConfiguratorAddonOptions(addonId: string, optionIds: st
   revalidatePath("/[locale]/account/admin", "page");
 }
 
+/** Public: full configurator data for customer (no auth). Used by Configurator component. */
+export type PublicConfiguratorData = {
+  stepsMeta: { id: string; step_key: string | null; label_en: string; label_fr: string; optional: boolean; sort_order: number }[];
+  functionOptions: { id: string; label_en: string; label_fr: string; letter: string; price: number }[];
+  functionStepsMap: Record<string, string[]>;
+  options: { id: string; step_id: string; parent_option_id: string | null; label_en: string; label_fr: string; letter: string; price: number }[];
+  addons: { id: string; step_id: string; label_en: string; label_fr: string; price: number; option_ids: string[] }[];
+};
+
+export async function getPublicConfiguratorData(): Promise<PublicConfiguratorData | null> {
+  try {
+    const supabase = createServerClient();
+
+    const { data: stepsRows, error: stepsErr } = await supabase
+      .from("configurator_steps")
+      .select("id, step_key, label_en, label_fr, optional, sort_order")
+      .order("sort_order", { ascending: true });
+    if (stepsErr || !stepsRows?.length) return null;
+
+    const stepsMeta = stepsRows.map((s) => ({
+      id: s.id,
+      step_key: (s as { step_key?: string }).step_key ?? null,
+      label_en: s.label_en,
+      label_fr: s.label_fr,
+      optional: (s as { optional?: boolean }).optional ?? false,
+      sort_order: s.sort_order ?? 0,
+    }));
+
+    const functionStep = stepsMeta.find((s) => s.step_key === "function");
+    if (!functionStep) return null;
+
+    const { data: allOptions, error: optErr } = await supabase
+      .from("configurator_options")
+      .select("id, step_id, parent_option_id, label_en, label_fr, letter, price")
+      .order("sort_order", { ascending: true });
+    if (optErr) return null;
+
+    const functionOptions = (allOptions ?? []).filter(
+      (o) => o.step_id === functionStep.id && (o as { parent_option_id?: string }).parent_option_id == null
+    ).map((o) => ({
+      id: o.id,
+      label_en: o.label_en,
+      label_fr: o.label_fr,
+      letter: (o as { letter?: string }).letter ?? "A",
+      price: Number((o as { price?: number }).price ?? 0),
+    }));
+
+    const { data: fsRows, error: fsErr } = await supabase
+      .from("configurator_function_steps")
+      .select("function_option_id, step_id, sort_order")
+      .order("sort_order", { ascending: true });
+    if (fsErr) return { stepsMeta, functionOptions, functionStepsMap: {}, options: allOptions ?? [], addons: [] };
+
+    const functionStepsMap: Record<string, string[]> = {};
+    (fsRows ?? []).forEach((r: { function_option_id: string; step_id: string }) => {
+      if (!functionStepsMap[r.function_option_id]) functionStepsMap[r.function_option_id] = [];
+      functionStepsMap[r.function_option_id].push(r.step_id);
+    });
+
+    const { data: addonsRows, error: addonsErr } = await supabase
+      .from("configurator_addons")
+      .select("id, step_id, label_en, label_fr, price");
+    if (addonsErr) return { stepsMeta, functionOptions, functionStepsMap, options: allOptions ?? [], addons: [] };
+
+    const { data: addonOptRows } = await supabase.from("configurator_addon_options").select("addon_id, option_id");
+    const optionIdsByAddon: Record<string, string[]> = {};
+    (addonsRows ?? []).forEach((a: { id: string }) => (optionIdsByAddon[a.id] = []));
+    (addonOptRows ?? []).forEach((r: { addon_id: string; option_id: string }) => {
+      if (optionIdsByAddon[r.addon_id]) optionIdsByAddon[r.addon_id].push(r.option_id);
+    });
+
+    const addons = (addonsRows ?? []).map((a: { id: string; step_id: string; label_en: string; label_fr: string; price: number }) => ({
+      id: a.id,
+      step_id: a.step_id,
+      label_en: a.label_en,
+      label_fr: a.label_fr,
+      price: Number(a.price ?? 0),
+      option_ids: optionIdsByAddon[a.id] ?? [],
+    }));
+
+    const options = (allOptions ?? []).map((o) => ({
+      id: o.id,
+      step_id: o.step_id,
+      parent_option_id: (o as { parent_option_id?: string }).parent_option_id ?? null,
+      label_en: o.label_en,
+      label_fr: o.label_fr,
+      letter: (o as { letter?: string }).letter ?? "A",
+      price: Number((o as { price?: number }).price ?? 0),
+    }));
+
+    return { stepsMeta, functionOptions, functionStepsMap, options, addons };
+  } catch {
+    return null;
+  }
+}
+
 // ——— Orders (admin: view orders + shipping addresses for labels) ———
 export type OrderRow = {
   id: string;
@@ -835,4 +1016,26 @@ export async function getAdminOrders(): Promise<OrderRow[]> {
     })) as OrderRow[];
   }
   return [];
+}
+
+export type OrderStatus = "new" | "shipped" | "completed";
+
+export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
+  await requireAdmin();
+  if (!orderId) throw new Error("Invalid order id");
+  const supabase = createServerClient();
+  const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
+  if (error) throw error;
+  revalidatePath("/[locale]/account/admin", "page");
+  revalidatePath("/[locale]/account/admin/orders", "page");
+}
+
+export async function deleteOrder(orderId: string): Promise<void> {
+  await requireAdmin();
+  if (!orderId) throw new Error("Invalid order id");
+  const supabase = createServerClient();
+  const { error } = await supabase.from("orders").delete().eq("id", orderId);
+  if (error) throw error;
+  revalidatePath("/[locale]/account/admin", "page");
+  revalidatePath("/[locale]/account/admin/orders", "page");
 }

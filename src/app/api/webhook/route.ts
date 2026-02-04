@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (event.type === "checkout.session.completed") {
+    console.log("[Webhook] checkout.session.completed received");
     try {
       const session = event.data.object as Stripe.Checkout.Session;
 
@@ -44,8 +45,28 @@ export async function POST(request: NextRequest) {
       const configurationId = session.metadata?.configuration_id;
       const summary = session.metadata?.summary ?? "Ciavaglia order";
       const userId = session.metadata?.user_id || null;
+      const locale = session.metadata?.locale === "fr" ? "fr" : "en";
       const total = (session.amount_total ?? 0) / 100;
-      const customerEmail = session.customer_details?.email || session.customer_email;
+      let customerEmail: string | null =
+        (session.customer_details as { email?: string | null } | undefined)?.email ||
+        (session as { customer_email?: string | null }).customer_email ||
+        null;
+      if (!customerEmail?.trim() && typeof session.customer === "string") {
+        try {
+          const stripe = getStripe();
+          const customer = await stripe.customers.retrieve(session.customer);
+          if (customer && !("deleted" in customer)) {
+            customerEmail = customer.email ?? null;
+          }
+        } catch (e) {
+          console.warn("[Webhook] Could not fetch customer email:", e);
+        }
+      }
+      if (customerEmail?.trim()) {
+        console.log("[Webhook] Customer confirmation will be sent to:", customerEmail.trim());
+      } else {
+        console.warn("[Webhook] No customer email on session; only atelier notification will be sent.");
+      }
 
       const shipping = session.collected_information?.shipping_details ?? (session as { shipping_details?: { address?: { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string }; name?: string } }).shipping_details;
       const addr = shipping?.address;
@@ -168,18 +189,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (customerEmail) {
-        try {
-          await sendOrderEmails({
-            customerEmail,
-            atelierEmail: process.env.ORDER_NOTIFY_EMAIL ?? "atelier@civagliatimepieces.com",
-            summary,
-            total,
-          });
-        } catch (emailError) {
-          console.error("Webhook: order emails failed (order already created)", emailError);
-          // Do not return 500; order was created successfully
-        }
+      try {
+        console.log("[Webhook] Sending order emails…");
+        await sendOrderEmails({
+          customerEmail: customerEmail ?? null,
+          atelierEmail: process.env.ORDER_NOTIFY_EMAIL ?? "atelier@civagliatimepieces.com",
+          summary,
+          total,
+          locale,
+        });
+        console.log("[Webhook] Order emails sent");
+      } catch (emailError) {
+        console.error("[Webhook] Order emails failed (order already created):", emailError);
+        // Do not return 500; order was created successfully
       }
     } catch (error) {
       console.error("Webhook: checkout.session.completed handler error", error);

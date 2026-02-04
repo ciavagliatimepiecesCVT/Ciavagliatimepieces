@@ -115,12 +115,14 @@ create table if not exists featured_slides (
   updated_at timestamptz default now()
 );
 
--- Configurator: steps (Function, Case, Dial, etc.) and options per step. Options can depend on a parent (e.g. Case options per Function).
+-- Configurator: steps (Function, Size, Case, Dial, etc.). step_key = function|size|case|dial|hands|strap|extra (see migration configurator_function_steps.sql).
 create table if not exists configurator_steps (
   id uuid primary key default gen_random_uuid(),
   label_en text not null unique,
   label_fr text not null,
   sort_order int default 0,
+  step_key text,
+  optional boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -159,12 +161,21 @@ create table if not exists configurator_addon_options (
   primary key (addon_id, option_id)
 );
 
+-- Which steps (and order) each watch type (function option) has. See migration configurator_function_steps.sql.
+create table if not exists configurator_function_steps (
+  function_option_id uuid not null references configurator_options(id) on delete cascade,
+  step_id uuid not null references configurator_steps(id) on delete cascade,
+  sort_order int not null default 0,
+  primary key (function_option_id, step_id)
+);
+
 alter table watch_categories enable row level security;
 alter table featured_slides enable row level security;
 alter table configurator_steps enable row level security;
 alter table configurator_options enable row level security;
 alter table configurator_addons enable row level security;
 alter table configurator_addon_options enable row level security;
+alter table configurator_function_steps enable row level security;
 alter table products enable row level security;
 alter table product_images enable row level security;
 alter table journal_posts enable row level security;
@@ -244,6 +255,10 @@ create policy "Anyone can view configurator addons" on configurator_addons
 
 drop policy if exists "Anyone can view configurator addon options" on configurator_addon_options;
 create policy "Anyone can view configurator addon options" on configurator_addon_options
+  for select using (true);
+
+drop policy if exists "Anyone can view configurator function steps" on configurator_function_steps;
+create policy "Anyone can view configurator function steps" on configurator_function_steps
   for select using (true);
 
 drop policy if exists "Anyone can view journal posts" on journal_posts;

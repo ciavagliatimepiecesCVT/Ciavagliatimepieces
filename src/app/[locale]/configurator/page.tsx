@@ -5,7 +5,7 @@ export default async function ConfiguratorPage({ params }: { params: Promise<{ l
   const { locale } = await params;
 
   return (
-    <section className="min-h-screen bg-background">
+    <section className="min-h-screen bg-neutral-900">
       <Configurator locale={locale} />
     </section>
   );

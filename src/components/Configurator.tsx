@@ -1,132 +1,147 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import {
-  getConfiguratorSteps,
-  getConfiguratorOptions,
-  getConfiguratorAddons,
-  type ConfiguratorStepRow,
-  type ConfiguratorOptionRow,
-  type ConfiguratorAddonWithOptionsRow,
-} from "@/app/[locale]/account/admin/actions";
+import { getPublicConfiguratorData } from "@/app/[locale]/account/admin/actions";
+
+// Use site theme from globals.css: --accent, --foreground, --background
+
+type StepMeta = { id: string; step_key: string | null; label_en: string; label_fr: string; optional: boolean };
 
 export default function Configurator({ locale }: { locale: string }) {
   const isFr = locale === "fr";
-  const [steps, setSteps] = useState<ConfiguratorStepRow[]>([]);
-  const [optionsByStep, setOptionsByStep] = useState<Record<number, ConfiguratorOptionRow[]>>({});
+  const [configData, setConfigData] = useState<Awaited<ReturnType<typeof getPublicConfiguratorData>>>(null);
+  const [dataLoading, setDataLoading] = useState(true);
+
   const [stepIndex, setStepIndex] = useState(0);
-  const [selectedIds, setSelectedIds] = useState<(string | null)[]>([]);
-  const [extraIds, setExtraIds] = useState<string[]>([]);
-  const [addonsList, setAddonsList] = useState<ConfiguratorAddonWithOptionsRow[]>([]);
-  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [stepsLoaded, setStepsLoaded] = useState(false);
+  const [selections, setSelections] = useState<Partial<Record<string, string>>>({});
+  const [addonChecked, setAddonChecked] = useState<Record<string, boolean>>({});
   const [totalExpanded, setTotalExpanded] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const currentStep = steps[stepIndex];
-  const isExtraStep = currentStep?.label_en?.toLowerCase() === "extra";
-  const parentOptionId = stepIndex === 0 ? null : selectedIds[0];
-
-  const loadSteps = useCallback(async () => {
-    try {
-      const data = await getConfiguratorSteps();
-      setSteps(data);
-      setSelectedIds(data.map(() => null));
-      setStepsLoaded(true);
-    } catch {
-      setStepsLoaded(true);
-    }
+  useEffect(() => {
+    let cancelled = false;
+    getPublicConfiguratorData().then((data) => {
+      if (!cancelled) {
+        setConfigData(data);
+        setDataLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  useEffect(() => {
-    loadSteps();
-  }, [loadSteps]);
+  const stepsMeta = configData?.stepsMeta ?? [];
+  const functionOptions = configData?.functionOptions ?? [];
+  const functionStepsMap = configData?.functionStepsMap ?? {};
+  const options = configData?.options ?? [];
+  const addons = configData?.addons ?? [];
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await getConfiguratorAddons();
-        setAddonsList(data);
-      } catch {
-        setAddonsList([]);
-      }
-    };
-    if (stepsLoaded) load();
-  }, [stepsLoaded]);
+  const functionStep = useMemo(() => stepsMeta.find((s) => s.step_key === "function"), [stepsMeta]);
+  const stepIdToMeta = useMemo(() => new Map(stepsMeta.map((s) => [s.id, s])), [stepsMeta]);
 
-  useEffect(() => {
-    if (!currentStep) return;
-    const loadOptions = async () => {
-      const opts = await getConfiguratorOptions(currentStep.id, parentOptionId);
-      setOptionsByStep((prev) => ({ ...prev, [stepIndex]: opts }));
-    };
-    loadOptions();
-  }, [currentStep?.id, parentOptionId, stepIndex]);
+  const functionId = selections.function ?? functionOptions[0]?.id ?? "";
+  const stepIdsForFunction = functionStepsMap[functionId] ?? [];
+  const stepsForFunction = useMemo(() => {
+    const keys = stepIdsForFunction
+      .map((sid) => stepIdToMeta.get(sid)?.step_key)
+      .filter((k): k is string => !!k);
+    return ["function", ...keys];
+  }, [stepIdsForFunction, stepIdToMeta]);
 
-  // When selection changes, clear add-ons that are no longer available for this step
-  useEffect(() => {
-    if (!currentStep) return;
-    const selectedOptionId = selectedIds[stepIndex];
-    setSelectedAddonIds((prev) =>
-      prev.filter((addonId) => {
-        const addon = addonsList.find((a) => a.id === addonId);
-        if (!addon || addon.step_id !== currentStep.id) return true;
-        return addon.option_ids.includes(selectedOptionId ?? "");
-      })
+  const currentStepKey = stepsForFunction[stepIndex] ?? "function";
+  const currentStepMeta = stepsForFunction[stepIndex] === "function"
+    ? functionStep
+    : stepIdsForFunction[stepIndex - 1]
+      ? stepIdToMeta.get(stepIdsForFunction[stepIndex - 1])
+      : null;
+  const currentStepId = currentStepKey === "function" ? functionStep?.id : stepIdsForFunction[stepIndex - 1];
+
+  const optionsForCurrentStep = useMemo(() => {
+    if (!currentStepId) return [];
+    return options.filter(
+      (o) =>
+        o.step_id === currentStepId &&
+        (o.parent_option_id === null || o.parent_option_id === functionId)
     );
-  }, [currentStep?.id, stepIndex, selectedIds, addonsList]);
+  }, [options, currentStepId, functionId]);
 
-  const options = optionsByStep[stepIndex] ?? [];
+  const selectedId = selections[currentStepKey] ?? null;
+  const isLastStep = stepIndex === stepsForFunction.length - 1;
+  const isOptionalStep = currentStepMeta?.optional ?? false;
 
-  const setSelection = useCallback((optionId: string | null) => {
-    setSelectedIds((prev) => {
-      const next = [...prev];
-      next[stepIndex] = optionId;
-      if (stepIndex === 0) {
-        for (let i = 1; i < next.length; i++) next[i] = null;
+  const setSelection = useCallback(
+    (optionId: string | null) => {
+      if (optionId === null) {
+        setSelections((prev) => {
+          const next = { ...prev };
+          delete next[currentStepKey];
+          return next;
+        });
+        return;
       }
-      return next;
-    });
-  }, [stepIndex]);
+      setSelections((prev) => {
+        const next = { ...prev, [currentStepKey]: optionId };
+        if (currentStepKey === "function") {
+          setAddonChecked({});
+          return { function: optionId };
+        }
+        return next;
+      });
+      if (currentStepKey === "function") {
+        setStepIndex(0);
+      }
+    },
+    [currentStepKey]
+  );
 
   const total = useMemo(() => {
     let t = 0;
-    steps.forEach((s, i) => {
-      const opts = optionsByStep[i] ?? [];
-      const isStepExtra = s.label_en?.toLowerCase() === "extra";
-      if (isStepExtra) {
-        extraIds.forEach((id) => {
-          const o = opts.find((x) => x.id === id);
-          if (o) t += Number(o.price);
-        });
-      } else {
-        const sid = selectedIds[i];
-        if (sid) {
-          const o = opts.find((x) => x.id === sid);
-          if (o) t += Number(o.price);
-        }
-      }
+    stepsForFunction.forEach((stepKey) => {
+      const id = selections[stepKey];
+      if (!id) return;
+      const stepId = stepKey === "function" ? functionStep?.id : stepIdsForFunction[stepsForFunction.indexOf(stepKey) - 1];
+      if (!stepId) return;
+      const opts = options.filter(
+        (o) =>
+          o.step_id === stepId &&
+          (o.parent_option_id === null || o.parent_option_id === functionId)
+      );
+      const o = opts.find((x) => x.id === id);
+      if (o) t += o.price;
     });
-    selectedAddonIds.forEach((addonId) => {
-      const addon = addonsList.find((a) => a.id === addonId);
-      if (addon) t += Number(addon.price);
+    addons.forEach((addon) => {
+      if (addonChecked[addon.id]) t += addon.price;
     });
     return t;
-  }, [steps, optionsByStep, selectedIds, extraIds, selectedAddonIds, addonsList]);
+  }, [stepsForFunction, selections, functionId, functionStep?.id, stepIdsForFunction, options, addons, addonChecked]);
 
-  const canContinue = useCallback(() => {
-    if (isExtraStep) return true;
-    return !!selectedIds[stepIndex];
-  }, [stepIndex, selectedIds, isExtraStep]);
+  const canContinue = useCallback(
+    () => isOptionalStep || !!selectedId,
+    [isOptionalStep, selectedId]
+  );
 
   const handleContinue = () => {
-    if (stepIndex < steps.length - 1) setStepIndex((s) => s + 1);
+    if (stepIndex < stepsForFunction.length - 1) setStepIndex((s) => s + 1);
     else handleReviewOrder();
   };
+
+  const stepsPayload = useMemo(() => {
+    const funcId = selections.function;
+    if (!funcId) return [];
+    return [
+      funcId,
+      ...stepIdsForFunction.map((_, i) => selections[stepsForFunction[i + 1]] ?? ""),
+    ];
+  }, [selections, stepsForFunction, stepIdsForFunction]);
+
+  const addonIdsPayload = useMemo(
+    () => addons.filter((a) => addonChecked[a.id]).map((a) => a.id),
+    [addons, addonChecked]
+  );
 
   const handleReviewOrder = async () => {
     setCheckoutError(null);
@@ -134,6 +149,7 @@ export default function Configurator({ locale }: { locale: string }) {
     try {
       const supabase = createBrowserClient();
       const { data: { user } } = await supabase.auth.getUser();
+      const extras = stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [];
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -142,9 +158,9 @@ export default function Configurator({ locale }: { locale: string }) {
           type: "custom",
           userId: user?.id ?? null,
           configuration: {
-            steps: selectedIds,
-            extras: extraIds,
-            addonIds: selectedAddonIds,
+            steps: stepsPayload,
+            extras,
+            addonIds: addonIdsPayload,
             price: total,
           },
         }),
@@ -168,102 +184,105 @@ export default function Configurator({ locale }: { locale: string }) {
 
   const handleStartOver = () => {
     setStepIndex(0);
-    setSelectedIds(steps.map(() => null));
-    setExtraIds([]);
-    setSelectedAddonIds([]);
+    setSelections({});
+    setAddonChecked({});
   };
 
   const totalLineItems = useMemo(() => {
     const lines: { label: string; price: number }[] = [];
-    steps.forEach((s, i) => {
-      const opts = optionsByStep[i] ?? [];
-      const isStepExtra = s.label_en?.toLowerCase() === "extra";
-      const stepLabel = isFr ? s.label_fr : s.label_en;
-      if (isStepExtra) {
-        extraIds.forEach((id) => {
-          const o = opts.find((x) => x.id === id);
-          if (o) lines.push({ label: `${stepLabel}: ${isFr ? o.label_fr : o.label_en}`, price: Number(o.price) });
-        });
-      } else {
-        const sid = selectedIds[i];
-        if (sid) {
-          const o = opts.find((x) => x.id === sid);
-          if (o) lines.push({ label: `${stepLabel}: ${isFr ? o.label_fr : o.label_en}`, price: Number(o.price) });
-        }
+    stepsForFunction.forEach((stepKey) => {
+      const id = selections[stepKey];
+      if (!id) return;
+      const stepId = stepKey === "function" ? functionStep?.id : stepIdsForFunction[stepsForFunction.indexOf(stepKey) - 1];
+      if (!stepId) return;
+      const meta = stepIdToMeta.get(stepId);
+      const stepLabel = meta ? (isFr ? meta.label_fr : meta.label_en) : stepKey;
+      const opts = options.filter(
+        (o) =>
+          o.step_id === stepId &&
+          (o.parent_option_id === null || o.parent_option_id === functionId)
+      );
+      const o = opts.find((x) => x.id === id);
+      if (o) lines.push({ label: `${stepLabel}: ${isFr ? o.label_fr : o.label_en}`, price: o.price });
+    });
+    addons.forEach((addon) => {
+      if (addonChecked[addon.id]) {
+        const label = isFr ? addon.label_fr : addon.label_en;
+        lines.push({ label, price: addon.price });
       }
     });
-    selectedAddonIds.forEach((addonId) => {
-      const addon = addonsList.find((a) => a.id === addonId);
-      if (addon) lines.push({ label: isFr ? addon.label_fr : addon.label_en, price: Number(addon.price) });
-    });
     return lines;
-  }, [steps, optionsByStep, selectedIds, extraIds, selectedAddonIds, addonsList, isFr]);
+  }, [stepsForFunction, selections, functionId, functionStep?.id, stepIdsForFunction, options, addons, addonChecked, isFr, stepIdToMeta]);
 
-  const selectedOptionForPreview = useMemo(() => {
-    if (isExtraStep && extraIds.length > 0) {
-      const opts = optionsByStep[stepIndex] ?? [];
-      const first = opts.find((x) => x.id === extraIds[0]);
-      return first?.preview_image_url || first?.image_url;
-    }
-    const sid = selectedIds[stepIndex];
-    if (!sid) return null;
-    const opts = optionsByStep[stepIndex] ?? [];
-    const o = opts.find((x) => x.id === sid);
-    return o?.preview_image_url || o?.image_url || null;
-  }, [stepIndex, selectedIds, extraIds, isExtraStep, optionsByStep]);
+  const caseAddons = useMemo(() => {
+    const caseStepId = stepsMeta.find((s) => s.step_key === "case")?.id;
+    if (!caseStepId) return [];
+    return addons.filter((a) => a.step_id === caseStepId);
+  }, [addons, stepsMeta]);
 
-  if (!stepsLoaded) {
+  const showFrostedForSelectedCase = useMemo(() => {
+    const caseOptionId = selections.case;
+    if (!caseOptionId) return [];
+    return caseAddons.filter((addon) => addon.option_ids.includes(caseOptionId));
+  }, [selections.case, caseAddons]);
+
+  if (dataLoading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-background text-foreground">
-        <p>{isFr ? "Chargement..." : "Loading..."}</p>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
+        <p className="text-foreground/70">{isFr ? "Chargement du configurateur..." : "Loading configurator..."}</p>
       </div>
     );
   }
 
-  if (steps.length === 0) {
+  if (!configData || !functionStep || functionOptions.length === 0) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 bg-background px-6 text-foreground">
-        <p className="text-center">{isFr ? "Aucune étape configurée. Ajoutez des étapes et options dans l’admin." : "No configurator steps set up. Add steps and options in the admin."}</p>
-        <Link href={`/${locale}/account/admin/configurator`} className="btn-hover rounded-full bg-accent px-6 py-3 text-sm font-medium text-white transition hover:bg-accent-strong">
-          {isFr ? "Aller à l’admin" : "Go to admin"}
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--background)] px-6">
+        <p className="text-center text-foreground/80">
+          {isFr ? "Le configurateur n’est pas encore configuré. Un administrateur peut définir les fonctions, étapes et options." : "The configurator is not set up yet. An admin can configure functions, steps and options."}
+        </p>
+        <Link href={`/${locale}`} className="text-sm font-medium text-[var(--accent)] underline hover:text-[var(--accent-strong)]">
+          {isFr ? "Retour à l’accueil" : "Back to home"}
         </Link>
       </div>
     );
   }
+
+  const stepLabel = (stepKey: string) => {
+    if (stepKey === "function") return functionStep ? (isFr ? functionStep.label_fr : functionStep.label_en) : stepKey;
+    const stepId = stepIdsForFunction[stepsForFunction.indexOf(stepKey) - 1];
+    const meta = stepId ? stepIdToMeta.get(stepId) : null;
+    return meta ? (isFr ? meta.label_fr : meta.label_en) : stepKey;
+  };
 
   return (
-    <div className="min-h-[80vh] bg-background text-foreground">
-      <div className="flex items-center justify-between border-b border-foreground/10 bg-white/60 px-6 py-4 shadow-sm">
-        <Link href={`/${locale}`} className="text-lg font-medium text-accent transition hover:text-accent-strong">
-          Ciavaglia Timepieces
-        </Link>
+    <div className="min-h-screen bg-[var(--background)] text-foreground">
+      <header className="flex items-center justify-end border-b border-foreground/10 bg-white/80 px-6 py-4 shadow-[0_1px_0_rgba(15,20,23,0.06)]">
         <button
           type="button"
           onClick={handleStartOver}
-          className="btn-hover flex items-center gap-2 text-sm text-foreground/70 transition hover:text-foreground"
+          className="flex items-center gap-2 text-sm text-foreground/70 transition hover:text-foreground"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           {isFr ? "Recommencer" : "Start Over"}
         </button>
-      </div>
+      </header>
 
-      <div className="border-b-2 border-foreground/20 bg-white px-6 py-4 shadow-sm">
+      <div className="border-b border-foreground/10 bg-white/60 px-6 py-4">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2 md:gap-4">
-          {steps.map((s, i) => {
-            const isCompleted = stepIndex > i || (stepIndex === i && (i === 0 ? selectedIds[0] : true));
+          {stepsForFunction.map((stepKey, i) => {
+            const hasSelection = stepKey === "function" ? !!selections.function : !!selections[stepKey];
+            const isOptional = stepKey === "function" ? false : (stepIdToMeta.get(stepIdsForFunction[i - 1])?.optional ?? false);
+            const isCompleted = stepIndex > i || (stepIndex === i && (hasSelection || isOptional));
             const isActive = stepIndex === i;
-            const label = isFr ? s.label_fr : s.label_en;
             return (
-              <div key={s.id} className="flex flex-col items-center gap-1">
+              <div key={stepKey} className="flex flex-col items-center gap-1">
                 <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition ${
-                    isCompleted
-                      ? "border-accent bg-accent text-white"
-                      : isActive
-                        ? "border-accent bg-accent text-white"
-                        : "border-foreground/35 bg-foreground/10 text-foreground/80"
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border-2 transition ${
+                    isCompleted || isActive
+                      ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                      : "border-foreground/25 bg-foreground/5 text-foreground/60"
                   }`}
                 >
                   {isCompleted && stepIndex > i ? (
@@ -276,12 +295,12 @@ export default function Configurator({ locale }: { locale: string }) {
                 </div>
                 <span
                   className={`text-xs font-medium uppercase tracking-wider ${
-                    isActive ? "text-accent" : isCompleted && stepIndex > i ? "text-foreground/70" : "text-foreground/80"
+                    isActive ? "text-[var(--accent)]" : isCompleted && stepIndex > i ? "text-foreground/70" : "text-foreground/50"
                   }`}
                 >
-                  {label}
+                  {stepLabel(stepKey)}
                 </span>
-                {isActive && <div className="h-0.5 w-full bg-accent" />}
+                {isActive && <div className="h-0.5 w-8 bg-[var(--accent)]" />}
               </div>
             );
           })}
@@ -289,168 +308,115 @@ export default function Configurator({ locale }: { locale: string }) {
       </div>
 
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 lg:flex-row lg:gap-12">
-        <div className="relative aspect-square max-h-[420px] w-full overflow-hidden rounded-[var(--radius-xl)] border-2 border-foreground/20 bg-white shadow-[var(--shadow)] lg:max-w-[420px]">
-          {selectedOptionForPreview ? (
-            <Image
-              src={selectedOptionForPreview}
-              alt=""
-              fill
-              className="object-contain"
-              sizes="420px"
-              unoptimized={selectedOptionForPreview.startsWith("http")}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
-              <span className="text-sm font-medium uppercase tracking-widest">
-                {isFr ? "Aperçu montre" : "Watch preview"}
-              </span>
-            </div>
-          )}
+        <div className="flex min-h-[320px] flex-1 items-center justify-center rounded-[var(--radius-xl)] border border-foreground/10 bg-white/70 shadow-[var(--shadow)] lg:min-h-[420px]">
+          <span className="text-sm font-medium uppercase tracking-widest text-foreground/40">
+            {isFr ? "Aperçu" : "Preview"}
+          </span>
         </div>
 
         <div className="min-w-0 flex-1">
-          {currentStep && (
-            <>
-              <h2 className="text-2xl font-medium text-foreground">
-                {isFr ? "Choisissez" : "Select"} {isFr ? currentStep.label_fr : currentStep.label_en}
-              </h2>
-              <p className="mt-1 text-sm text-foreground/60">
-                {options.length} {isFr ? "options" : "options available"}
-                {isExtraStep ? ` • ${isFr ? "Optionnel" : "Optional"}` : ""}
-              </p>
+          <h2 className="text-2xl font-semibold text-foreground">
+            {isFr ? "Choisissez" : "Select Your"} {currentStepMeta ? (isFr ? currentStepMeta.label_fr : currentStepMeta.label_en) : currentStepKey}
+          </h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            {optionsForCurrentStep.length} {isFr ? "options disponibles" : "options available"}
+            {isOptionalStep ? ` • ${isFr ? "Optionnel" : "Optional"}` : ""}
+          </p>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {options.map((opt) => {
-                  const selected = isExtraStep ? extraIds.includes(opt.id) : selectedIds[stepIndex] === opt.id;
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => {
-                        if (isExtraStep) {
-                          setExtraIds((prev) =>
-                            prev.includes(opt.id) ? prev.filter((x) => x !== opt.id) : [...prev, opt.id]
-                          );
-                        } else {
-                          setSelection(opt.id);
-                        }
-                      }}
-                      className={`btn-hover flex flex-col items-center rounded-[22px] border-2 p-4 text-left transition shadow-md ${
-                        selected ? "border-accent bg-accent/20 ring-2 ring-accent/50 ring-offset-2 ring-offset-background" : "border-foreground/30 bg-white hover:border-foreground/50 hover:shadow-lg"
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {optionsForCurrentStep.map((opt) => {
+              const selected = selectedId === opt.id;
+              const label = isFr ? opt.label_fr : opt.label_en;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setSelection(opt.id)}
+                  className={`flex flex-col items-center rounded-xl border-2 p-4 text-left transition ${
+                    selected
+                      ? "border-[var(--accent)] bg-[var(--accent)]/10 ring-2 ring-[var(--accent)]/30"
+                      : "border-foreground/20 bg-white/80 shadow-[0_24px_90px_rgba(15,20,23,0.08)] hover:border-foreground/35"
+                  }`}
+                >
+                  <div className="relative">
+                    <div
+                      className={`flex h-14 w-14 items-center justify-center rounded-full text-lg font-semibold ${
+                        selected ? "bg-[var(--accent)] text-white" : "bg-foreground/10 text-foreground/90"
                       }`}
                     >
-                      <div className="relative">
-                        {opt.image_url ? (
-                          <div className="relative h-14 w-14 overflow-hidden rounded-full">
-                            <Image
-                              src={opt.image_url}
-                              alt=""
-                              fill
-                              className="object-cover"
-                              sizes="56px"
-                              unoptimized={opt.image_url.startsWith("http")}
-                            />
-                          </div>
-                        ) : (
-                          <div
-                            className={`flex h-14 w-14 items-center justify-center rounded-full text-lg font-semibold ${
-                              selected ? "bg-accent text-white" : "bg-surface-strong text-foreground/80"
-                            }`}
-                          >
-                            {opt.letter}
-                          </div>
-                        )}
-                        {selected && (
-                          <div className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-foreground shadow-md ring-2 ring-white">
-                            <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                      <span className="mt-2 block w-full truncate text-center text-sm font-medium text-foreground">
-                        {isFr ? opt.label_fr : opt.label_en}
-                      </span>
-                      <span className={`text-sm font-medium ${selected ? "text-accent-strong" : "text-foreground/70"}`}>
-                        ${Number(opt.price).toLocaleString()}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {addonsList
-                .filter((a) => a.step_id === currentStep.id)
-                .map((addon) => {
-                  const selectedOptionId = selectedIds[stepIndex];
-                  const available = !!selectedOptionId && addon.option_ids.includes(selectedOptionId);
-                  const selected = selectedAddonIds.includes(addon.id);
-                  const selectedOption = options.find((o) => o.id === selectedOptionId);
-                  const selectedOptionLabel = selectedOption ? (isFr ? selectedOption.label_fr : selectedOption.label_en) : "";
-                  const availableLabels = options
-                    .filter((o) => addon.option_ids.includes(o.id))
-                    .map((o) => (isFr ? o.label_fr : o.label_en))
-                    .join(", ");
-                  return (
-                    <div key={addon.id} className="mt-6 flex flex-col gap-2">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          id={`addon-${addon.id}`}
-                          checked={selected}
-                          disabled={!available}
-                          onChange={() => {
-                            if (!available) return;
-                            setSelectedAddonIds((prev) =>
-                              prev.includes(addon.id) ? prev.filter((x) => x !== addon.id) : [...prev, addon.id]
-                            );
-                          }}
-                          className="mt-1 h-4 w-4 rounded border-foreground/30 text-accent focus:ring-accent disabled:opacity-50"
-                        />
-                        <label htmlFor={`addon-${addon.id}`} className={`text-sm ${available ? "text-foreground/80 cursor-pointer" : "text-foreground/50 cursor-not-allowed"}`}>
-                          {isFr ? addon.label_fr : addon.label_en} ({isFr ? "optionnel" : "Optional"}) · ${Number(addon.price).toLocaleString()}
-                          <br />
-                          <span className="text-xs text-foreground/50">
-                            {available
-                              ? (availableLabels ? (isFr ? `Disponible pour ${availableLabels}.` : `Available for ${availableLabels}.`) : (isFr ? "Optionnel" : "Optional"))
-                              : (selectedOptionLabel ? (isFr ? `Non disponible pour ${selectedOptionLabel}.` : `Not available for ${selectedOptionLabel}.`) : (isFr ? "Choisissez une option ci-dessus." : "Select an option above."))}
-                          </span>
-                        </label>
-                      </div>
+                      {opt.letter}
                     </div>
-                  );
-                })}
+                    {selected && (
+                      <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]">
+                        <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <span className="mt-2 block w-full truncate text-center text-sm font-medium text-foreground">{label}</span>
+                  <span className="text-sm font-medium text-[var(--accent)]">
+                    ${Number(opt.price).toLocaleString()}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-              {checkoutError && (
-                <div className="mt-6 rounded-[22px] border-2 border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                  {checkoutError}
+          {currentStepKey === "case" && showFrostedForSelectedCase.length > 0 && (
+            <div className="mt-8 space-y-4">
+              {showFrostedForSelectedCase.map((addon) => (
+                <div key={addon.id} className="rounded-xl border border-foreground/15 bg-white/80 p-4 shadow-[0_24px_90px_rgba(15,20,23,0.06)]">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={!!addonChecked[addon.id]}
+                      onChange={(e) => setAddonChecked((prev) => ({ ...prev, [addon.id]: e.target.checked }))}
+                      className="mt-1 h-5 w-5 rounded border-foreground/30 text-[var(--accent)] focus:ring-[var(--accent)]"
+                    />
+                    <div>
+                      <span className="font-medium text-foreground">
+                        {isFr ? addon.label_fr : addon.label_en} ({isFr ? "Optionnel" : "Optional"})
+                      </span>
+                      <p className="mt-1 text-sm text-foreground/60">
+                        {isFr
+                          ? "Disponible pour les boîtiers sélectionnés."
+                          : "Available for selected case options."}
+                      </p>
+                      <span className="mt-1 block text-sm font-medium text-[var(--accent)]">
+                        +${addon.price.toLocaleString()}
+                      </span>
+                    </div>
+                  </label>
                 </div>
-              )}
-
-              <div className="mt-10 flex items-center justify-between gap-4">
-                <button
-                  type="button"
-                  onClick={() => setStepIndex((s) => Math.max(0, s - 1))}
-                  disabled={stepIndex === 0}
-                  className="btn-hover rounded-[22px] border-2 border-foreground/40 bg-white px-5 py-2.5 text-sm font-medium text-foreground shadow-md transition hover:bg-surface-strong hover:border-foreground/60 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  ← {isFr ? "Retour" : "Back"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleContinue}
-                  disabled={!canContinue()}
-                  className="btn-hover rounded-[22px] border-2 border-foreground bg-white px-6 py-2.5 text-sm font-bold text-foreground shadow-lg ring-2 ring-foreground/30 ring-offset-2 ring-offset-background transition hover:bg-foreground hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:ring-0"
-                >
-                  {stepIndex < steps.length - 1
-                    ? `${isFr ? "Continuer" : "Continue"} →`
-                    : isFr
-                      ? "Vérifier la commande →"
-                      : "Review Order →"}
-                </button>
-              </div>
-            </>
+              ))}
+            </div>
           )}
+
+          {checkoutError && (
+            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {checkoutError}
+            </div>
+          )}
+
+          <div className="mt-10 flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => setStepIndex((s) => Math.max(0, s - 1))}
+              disabled={stepIndex === 0}
+              className="rounded-lg border border-foreground/25 bg-transparent px-5 py-2.5 text-sm font-medium text-foreground/80 transition hover:bg-foreground/10 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ← {isFr ? "Retour" : "Back"}
+            </button>
+            <button
+              type="button"
+              onClick={handleContinue}
+              disabled={!canContinue() || loading}
+              className="rounded-lg bg-foreground px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLastStep ? (isFr ? "Vérifier la commande →" : "Review Order →") : `${isFr ? "Continuer" : "Continue"} →`}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -458,18 +424,17 @@ export default function Configurator({ locale }: { locale: string }) {
         <button
           type="button"
           onClick={() => setTotalExpanded((e) => !e)}
-          className="btn-hover flex w-full items-center justify-between gap-3 rounded-[var(--radius-xl)] border-2 border-foreground/25 bg-white px-4 py-3 shadow-lg backdrop-blur-sm transition hover:border-foreground/40 hover:shadow-xl"
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-foreground/20 bg-white/95 px-4 py-3 shadow-[var(--shadow)] transition hover:border-foreground/30"
           aria-expanded={totalExpanded}
-          aria-label={totalExpanded ? (isFr ? "Réduire le total" : "Collapse total") : (isFr ? "Voir le détail du total" : "View total breakdown")}
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/25">
-              <svg className="h-4 w-4 text-accent-strong" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent)]/15">
+              <svg className="h-4 w-4 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div className="text-left">
-              <p className="text-xs font-medium uppercase tracking-wider text-foreground/70">{isFr ? "Total" : "Total"}</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-foreground/70">TOTAL</p>
               <p className="text-xl font-bold text-foreground">${total.toLocaleString()}</p>
             </div>
           </div>
@@ -483,12 +448,12 @@ export default function Configurator({ locale }: { locale: string }) {
           </svg>
         </button>
         {totalExpanded && (
-          <div className="mt-2 max-h-64 overflow-y-auto rounded-[22px] border-2 border-foreground/20 bg-white p-3 shadow-lg">
+          <div className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-foreground/20 bg-white/95 p-3 shadow-[var(--shadow)]">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-foreground/60">
               {isFr ? "Détail" : "Breakdown"}
             </p>
             {totalLineItems.length === 0 ? (
-              <p className="text-sm text-foreground/60">{isFr ? "Aucune sélection." : "No selections yet."}</p>
+              <p className="text-sm text-foreground/50">{isFr ? "Aucune sélection." : "No selections yet."}</p>
             ) : (
               <ul className="space-y-1.5 text-sm">
                 {totalLineItems.map((item, idx) => (
@@ -499,7 +464,7 @@ export default function Configurator({ locale }: { locale: string }) {
                 ))}
               </ul>
             )}
-            <div className="mt-2 flex justify-between border-t-2 border-foreground/20 pt-2 text-sm font-bold text-foreground">
+            <div className="mt-2 flex justify-between border-t border-foreground/20 pt-2 text-sm font-bold text-foreground">
               <span>{isFr ? "Total" : "Total"}</span>
               <span>${total.toLocaleString()}</span>
             </div>

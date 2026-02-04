@@ -71,12 +71,17 @@ export default function FeaturedScroll({
             jumpLabel={jumpLabel}
             purchaseLabel={purchaseLabel}
             purchaseUrl={purchaseUrl}
+            showWelcome={index === 0}
+            locale={locale}
           />
         );
       })}
     </section>
   );
 }
+
+const WELCOME_EN = "Welcome to Ciavaglia Timepieces";
+const WELCOME_FR = "Bienvenue chez Ciavaglia Timepieces";
 
 function FeaturedSlideMorph({
   primarySrc,
@@ -89,6 +94,8 @@ function FeaturedSlideMorph({
   jumpLabel,
   purchaseLabel,
   purchaseUrl,
+  showWelcome,
+  locale,
 }: {
   primarySrc: string;
   secondarySrc: string;
@@ -100,6 +107,8 @@ function FeaturedSlideMorph({
   jumpLabel: string;
   purchaseLabel: string;
   purchaseUrl: string | null;
+  showWelcome: boolean;
+  locale: string;
 }) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
@@ -175,6 +184,19 @@ function FeaturedSlideMorph({
         />
       </div>
       <div className="absolute inset-0 bg-black/30" aria-hidden />
+
+      {/* Welcome overlay – top of first slide, fades out on scroll */}
+      {showWelcome && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-[18%] z-10 flex justify-center px-6 transition-opacity duration-300"
+          style={{ opacity: 1 - progress }}
+          aria-hidden
+        >
+          <h1 className="text-center text-3xl font-medium tracking-wide text-white drop-shadow-lg md:text-4xl lg:text-5xl xl:text-6xl">
+            {locale === "fr" ? WELCOME_FR : WELCOME_EN}
+          </h1>
+        </div>
+      )}
 
       {/* Jump button – visible at top of section */}
       <div

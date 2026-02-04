@@ -2,63 +2,64 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getSiteUrl, getStripe } from "@/lib/stripe";
 
-/** Calculate custom build total from DB only (do not trust client price). */
+/** Calculate custom build total from DB only (do not trust client price).
+ * config.steps = [functionOptionId, ...optionIds in step order for that function].
+ * config.extras = optional extra-step option ids; config.addonIds = addon UUIDs (e.g. Frosted Finish).
+ */
 async function calculateCustomBuildPrice(
   supabase: ReturnType<typeof createServerClient>,
   config: { steps?: unknown[]; extras?: unknown[]; addonIds?: unknown[] }
 ): Promise<number> {
-  const selectedIds = Array.isArray(config.steps) ? config.steps : [];
+  const stepsPayload = Array.isArray(config.steps) ? config.steps : [];
   const extras = Array.isArray(config.extras) ? config.extras : [];
   const addonIds = Array.isArray(config.addonIds) ? config.addonIds : [];
 
-  const { data: stepRows } = await supabase
-    .from("configurator_steps")
-    .select("id, label_en")
+  const functionOptionId = stepsPayload[0] && typeof stepsPayload[0] === "string" ? stepsPayload[0] : null;
+  if (!functionOptionId) return 0;
+
+  const { data: functionStepRows } = await supabase
+    .from("configurator_function_steps")
+    .select("step_id, sort_order")
+    .eq("function_option_id", functionOptionId)
     .order("sort_order", { ascending: true });
-  if (!stepRows?.length) return 0;
+  const stepIdsOrdered = (functionStepRows ?? []).map((r: { step_id: string }) => r.step_id);
+  if (!stepIdsOrdered.length) return 0;
 
   let total = 0;
-  const parentOptionId = selectedIds[0] && typeof selectedIds[0] === "string" ? selectedIds[0] : null;
 
-  for (let i = 0; i < stepRows.length; i++) {
-    const step = stepRows[i];
-    const isExtra = step?.label_en?.toLowerCase() === "extra";
+  for (let i = 0; i < stepIdsOrdered.length; i++) {
+    const stepId = stepIdsOrdered[i];
+    const selectedOptionId = stepsPayload[i + 1] && typeof stepsPayload[i + 1] === "string" ? stepsPayload[i + 1] : null;
+
+    const { data: stepRow } = await supabase.from("configurator_steps").select("id, step_key").eq("id", stepId).single();
+    const stepKey = (stepRow as { step_key?: string } | null)?.step_key;
 
     let q = supabase
       .from("configurator_options")
       .select("id, price")
-      .eq("step_id", step!.id)
-      .order("sort_order", { ascending: true });
-    if (i === 0) {
-      q = q.is("parent_option_id", null);
-    } else {
-      q = q.eq("parent_option_id", parentOptionId ?? "");
-    }
+      .eq("step_id", stepId)
+      .or(`parent_option_id.is.null,parent_option_id.eq.${functionOptionId}`);
     const { data: options } = await q;
 
-    if (isExtra) {
-      for (const id of extras) {
-        if (typeof id !== "string") continue;
-        const opt = options?.find((o) => o.id === id);
-        if (opt) total += Number(opt.price);
+    if (stepKey === "extra") {
+      const idsToSum = extras.length ? extras : (selectedOptionId ? [selectedOptionId] : []);
+      for (const id of idsToSum) {
+        if (typeof id !== "string" || !id) continue;
+        const opt = options?.find((o: { id: string }) => o.id === id);
+        if (opt) total += Number((opt as { price: number }).price);
       }
-    } else {
-      const selectedId = selectedIds[i] && typeof selectedIds[i] === "string" ? selectedIds[i] : null;
-      if (selectedId) {
-        const opt = options?.find((o) => o.id === selectedId);
-        if (opt) total += Number(opt.price);
-      }
+    } else if (selectedOptionId && typeof selectedOptionId === "string" && selectedOptionId) {
+      const opt = options?.find((o: { id: string }) => o.id === selectedOptionId);
+      if (opt) total += Number((opt as { price: number }).price);
     }
   }
 
   if (addonIds.length > 0) {
-    const { data: addons } = await supabase
-      .from("configurator_addons")
-      .select("id, price");
+    const { data: addons } = await supabase.from("configurator_addons").select("id, price");
     for (const id of addonIds) {
       if (typeof id !== "string") continue;
-      const addon = addons?.find((a) => a.id === id);
-      if (addon) total += Number(addon.price);
+      const addon = addons?.find((a: { id: string }) => a.id === id);
+      if (addon) total += Number((addon as { price: number }).price);
     }
   }
 
@@ -290,6 +291,7 @@ export async function POST(request: NextRequest) {
       success_url: `${siteUrl}/${localeSegment}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/${localeSegment}/checkout/cancel`,
       metadata,
+      locale: localeSegment === "fr" ? "fr" : "en",
       billing_address_collection: "required",
       shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "FR", "DE", "IT", "ES", "CH", "AU", "JP"] },
       allow_promotion_codes: true,
