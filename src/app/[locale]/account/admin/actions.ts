@@ -468,6 +468,122 @@ export async function deleteFeaturedSlide(id: string) {
   revalidatePath("/[locale]/account/admin", "page");
 }
 
+// ——— Giveaway (single active campaign; appears on home featured when active) ———
+const GIVEAWAY_CURRENT_ID = "00000000-0000-0000-0000-000000000001";
+
+export type GiveawayRow = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  image_url: string | null;
+  link_url: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Public: fetch active giveaway for home page featured section. */
+export async function getActiveGiveaway(): Promise<GiveawayRow | null> {
+  try {
+    const supabase = createServerClient();
+    const { data, error } = await supabase
+      .from("giveaways")
+      .select("id, title, description, image_url, link_url, active, created_at, updated_at")
+      .eq("id", GIVEAWAY_CURRENT_ID)
+      .eq("active", true)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data as GiveawayRow;
+  } catch {
+    return null;
+  }
+}
+
+export async function getAdminGiveaway(): Promise<GiveawayRow | null> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("giveaways")
+    .select("id, title, description, image_url, link_url, active, created_at, updated_at")
+    .eq("id", GIVEAWAY_CURRENT_ID)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as GiveawayRow;
+}
+
+export async function upsertGiveaway(input: {
+  title?: string | null;
+  description?: string | null;
+  image_url?: string | null;
+  link_url?: string | null;
+  active?: boolean;
+}): Promise<void> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data: existing } = await supabase
+    .from("giveaways")
+    .select("id")
+    .eq("id", GIVEAWAY_CURRENT_ID)
+    .maybeSingle();
+
+  const row = {
+    title: input.title?.trim() || null,
+    description: input.description?.trim() || null,
+    image_url: input.image_url?.trim() || null,
+    link_url: input.link_url?.trim() || null,
+    active: input.active ?? false,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (existing) {
+    const { error } = await supabase.from("giveaways").update(row).eq("id", GIVEAWAY_CURRENT_ID);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("giveaways").insert({
+      id: GIVEAWAY_CURRENT_ID,
+      ...row,
+    });
+    if (error) throw error;
+  }
+  revalidatePath("/[locale]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+  revalidatePath("/[locale]/account/admin/giveaway", "page");
+}
+
+/** Remove the giveaway: set active = false and clear content so it no longer shows on the homepage. */
+export async function removeGiveaway(): Promise<void> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data: existing } = await supabase
+    .from("giveaways")
+    .select("id")
+    .eq("id", GIVEAWAY_CURRENT_ID)
+    .maybeSingle();
+
+  const row = {
+    title: null,
+    description: null,
+    image_url: null,
+    link_url: null,
+    active: false,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (existing) {
+    const { error } = await supabase.from("giveaways").update(row).eq("id", GIVEAWAY_CURRENT_ID);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("giveaways").insert({
+      id: GIVEAWAY_CURRENT_ID,
+      ...row,
+    });
+    if (error) throw error;
+  }
+  revalidatePath("/[locale]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+  revalidatePath("/[locale]/account/admin/giveaway", "page");
+}
+
 // ——— Configurator (steps + options with images) ———
 export type ConfiguratorStepRow = {
   id: string;

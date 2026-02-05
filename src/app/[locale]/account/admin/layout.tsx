@@ -11,6 +11,7 @@ const navItems = [
   { href: "categories", labelEn: "Categories", labelFr: "Catégories" },
   { href: "configurator", labelEn: "Configurator", labelFr: "Configurateur" },
   { href: "featured", labelEn: "Featured", labelFr: "À la une" },
+  { href: "giveaway", labelEn: "Giveaway", labelFr: "Concours" },
   { href: "journal", labelEn: "Journal", labelFr: "Journal" },
 ] as const;
 

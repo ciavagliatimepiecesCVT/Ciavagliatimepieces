@@ -138,6 +138,15 @@ export default function AdminConfiguratorPage() {
   const functionStep = steps.find((s) => (s as { step_key?: string }).step_key === "function");
   const caseStep = steps.find((s) => (s as { step_key?: string }).step_key === "case");
   const stepsAfterFunction = steps.filter((s) => (s as { step_key?: string }).step_key !== "function");
+  /** When editing "which steps follow", show selected steps in their current order so ↑↓ move visually */
+  const orderedStepsForFunctionEdit = useMemo(() => {
+    const selected = functionStepIds
+      .map((id) => stepsAfterFunction.find((s) => s.id === id))
+      .filter((s): s is ConfiguratorStepRow => !!s);
+    const unselected = stepsAfterFunction.filter((s) => !functionStepIds.includes(s.id));
+    return [...selected, ...unselected];
+  }, [stepsAfterFunction, functionStepIds]);
+
   const stepIdToMeta = useMemo(
     () => new Map(steps.map((s) => [s.id, s as ConfiguratorStepRow & { step_key?: string }])),
     [steps]
@@ -785,7 +794,7 @@ export default function AdminConfiguratorPage() {
                 {isFr ? "Cochez et réordonnez (↑↓)." : "Check and reorder (↑↓)."}
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
-                {stepsAfterFunction.map((s) => {
+                {orderedStepsForFunctionEdit.map((s) => {
                   const checked = functionStepIds.includes(s.id);
                   return (
                     <div key={s.id} className="flex items-center gap-2">
@@ -795,8 +804,8 @@ export default function AdminConfiguratorPage() {
                       </label>
                       {checked && (
                         <>
-                          <button type="button" onClick={() => moveFunctionStep(s.id, "up")} className="text-foreground/60 hover:text-foreground">↑</button>
-                          <button type="button" onClick={() => moveFunctionStep(s.id, "down")} className="text-foreground/60 hover:text-foreground">↓</button>
+                          <button type="button" onClick={() => moveFunctionStep(s.id, "up")} className="text-foreground/60 hover:text-foreground" title={isFr ? "Monter" : "Move up"}>↑</button>
+                          <button type="button" onClick={() => moveFunctionStep(s.id, "down")} className="text-foreground/60 hover:text-foreground" title={isFr ? "Descendre" : "Move down"}>↓</button>
                         </>
                       )}
                     </div>

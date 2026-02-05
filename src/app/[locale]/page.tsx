@@ -6,7 +6,7 @@ import FeaturedScroll from "@/components/FeaturedScroll";
 import StorySection from "@/components/StorySection";
 import { getDictionary, Locale } from "@/lib/i18n";
 import { getWatchCategories } from "@/lib/watch-categories";
-import { getFeaturedSlides } from "@/app/[locale]/account/admin/actions";
+import { getFeaturedSlides, getActiveGiveaway } from "@/app/[locale]/account/admin/actions";
 import { builtWatches } from "@/data/watches";
 
 const heroFallbackImage =
@@ -23,10 +23,29 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
   const hero = dictionary.hero;
   const home = dictionary.home;
   const isFr = locale === "fr";
-  const [watchCategories, featuredSlides] = await Promise.all([
+  const [watchCategories, featuredSlidesRaw, activeGiveaway] = await Promise.all([
     getWatchCategories(),
     getFeaturedSlides(),
+    getActiveGiveaway(),
   ]);
+
+  const heroFallbackForGiveaway = heroFallbackImage;
+  const featuredSlides =
+    activeGiveaway && (activeGiveaway.title || activeGiveaway.description || activeGiveaway.image_url)
+      ? [
+          {
+            id: activeGiveaway.id,
+            image_url: activeGiveaway.image_url || heroFallbackForGiveaway,
+            image_url_secondary: activeGiveaway.image_url || heroFallbackForGiveaway,
+            title: activeGiveaway.title,
+            subtitle: null,
+            description: activeGiveaway.description,
+            link_url: activeGiveaway.link_url,
+            sort_order: -1,
+          },
+          ...featuredSlidesRaw,
+        ]
+      : featuredSlidesRaw;
 
   return (
     <div className="space-y-0">
