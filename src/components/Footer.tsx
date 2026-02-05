@@ -36,7 +36,7 @@ export default function Footer({ locale }: { locale: string }) {
         <div className="text-sm uppercase tracking-[0.2em]">
           <p className="font-semibold text-foreground/80">{isFr ? "Contact" : "Contact"}</p>
           <div className="mt-4 flex flex-col gap-2 text-foreground/80">
-            <span>contact@ciavagliatimepieces.com</span>
+            <a href="mailto:ciavagliatimepieces@gmail.com" className="hover:text-foreground">ciavagliatimepieces@gmail.com</a>
             <a href="tel:+15142432116" className="hover:text-foreground">+1 514 243 2116</a>
             <span>{isFr ? "Montréal" : "Montreal"}</span>
           </div>
