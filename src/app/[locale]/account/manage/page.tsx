@@ -17,10 +17,12 @@ type Profile = {
 
 type Order = {
   id: string;
+  order_number: string | null;
   total: number;
   status: string;
   created_at: string;
   summary: string | null;
+  tracking_url: string | null;
 };
 
 function emptyProfile(): Profile {
@@ -62,11 +64,30 @@ export default function ManageAccountPage() {
 
       setUserId(user.id);
       const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
-      const { data: orderData } = await supabase
+      let orderData: Order[] | null = null;
+      const { data: ordersWithOptional, error: orderError } = await supabase
         .from("orders")
-        .select("id,total,status,created_at,summary")
+        .select("id, order_number, total, status, created_at, summary, tracking_url")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
+      if (!orderError) {
+        orderData = (ordersWithOptional ?? []).map((o) => ({
+          ...o,
+          order_number: (o as { order_number?: string }).order_number ?? null,
+          tracking_url: (o as { tracking_url?: string }).tracking_url ?? null,
+        }));
+      } else {
+        const { data: ordersFallback } = await supabase
+          .from("orders")
+          .select("id, total, status, created_at, summary")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+        orderData = (ordersFallback ?? []).map((o) => ({
+          ...o,
+          order_number: null,
+          tracking_url: null,
+        }));
+      }
 
       const p = profileData ?? null;
       setProfile(p);
@@ -304,12 +325,35 @@ export default function ManageAccountPage() {
                       <div key={order.id} className="rounded-[20px] border border-foreground/10 bg-white px-4 py-3">
                         <p className="text-xs uppercase tracking-[0.3em] text-foreground/50">
                           {new Date(order.created_at).toLocaleDateString()}
+                          {order.order_number && (
+                            <span className="ml-2 font-mono text-foreground/60"> · {order.order_number}</span>
+                          )}
                         </p>
                         <p className="mt-2 text-sm text-foreground/70">{order.summary ?? "Custom Ciavaglia order"}</p>
-                        <div className="mt-2 flex items-center justify-between text-sm">
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
                           <span className="uppercase tracking-[0.2em] text-foreground/60">{order.status}</span>
                           <span className="font-semibold">${order.total.toLocaleString()}</span>
                         </div>
+                        {(order.order_number || order.tracking_url) && (
+                          <p className="mt-2">
+                            <a
+                              href={
+                                order.tracking_url
+                                  ? order.tracking_url
+                                  : order.order_number
+                                    ? `/${locale}/track-order?order_number=${encodeURIComponent(order.order_number)}`
+                                    : `/${locale}/track-order`
+                              }
+                              target={order.tracking_url ? "_blank" : undefined}
+                              rel={order.tracking_url ? "noopener noreferrer" : undefined}
+                              className="text-xs font-medium uppercase tracking-[0.15em] text-foreground/70 hover:underline"
+                            >
+                              {order.tracking_url
+                                ? (isFr ? "Suivre le colis" : "Track package")
+                                : (isFr ? "Voir le suivi" : "View tracking")}
+                            </a>
+                          </p>
+                        )}
                       </div>
                     ))
                   )}

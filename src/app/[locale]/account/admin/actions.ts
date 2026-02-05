@@ -980,6 +980,7 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
 // ——— Orders (admin: view orders + shipping addresses for labels) ———
 export type OrderRow = {
   id: string;
+  order_number: string | null;
   configuration_id: string | null;
   user_id: string | null;
   total: number;
@@ -994,13 +995,16 @@ export type OrderRow = {
   shipping_state: string | null;
   shipping_postal_code: string | null;
   shipping_country: string | null;
+  tracking_number: string | null;
+  tracking_carrier: string | null;
+  tracking_url: string | null;
   created_at: string;
 };
 
 export async function getAdminOrders(): Promise<OrderRow[]> {
   await requireAdmin();
   const supabase = createServerClient();
-  const fullSelect = "id, configuration_id, user_id, total, status, summary, stripe_session_id, customer_email, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, created_at";
+  const fullSelect = "id, order_number, configuration_id, user_id, total, status, summary, stripe_session_id, customer_email, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, tracking_number, tracking_carrier, tracking_url, created_at";
   const { data, error } = await supabase
     .from("orders")
     .select(fullSelect)
@@ -1014,6 +1018,7 @@ export async function getAdminOrders(): Promise<OrderRow[]> {
     if (fallbackError) return [];
     return (fallback ?? []).map((row) => ({
       ...row,
+      order_number: null,
       customer_email: null,
       shipping_name: null,
       shipping_line1: null,
@@ -1022,6 +1027,9 @@ export async function getAdminOrders(): Promise<OrderRow[]> {
       shipping_state: null,
       shipping_postal_code: null,
       shipping_country: null,
+      tracking_number: null,
+      tracking_carrier: null,
+      tracking_url: null,
     })) as OrderRow[];
   }
   return [];
@@ -1034,6 +1042,27 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
   if (!orderId) throw new Error("Invalid order id");
   const supabase = createServerClient();
   const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
+  if (error) throw error;
+  revalidatePath("/[locale]/account/admin", "page");
+  revalidatePath("/[locale]/account/admin/orders", "page");
+}
+
+export type OrderTrackingInput = {
+  tracking_number?: string | null;
+  tracking_carrier?: string | null;
+  tracking_url?: string | null;
+};
+
+export async function updateOrderTracking(orderId: string, input: OrderTrackingInput): Promise<void> {
+  await requireAdmin();
+  if (!orderId) throw new Error("Invalid order id");
+  const supabase = createServerClient();
+  const updates: Record<string, string | null> = {};
+  if (input.tracking_number !== undefined) updates.tracking_number = input.tracking_number || null;
+  if (input.tracking_carrier !== undefined) updates.tracking_carrier = input.tracking_carrier || null;
+  if (input.tracking_url !== undefined) updates.tracking_url = input.tracking_url || null;
+  if (Object.keys(updates).length === 0) return;
+  const { error } = await supabase.from("orders").update(updates).eq("id", orderId);
   if (error) throw error;
   revalidatePath("/[locale]/account/admin", "page");
   revalidatePath("/[locale]/account/admin/orders", "page");

@@ -165,30 +165,42 @@ export async function POST(request: NextRequest) {
         await supabase.from("cart_items").delete().eq("user_id", userId);
       }
 
-      const { error: insertOrderError } = await supabase.from("orders").insert({
-        configuration_id: orderType === "cart" ? null : configurationId || null,
-        user_id: userId,
-        total,
-        status: "paid",
-        summary,
-        stripe_session_id: session.id,
-        customer_email: customerEmail ?? null,
-        shipping_name: shippingName,
-        shipping_line1: shippingLine1,
-        shipping_line2: shippingLine2,
-        shipping_city: shippingCity,
-        shipping_state: shippingState,
-        shipping_postal_code: shippingPostalCode,
-        shipping_country: shippingCountry,
-      });
+      const { data: insertedOrder, error: insertOrderError } = await supabase
+        .from("orders")
+        .insert({
+          configuration_id: orderType === "cart" ? null : configurationId || null,
+          user_id: userId,
+          total,
+          status: "paid",
+          summary,
+          stripe_session_id: session.id,
+          customer_email: customerEmail ?? null,
+          shipping_name: shippingName,
+          shipping_line1: shippingLine1,
+          shipping_line2: shippingLine2,
+          shipping_city: shippingCity,
+          shipping_state: shippingState,
+          shipping_postal_code: shippingPostalCode,
+          shipping_country: shippingCountry,
+        })
+        .select("id")
+        .single();
 
-      if (insertOrderError) {
+      if (insertOrderError || !insertedOrder?.id) {
         console.error("Webhook: failed to insert order", insertOrderError);
         return NextResponse.json(
           { error: "Failed to create order", received: false },
           { status: 500 }
         );
       }
+
+      const orderNumber =
+        "CT-" +
+        insertedOrder.id.replace(/-/g, "").slice(0, 8).toUpperCase();
+      await supabase
+        .from("orders")
+        .update({ order_number: orderNumber })
+        .eq("id", insertedOrder.id);
 
       try {
         console.log("[Webhook] Sending order emails…");
@@ -198,6 +210,7 @@ export async function POST(request: NextRequest) {
           summary,
           total,
           locale,
+          orderNumber,
         });
         console.log("[Webhook] Order emails sent");
       } catch (emailError) {

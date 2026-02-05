@@ -216,6 +216,10 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
     try {
       const supabase = createBrowserClient();
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push(`/${locale}/account/login?redirect=${encodeURIComponent(`/${locale}/configurator`)}`);
+        return;
+      }
       const extras = stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [];
       const res = await fetch("/api/checkout", {
         method: "POST",
@@ -223,7 +227,7 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
         body: JSON.stringify({
           locale,
           type: "custom",
-          userId: user?.id ?? null,
+          userId: user.id,
           configuration: {
             steps: stepsPayload,
             extras,
