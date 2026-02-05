@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -452,10 +453,31 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
       </div>
 
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 lg:flex-row lg:gap-12">
-        <div className="flex min-h-[320px] flex-1 items-center justify-center rounded-[var(--radius-xl)] border border-foreground/10 bg-white/70 shadow-[var(--shadow)] lg:min-h-[420px]">
-          <span className="text-sm font-medium uppercase tracking-widest text-foreground/40">
-            {isFr ? "Aperçu" : "Preview"}
-          </span>
+        <div className="relative flex min-h-[320px] flex-1 items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white/70 shadow-[var(--shadow)] lg:min-h-[420px]">
+          {(() => {
+            const opt = optionsForCurrentStep.find((o) => o.id === selectedId) as { image_url?: string; preview_image_url?: string } | undefined;
+            const optionImage = opt?.image_url || opt?.preview_image_url;
+            const stepMeta = currentStepId ? stepIdToMeta.get(currentStepId) : null;
+            const stepImage = (stepMeta as { image_url?: string } | undefined)?.image_url;
+            const previewUrl = optionImage || stepImage;
+            if (previewUrl) {
+              return (
+                <Image
+                  src={previewUrl}
+                  alt=""
+                  fill
+                  className="object-contain p-4"
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  unoptimized={previewUrl.startsWith("http") && !previewUrl.includes("supabase")}
+                />
+              );
+            }
+            return (
+              <span className="text-sm font-medium uppercase tracking-widest text-foreground/40">
+                {isFr ? "Aperçu" : "Preview"}
+              </span>
+            );
+          })()}
         </div>
 
         <div className="min-w-0 flex-1">
@@ -483,19 +505,41 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
                   }`}
                 >
                   <div className="relative">
-                    <div
-                      className={`flex h-14 w-14 items-center justify-center rounded-full text-lg font-semibold ${
-                        selected ? "bg-[var(--accent)] text-white" : "bg-foreground/10 text-foreground/90"
-                      }`}
-                    >
-                      {opt.letter}
-                    </div>
-                    {selected && (
-                      <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]">
-                        <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
+                    {(opt as { image_url?: string }).image_url || (opt as { preview_image_url?: string }).preview_image_url ? (
+                      <div className={`relative h-14 w-14 overflow-hidden rounded-full ${selected ? "ring-2 ring-[var(--accent)]" : ""}`}>
+                        <Image
+                          src={(opt as { image_url?: string }).image_url || (opt as { preview_image_url?: string }).preview_image_url!}
+                          alt=""
+                          width={56}
+                          height={56}
+                          className="h-full w-full object-cover"
+                          unoptimized={(opt as { image_url?: string }).image_url?.startsWith("http") ?? false}
+                        />
+                        {selected && (
+                          <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]">
+                            <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
                       </div>
+                    ) : (
+                      <>
+                        <div
+                          className={`flex h-14 w-14 items-center justify-center rounded-full text-lg font-semibold ${
+                            selected ? "bg-[var(--accent)] text-white" : "bg-foreground/10 text-foreground/90"
+                          }`}
+                        >
+                          {opt.letter}
+                        </div>
+                        {selected && (
+                          <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]">
+                            <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                   <span className="mt-2 block w-full truncate text-center text-sm font-medium text-foreground">{label}</span>

@@ -476,6 +476,7 @@ export type ConfiguratorStepRow = {
   sort_order: number;
   step_key?: string | null;
   optional?: boolean;
+  image_url?: string | null;
 };
 export type ConfiguratorOptionRow = {
   id: string;
@@ -496,13 +497,14 @@ export async function getConfiguratorSteps(): Promise<ConfiguratorStepRow[]> {
     const supabase = createServerClient();
     const { data, error } = await supabase
       .from("configurator_steps")
-      .select("id, label_en, label_fr, sort_order, step_key, optional")
+      .select("id, label_en, label_fr, sort_order, step_key, optional, image_url")
       .order("sort_order", { ascending: true });
     if (error) return [];
     return (data ?? []).map((r) => ({
       ...r,
       step_key: (r as { step_key?: string }).step_key ?? null,
       optional: (r as { optional?: boolean }).optional ?? false,
+      image_url: (r as { image_url?: string }).image_url ?? null,
     }));
   } catch {
     return [];
@@ -536,13 +538,14 @@ export async function getAdminConfiguratorSteps(): Promise<ConfiguratorStepRow[]
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("configurator_steps")
-    .select("id, label_en, label_fr, sort_order, step_key, optional")
+    .select("id, label_en, label_fr, sort_order, step_key, optional, image_url")
     .order("sort_order", { ascending: true });
   if (error) throw error;
   return (data ?? []).map((r) => ({
     ...r,
     step_key: (r as { step_key?: string }).step_key ?? null,
     optional: (r as { optional?: boolean }).optional ?? false,
+    image_url: (r as { image_url?: string }).image_url ?? null,
   }));
 }
 
@@ -623,6 +626,7 @@ export async function createConfiguratorStep(input: {
   sort_order?: number;
   step_key?: string | null;
   optional?: boolean;
+  image_url?: string | null;
 }) {
   await requireAdmin();
   if (!input.label_en?.trim()) throw new Error("Label required");
@@ -634,6 +638,7 @@ export async function createConfiguratorStep(input: {
   };
   if (input.step_key !== undefined) row.step_key = input.step_key || null;
   if (input.optional !== undefined) row.optional = input.optional;
+  if (input.image_url !== undefined) row.image_url = input.image_url?.trim() || null;
   const { error } = await supabase.from("configurator_steps").insert(row);
   if (error) throw error;
   revalidatePath("/[locale]/configurator", "page");
@@ -642,7 +647,7 @@ export async function createConfiguratorStep(input: {
 
 export async function updateConfiguratorStep(
   id: string,
-  input: { label_en?: string; label_fr?: string; sort_order?: number; step_key?: string | null; optional?: boolean }
+  input: { label_en?: string; label_fr?: string; sort_order?: number; step_key?: string | null; optional?: boolean; image_url?: string | null }
 ) {
   await requireAdmin();
   if (!id) throw new Error("Invalid id");
@@ -653,6 +658,7 @@ export async function updateConfiguratorStep(
   if (input.sort_order !== undefined) updates.sort_order = input.sort_order;
   if (input.step_key !== undefined) updates.step_key = input.step_key || null;
   if (input.optional !== undefined) updates.optional = input.optional;
+  if (input.image_url !== undefined) updates.image_url = input.image_url?.trim() || null;
   if (Object.keys(updates).length === 0) return;
   const { error } = await supabase.from("configurator_steps").update(updates).eq("id", id);
   if (error) throw error;
@@ -874,10 +880,10 @@ export async function setConfiguratorAddonOptions(addonId: string, optionIds: st
 
 /** Public: full configurator data for customer (no auth). Used by Configurator component. */
 export type PublicConfiguratorData = {
-  stepsMeta: { id: string; step_key: string | null; label_en: string; label_fr: string; optional: boolean; sort_order: number }[];
+  stepsMeta: { id: string; step_key: string | null; label_en: string; label_fr: string; optional: boolean; sort_order: number; image_url: string | null }[];
   functionOptions: { id: string; label_en: string; label_fr: string; letter: string; price: number }[];
   functionStepsMap: Record<string, string[]>;
-  options: { id: string; step_id: string; parent_option_id: string | null; label_en: string; label_fr: string; letter: string; price: number }[];
+  options: { id: string; step_id: string; parent_option_id: string | null; label_en: string; label_fr: string; letter: string; price: number; image_url: string | null; preview_image_url: string | null }[];
   addons: { id: string; step_id: string; label_en: string; label_fr: string; price: number; option_ids: string[] }[];
 };
 
@@ -887,7 +893,7 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
 
     const { data: stepsRows, error: stepsErr } = await supabase
       .from("configurator_steps")
-      .select("id, step_key, label_en, label_fr, optional, sort_order")
+      .select("id, step_key, label_en, label_fr, optional, sort_order, image_url")
       .order("sort_order", { ascending: true });
     if (stepsErr || !stepsRows?.length) return null;
 
@@ -898,6 +904,7 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
       label_fr: s.label_fr,
       optional: (s as { optional?: boolean }).optional ?? false,
       sort_order: s.sort_order ?? 0,
+      image_url: (s as { image_url?: string }).image_url ?? null,
     }));
 
     const functionStep = stepsMeta.find((s) => s.step_key === "function");
@@ -905,7 +912,7 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
 
     const { data: allOptions, error: optErr } = await supabase
       .from("configurator_options")
-      .select("id, step_id, parent_option_id, label_en, label_fr, letter, price")
+      .select("id, step_id, parent_option_id, label_en, label_fr, letter, price, image_url, preview_image_url")
       .order("sort_order", { ascending: true });
     if (optErr) return null;
 
@@ -960,6 +967,8 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
       label_fr: o.label_fr,
       letter: (o as { letter?: string }).letter ?? "A",
       price: Number((o as { price?: number }).price ?? 0),
+      image_url: (o as { image_url?: string }).image_url ?? null,
+      preview_image_url: (o as { preview_image_url?: string }).preview_image_url ?? null,
     }));
 
     return { stepsMeta, functionOptions, functionStepsMap, options, addons };

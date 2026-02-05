@@ -10,6 +10,7 @@ import {
   getFunctionSteps,
   setFunctionSteps,
   createConfiguratorStep,
+  updateConfiguratorStep,
   deleteConfiguratorStep,
   createConfiguratorOption,
   updateConfiguratorOption,
@@ -18,6 +19,7 @@ import {
   setConfiguratorAddonOptions,
   getAdminConfiguratorAddons,
   updateConfiguratorAddon,
+  uploadProductImage,
 } from "../actions";
 import type {
   ConfiguratorStepRow,
@@ -59,6 +61,8 @@ export default function AdminConfiguratorPage() {
     label_fr: "",
     letter: "A",
     price: 0,
+    image_url: "",
+    preview_image_url: "",
   });
   const [showAddOption, setShowAddOption] = useState(false);
 
@@ -74,9 +78,15 @@ export default function AdminConfiguratorPage() {
     label_fr: "",
     step_key: "",
     optional: false,
+    image_url: "",
   });
   const [createStepLoading, setCreateStepLoading] = useState(false);
   const [deleteStepLoading, setDeleteStepLoading] = useState(false);
+  const [stepImageForm, setStepImageForm] = useState({ image_url: "" });
+  const [savingStepImage, setSavingStepImage] = useState(false);
+  const [uploadingStepImage, setUploadingStepImage] = useState(false);
+  const [uploadingOptionImage, setUploadingOptionImage] = useState<"image" | "preview" | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -185,10 +195,11 @@ export default function AdminConfiguratorPage() {
         step_key: key,
         optional: stepForm.optional,
         sort_order: nextSortOrder,
+        image_url: stepForm.image_url.trim() || null,
       });
       await load();
       setShowCreateStep(false);
-      setStepForm({ label_en: "", label_fr: "", step_key: "", optional: false });
+      setStepForm({ label_en: "", label_fr: "", step_key: "", optional: false, image_url: "" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create step");
     } finally {
@@ -216,6 +227,26 @@ export default function AdminConfiguratorPage() {
       setError(e instanceof Error ? e.message : "Failed to delete step");
     } finally {
       setDeleteStepLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const row = currentStepRow as (ConfiguratorStepRow & { image_url?: string }) | undefined;
+    setStepImageForm({ image_url: row?.image_url ?? "" });
+  }, [currentStepRow?.id, (currentStepRow as { image_url?: string })?.image_url]);
+
+  const handleSaveStepImage = async () => {
+    const row = currentStepRow as (ConfiguratorStepRow & { step_key?: string }) | undefined;
+    if (!row?.id || row.step_key === "function") return;
+    setError(null);
+    setSavingStepImage(true);
+    try {
+      await updateConfiguratorStep(row.id, { image_url: stepImageForm.image_url.trim() || null });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save step image");
+    } finally {
+      setSavingStepImage(false);
     }
   };
 
@@ -274,6 +305,8 @@ export default function AdminConfiguratorPage() {
         letter: optionForm.letter,
         price: optionForm.price,
         parent_option_id: optionForm.parent_option_id || null,
+        image_url: optionForm.image_url.trim() || null,
+        preview_image_url: optionForm.preview_image_url.trim() || null,
       });
       await load();
       setEditingOptionId(null);
@@ -293,6 +326,8 @@ export default function AdminConfiguratorPage() {
         label_fr: optionForm.label_fr,
         letter: optionForm.letter,
         price: optionForm.price,
+        image_url: optionForm.image_url.trim() || null,
+        preview_image_url: optionForm.preview_image_url.trim() || null,
       });
       await load();
       setShowAddOption(false);
@@ -303,6 +338,8 @@ export default function AdminConfiguratorPage() {
         label_fr: "",
         letter: "A",
         price: 0,
+        image_url: "",
+        preview_image_url: "",
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to add");
@@ -441,7 +478,7 @@ export default function AdminConfiguratorPage() {
               setShowAddOption(false);
               setEditingFunctionStepsFor(null);
               setEditingAddonId(null);
-              if (!showCreateStep) setStepForm({ label_en: "", label_fr: "", step_key: "", optional: false });
+              if (!showCreateStep) setStepForm({ label_en: "", label_fr: "", step_key: "", optional: false, image_url: "" });
             }}
             className="flex flex-col items-center gap-1"
             aria-label={isFr ? "Ajouter une étape" : "Add step"}
@@ -507,6 +544,43 @@ export default function AdminConfiguratorPage() {
                   {isFr ? "Étape optionnelle (le client peut passer)" : "Optional step (customer can skip)"}
                 </label>
               </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium uppercase tracking-wider text-foreground/60">
+                  {isFr ? "Image de l’étape (URL)" : "Step image (URL)"}
+                </label>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="block max-w-[200px] text-xs text-foreground/70 file:mr-2 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground"
+                    disabled={uploadingStepImage}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setUploadError(null);
+                      setUploadingStepImage(true);
+                      try {
+                        const fd = new FormData();
+                        fd.append("image", file);
+                        const { url } = await uploadProductImage(fd);
+                        setStepForm((p) => ({ ...p, image_url: url }));
+                      } catch (err) {
+                        setUploadError(err instanceof Error ? err.message : "Upload failed");
+                      } finally {
+                        setUploadingStepImage(false);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  <input
+                    value={stepForm.image_url}
+                    onChange={(e) => setStepForm((p) => ({ ...p, image_url: e.target.value }))}
+                    placeholder={isFr ? "Ou coller une URL" : "Or paste URL"}
+                    className="min-w-[200px] flex-1 rounded-lg border border-foreground/20 px-3 py-2 text-sm"
+                  />
+                </div>
+                {uploadingStepImage && <p className="mt-1 text-xs text-foreground/50">{isFr ? "Upload…" : "Uploading…"}</p>}
+              </div>
             </div>
             <div className="mt-4 flex gap-2">
               <button
@@ -521,7 +595,7 @@ export default function AdminConfiguratorPage() {
                 type="button"
                 onClick={() => {
                   setShowCreateStep(false);
-                  setStepForm({ label_en: "", label_fr: "", step_key: "", optional: false });
+                  setStepForm({ label_en: "", label_fr: "", step_key: "", optional: false, image_url: "" });
                 }}
                 className="rounded-lg border border-foreground/20 px-4 py-2 text-sm"
               >
@@ -555,7 +629,49 @@ export default function AdminConfiguratorPage() {
               : isFr ? "Cliquez sur une carte pour modifier. Les options s'affichent comme pour le client." : "Click a card to edit. Options appear as customers see them."}
           </p>
           {currentStepRow && (currentStepRow as { step_key?: string }).step_key !== "function" && (
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs text-foreground/60">{isFr ? "Image de l’étape" : "Step image"}</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="block max-w-[180px] text-xs text-foreground/70 file:mr-2 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground"
+                  disabled={uploadingStepImage}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadError(null);
+                    setUploadingStepImage(true);
+                    try {
+                      const fd = new FormData();
+                      fd.append("image", file);
+                      const { url } = await uploadProductImage(fd);
+                      setStepImageForm((p) => ({ ...p, image_url: url }));
+                    } catch (err) {
+                      setUploadError(err instanceof Error ? err.message : "Upload failed");
+                    } finally {
+                      setUploadingStepImage(false);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+                <input
+                  value={stepImageForm.image_url}
+                  onChange={(e) => setStepImageForm((p) => ({ ...p, image_url: e.target.value }))}
+                  placeholder="https://…"
+                  className="w-64 rounded-lg border border-foreground/20 px-2 py-1.5 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveStepImage}
+                  disabled={savingStepImage}
+                  className="rounded-full border border-foreground/20 px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-foreground/5 disabled:opacity-50"
+                >
+                  {savingStepImage ? "…" : isFr ? "Enregistrer" : "Save"}
+                </button>
+              </div>
+              {uploadingStepImage && <span className="text-xs text-foreground/50">{isFr ? "Upload…" : "Uploading…"}</span>}
+              {uploadError && <span className="text-xs text-red-600">{uploadError}</span>}
               <button
                 type="button"
                 onClick={handleDeleteStep}
@@ -579,9 +695,19 @@ export default function AdminConfiguratorPage() {
                     isEditing ? "border-[var(--accent)] bg-[var(--accent)]/10 ring-2 ring-[var(--accent)]/30" : "border-foreground/20 bg-white/80 shadow-[0_24px_90px_rgba(15,20,23,0.08)]"
                   }`}
                 >
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-foreground/10 text-lg font-semibold text-foreground/90">
-                    {opt.letter}
-                  </div>
+                  {(opt as { image_url?: string }).image_url ? (
+                    <div className="relative h-14 w-14 overflow-hidden rounded-full bg-foreground/10">
+                      <img
+                        src={(opt as { image_url: string }).image_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-foreground/10 text-lg font-semibold text-foreground/90">
+                      {opt.letter}
+                    </div>
+                  )}
                   <span className="mt-2 block w-full truncate text-center text-sm font-medium text-foreground">{label}</span>
                   <span className="text-sm font-medium text-[var(--accent)]">${Number(opt.price).toLocaleString()}</span>
                   {currentStepKey !== "function" && opt.parent_option_id && (
@@ -594,7 +720,17 @@ export default function AdminConfiguratorPage() {
                       type="button"
                       onClick={() => {
                         setEditingOptionId(opt.id);
-                        setOptionForm({ step_id: opt.step_id, parent_option_id: opt.parent_option_id, label_en: opt.label_en, label_fr: opt.label_fr, letter: opt.letter, price: opt.price });
+                        setUploadError(null);
+                        setOptionForm({
+                          step_id: opt.step_id,
+                          parent_option_id: opt.parent_option_id,
+                          label_en: opt.label_en,
+                          label_fr: opt.label_fr,
+                          letter: opt.letter,
+                          price: opt.price,
+                          image_url: (opt as { image_url?: string }).image_url ?? "",
+                          preview_image_url: (opt as { preview_image_url?: string }).preview_image_url ?? "",
+                        });
                         setShowAddOption(false);
                       }}
                       className="rounded-full border border-foreground/20 bg-white px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-foreground/5"
@@ -621,7 +757,7 @@ export default function AdminConfiguratorPage() {
             {currentStepKey === "function" ? (
               <button
                 type="button"
-                onClick={() => { if (!functionStep) return; setShowAddOption(true); setEditingOptionId(null); setOptionForm({ step_id: functionStep.id, parent_option_id: null, label_en: "", label_fr: "", letter: "A", price: 0 }); }}
+                onClick={() => { if (!functionStep) return; setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: functionStep.id, parent_option_id: null, label_en: "", label_fr: "", letter: "A", price: 0, image_url: "", preview_image_url: "" }); }}
                 disabled={!functionStep}
                 className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-foreground/30 bg-white/60 p-4 text-foreground/60 transition hover:border-foreground/50 hover:bg-white/80 hover:text-foreground/80 disabled:opacity-50"
               >
@@ -631,7 +767,7 @@ export default function AdminConfiguratorPage() {
             ) : currentStepRow ? (
               <button
                 type="button"
-                onClick={() => { setShowAddOption(true); setEditingOptionId(null); setOptionForm({ step_id: currentStepRow.id, parent_option_id: selectedFunctionId, label_en: "", label_fr: "", letter: "A", price: 0 }); }}
+                onClick={() => { setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: currentStepRow.id, parent_option_id: selectedFunctionId, label_en: "", label_fr: "", letter: "A", price: 0, image_url: "", preview_image_url: "" }); }}
                 className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-foreground/30 bg-white/60 p-4 text-foreground/60 transition hover:border-foreground/50 hover:bg-white/80 hover:text-foreground/80"
               >
                 <span className="text-2xl">+</span>
@@ -841,6 +977,77 @@ export default function AdminConfiguratorPage() {
                     className="mt-1 w-full rounded-lg border border-foreground/20 px-3 py-2"
                   />
                 </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs uppercase text-foreground/60">{isFr ? "Image" : "Image"}</label>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="block max-w-[180px] text-xs text-foreground/70 file:mr-2 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground"
+                      disabled={uploadingOptionImage !== null}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadError(null);
+                        setUploadingOptionImage("image");
+                        try {
+                          const fd = new FormData();
+                          fd.append("image", file);
+                          const { url } = await uploadProductImage(fd);
+                          setOptionForm((p) => ({ ...p, image_url: url }));
+                        } catch (err) {
+                          setUploadError(err instanceof Error ? err.message : "Upload failed");
+                        } finally {
+                          setUploadingOptionImage(null);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                    <input
+                      value={optionForm.image_url}
+                      onChange={(e) => setOptionForm((p) => ({ ...p, image_url: e.target.value }))}
+                      placeholder={isFr ? "Ou URL" : "Or URL"}
+                      className="min-w-[200px] flex-1 rounded-lg border border-foreground/20 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  {uploadingOptionImage === "image" && <p className="mt-1 text-xs text-foreground/50">{isFr ? "Upload…" : "Uploading…"}</p>}
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs uppercase text-foreground/60">{isFr ? "Image aperçu" : "Preview image"}</label>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="block max-w-[180px] text-xs text-foreground/70 file:mr-2 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground"
+                      disabled={uploadingOptionImage !== null}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadError(null);
+                        setUploadingOptionImage("preview");
+                        try {
+                          const fd = new FormData();
+                          fd.append("image", file);
+                          const { url } = await uploadProductImage(fd);
+                          setOptionForm((p) => ({ ...p, preview_image_url: url }));
+                        } catch (err) {
+                          setUploadError(err instanceof Error ? err.message : "Upload failed");
+                        } finally {
+                          setUploadingOptionImage(null);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                    <input
+                      value={optionForm.preview_image_url}
+                      onChange={(e) => setOptionForm((p) => ({ ...p, preview_image_url: e.target.value }))}
+                      placeholder={isFr ? "Ou URL" : "Or URL"}
+                      className="min-w-[200px] flex-1 rounded-lg border border-foreground/20 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  {uploadingOptionImage === "preview" && <p className="mt-1 text-xs text-foreground/50">{isFr ? "Upload…" : "Uploading…"}</p>}
+                </div>
+                {uploadError && <p className="mt-1 text-xs text-red-600">{uploadError}</p>}
               </div>
               <div className="mt-4 flex gap-2">
                 <button
