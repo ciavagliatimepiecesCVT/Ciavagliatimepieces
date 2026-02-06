@@ -106,7 +106,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
     <div className="grid gap-8 md:grid-cols-3">
       {watches.map((watch) => (
         <ScrollReveal key={watch.id}>
-          <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+          <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
             <Image
               src={watch.image}
               alt={watch.name}

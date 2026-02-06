@@ -70,13 +70,13 @@ export default function TrackOrderPage() {
       <div className="mx-auto max-w-2xl space-y-10">
         <ScrollReveal>
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">
+            <p className="text-xs uppercase tracking-[0.4em] text-white/60">
               {isFr ? "Suivi" : "Tracking"}
             </p>
-            <h1 className="mt-4 text-4xl">
+            <h1 className="mt-4 text-4xl text-white">
               {isFr ? "Suivre une commande" : "Track your order"}
             </h1>
-            <p className="mt-4 text-foreground/70">
+            <p className="mt-4 text-white/80">
               {isFr
                 ? "Entrez le numéro de commande indiqué dans votre e-mail de confirmation."
                 : "Enter the order number from your confirmation email."}
@@ -119,7 +119,7 @@ export default function TrackOrderPage() {
 
         {result && (
           <ScrollReveal>
-            <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+            <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
               <h2 className="text-lg font-semibold text-foreground/90">
                 {isFr ? "Résultat" : "Order status"}
               </h2>

@@ -275,7 +275,7 @@ export default function AdminOrdersPage() {
       </ScrollReveal>
 
       <ScrollReveal>
-        <div className="overflow-x-auto rounded-[28px] border border-white/70 bg-white/80 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+        <div className="overflow-x-auto rounded-[28px] border border-white/70 bg-white/80 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
           {displayedOrders.length === 0 ? (
             <div className="p-10 text-center text-foreground/60">
               {activeTab === "new"

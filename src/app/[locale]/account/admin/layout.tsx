@@ -38,7 +38,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <section className="px-6">
         <div className="mx-auto max-w-6xl py-12">
-          <p className="text-foreground/70">{isFr ? "Chargement..." : "Loading..."}</p>
+          <p className="text-white/80">{isFr ? "Chargement..." : "Loading..."}</p>
         </div>
       </section>
     );
@@ -50,8 +50,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <section className="px-6">
       <div className="mx-auto max-w-6xl py-8">
-        <div className="mb-8 border-b border-foreground/10 pb-4">
-          <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">Admin</p>
+        <div className="mb-8 border-b border-white/20 pb-4">
+          <p className="text-xs uppercase tracking-[0.4em] text-white/60">Admin</p>
           <nav className="mt-3 flex flex-wrap gap-2" aria-label={isFr ? "Administration" : "Admin navigation"}>
             {navItems.map((item) => {
               const href = `${base}/${item.href}`;
@@ -63,8 +63,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   href={href}
                   className={`rounded-full px-5 py-2.5 text-sm font-medium uppercase tracking-[0.2em] transition ${
                     active
-                      ? "bg-foreground text-white"
-                      : "border border-foreground/20 text-foreground/70 hover:border-foreground/40 hover:text-foreground"
+                      ? "bg-white text-[var(--logo-green)]"
+                      : "border border-white/40 text-white/80 hover:border-white hover:text-white"
                   }`}
                 >
                   {label}

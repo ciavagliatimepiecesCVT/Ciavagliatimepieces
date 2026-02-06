@@ -63,11 +63,11 @@ export default async function ShopCategoryPage({
       <div className="mx-auto max-w-6xl space-y-10">
         <ScrollReveal>
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">
+            <p className="text-xs uppercase tracking-[0.4em] text-white/60">
               {isFr ? "Collection" : "Collection"}
             </p>
-            <h1 className="mt-4 text-4xl">{label ?? category}</h1>
-            <p className="mt-4 text-foreground/70">
+            <h1 className="mt-4 text-4xl text-white">{label ?? category}</h1>
+            <p className="mt-4 text-white/80">
               {isFr
                 ? "Pieces de cette ligne, pretes a expedier."
                 : "Pieces in this line, ready to ship."}
@@ -76,7 +76,7 @@ export default async function ShopCategoryPage({
         </ScrollReveal>
         <ScrollReveal>
           {watches.length === 0 ? (
-            <p className="rounded-[28px] border border-white/70 bg-white/80 p-10 text-center text-foreground/70">
+            <p className="rounded-[28px] border border-white/70 bg-white/80 p-10 text-center text-foreground text-foreground/70">
               {isFr ? "Aucune piece dans cette collection pour le moment." : "No pieces in this collection yet."}
             </p>
           ) : (

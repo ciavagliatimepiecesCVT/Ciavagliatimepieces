@@ -46,13 +46,13 @@ export default async function ShopPage({ params }: { params: Promise<{ locale: L
       <div className="mx-auto max-w-6xl space-y-10">
         <ScrollReveal>
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">
+            <p className="text-xs uppercase tracking-[0.4em] text-white/60">
               {isFr ? "Montres pretes" : "Built Watches"}
             </p>
-            <h1 className="mt-4 text-4xl">
+            <h1 className="mt-4 text-4xl text-white">
               {isFr ? "Des pieces pretes a expedier." : "Ready-to-ship masterpieces."}
             </h1>
-            <p className="mt-4 text-foreground/70">
+            <p className="mt-4 text-white/80">
               {isFr
                 ? "Chaque piece est assemblee par Ciavaglia et disponible en quantite limitee."
                 : "Each piece is built by Ciavaglia and available in limited quantities. Add to cart or checkout instantly."}

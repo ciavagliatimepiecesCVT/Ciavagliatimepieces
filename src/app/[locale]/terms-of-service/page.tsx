@@ -26,13 +26,13 @@ export default async function TermsOfServicePage({ params }: { params: Promise<{
       <div className="mx-auto max-w-3xl space-y-10">
         <ScrollReveal>
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">
+            <p className="text-xs uppercase tracking-[0.4em] text-white/60">
               {isFr ? "Legal" : "Legal"}
             </p>
-            <h1 className="mt-4 text-4xl">
+            <h1 className="mt-4 text-4xl text-white">
               {isFr ? "Conditions d'utilisation" : "Terms of Service"}
             </h1>
-            <p className="mt-4 text-foreground/70">
+            <p className="mt-4 text-white/80">
               {isFr
                 ? "En utilisant le site Ciavaglia Timepieces, vous acceptez les présentes conditions."
                 : "By using the Ciavaglia Timepieces website, you agree to these terms."}

@@ -48,7 +48,7 @@ export default function FeaturedScroll({
         ];
 
   return (
-    <section className="w-full bg-[var(--background)]">
+    <section className="w-full bg-[var(--background)] text-foreground">
       {items.map((slide, index) => {
         const primary = slide.image_url || fallbackImage;
         const secondary = slide.image_url_secondary || primary || fallbackImage;

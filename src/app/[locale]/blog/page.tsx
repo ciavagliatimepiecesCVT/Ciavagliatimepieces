@@ -44,13 +44,13 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: L
       <div className="mx-auto max-w-5xl space-y-10">
         <ScrollReveal>
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">
+            <p className="text-xs uppercase tracking-[0.4em] text-white/60">
               {isFr ? "Journal" : "Journal"}
             </p>
-            <h1 className="mt-4 text-4xl">
+            <h1 className="mt-4 text-4xl text-white">
               {isFr ? "Histoires Ciavaglia." : "Stories from the studio."}
             </h1>
-            <p className="mt-4 text-foreground/70">
+            <p className="mt-4 text-white/80">
               {isFr
                 ? "Coulisses, philosophie du design et rituels horlogers."
                 : "Behind-the-scenes notes, design philosophy, and watchmaking rituals."}
@@ -60,14 +60,14 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: L
         <div className="grid gap-6">
           {list.length === 0 ? (
             <ScrollReveal>
-              <p className="rounded-[26px] border border-white/70 bg-white/80 p-10 text-center text-foreground/70">
+              <p className="rounded-[26px] border border-white/70 bg-white/80 p-10 text-center text-foreground text-foreground/70">
                 {isFr ? "Aucun article pour le moment." : "No posts yet."}
               </p>
             </ScrollReveal>
           ) : (
             list.map((post) => (
               <ScrollReveal key={post.id}>
-                <article className="rounded-[26px] border border-white/70 bg-white/80 p-6 shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
+                <article className="rounded-[26px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
                   <p className="text-xs uppercase tracking-[0.3em] text-foreground/50">
                     {formatDate(post.published_at)}
                   </p>

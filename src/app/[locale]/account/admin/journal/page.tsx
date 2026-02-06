@@ -160,7 +160,7 @@ export default function AdminJournalPage() {
 
       {showAddJournal && (
         <ScrollReveal>
-          <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+          <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
             <h2 className="text-xl">{isFr ? "Nouvel article" : "New post"}</h2>
             <div className="mt-4 space-y-4">
               <div>
@@ -198,7 +198,7 @@ export default function AdminJournalPage() {
       <div className="space-y-6">
         {journalPosts.map((post) => (
           <ScrollReveal key={post.id}>
-            <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+            <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
               {editingJournalId === post.id ? (
                 <div className="space-y-4">
                   <div>

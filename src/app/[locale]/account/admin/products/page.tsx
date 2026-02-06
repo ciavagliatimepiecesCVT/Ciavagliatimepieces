@@ -219,7 +219,7 @@ export default function AdminProductsPage() {
 
       {showAdd && (
         <ScrollReveal>
-          <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+          <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
             <h2 className="text-xl">{isFr ? "Nouveau produit" : "New product"}</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
@@ -329,7 +329,7 @@ export default function AdminProductsPage() {
       <div className="space-y-6">
         {products.map((p) => (
           <ScrollReveal key={p.id}>
-            <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+            <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
               <div className="flex flex-wrap gap-6">
                 <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[16px] bg-foreground/5">
                   <Image src={p.image ?? "/images/hero-1.svg"} alt={p.name} width={96} height={96} className="h-full w-full object-cover" />

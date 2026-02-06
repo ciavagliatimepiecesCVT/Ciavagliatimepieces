@@ -36,7 +36,7 @@ export default async function CheckoutSuccess({
   return (
     <section className="px-6">
       <ScrollReveal>
-        <div className="mx-auto max-w-3xl rounded-[32px] border border-white/70 bg-white/80 p-10 text-center shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+        <div className="mx-auto max-w-3xl rounded-[32px] border border-white/70 bg-white/80 p-10 text-center text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
           {verified ? (
             <>
               <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">

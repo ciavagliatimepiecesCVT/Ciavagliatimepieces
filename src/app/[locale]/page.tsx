@@ -81,7 +81,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
       <StorySection
         id="watch-collections"
         minHeight="100vh"
-        className="border-t border-foreground/10 bg-[var(--background)]"
+        className="border-t border-foreground/10 bg-[var(--background)] text-foreground"
         contentCenter={false}
       >
         <div className="mx-auto w-full max-w-6xl px-6 py-20">
@@ -145,7 +145,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
 
       <StorySection
         minHeight="100vh"
-        className="bg-white/50"
+        className="bg-white/50 text-foreground"
         contentCenter={false}
       >
         <div className="mx-auto w-full max-w-6xl px-6 py-20">
@@ -207,7 +207,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
 
       <StorySection
         minHeight="100vh"
-        className="bg-[var(--background)]"
+        className="bg-[var(--background)] text-foreground"
         contentCenter={false}
       >
         <div className="mx-auto grid w-full max-w-6xl gap-12 px-6 py-20 md:grid-cols-[1fr_1fr] md:items-center">
@@ -244,7 +244,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
 
       <StorySection
         minHeight="90vh"
-        className="bg-gradient-to-br from-[#f6efe6] via-[#f2e7d6] to-[#efe0cb]"
+        className="bg-gradient-to-br from-[#f6efe6] via-[#f2e7d6] to-[#efe0cb] text-foreground"
         contentCenter={true}
       >
         <ScrollReveal>

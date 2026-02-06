@@ -175,7 +175,7 @@ export default function AdminCategoriesPage() {
 
       {showAddCategory && (
         <ScrollReveal>
-          <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+          <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
             <h2 className="text-xl">{isFr ? "Nouvelle catégorie" : "New category"}</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
@@ -206,7 +206,7 @@ export default function AdminCategoriesPage() {
       <div className="space-y-6">
         {watchCategories.map((cat) => (
           <ScrollReveal key={cat.id}>
-            <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+            <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
               {editingCategoryId === cat.id ? (
                 <div className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">

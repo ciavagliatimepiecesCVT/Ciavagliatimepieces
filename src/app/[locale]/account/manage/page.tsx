@@ -159,11 +159,11 @@ export default function ManageAccountPage() {
       <div className="mx-auto max-w-6xl space-y-10">
         <ScrollReveal>
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">{isFr ? "Compte" : "Account"}</p>
-            <h1 className="mt-4 text-4xl">
+            <p className="text-xs uppercase tracking-[0.4em] text-white/60">{isFr ? "Compte" : "Account"}</p>
+            <h1 className="mt-4 text-4xl text-white">
               {isFr ? "Votre tableau de bord." : "Your dashboard."}
             </h1>
-            <p className="mt-4 text-foreground/70">
+            <p className="mt-4 text-white/80">
               {isFr
                 ? "Gérez vos configurations, livraisons et commandes."
                 : "Review your saved configurations, shipping details, and order history in one place."}
@@ -172,7 +172,7 @@ export default function ManageAccountPage() {
         </ScrollReveal>
         {loading ? (
           <ScrollReveal>
-            <div className="rounded-[28px] border border-white/70 bg-white/80 p-6">
+            <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground">
               {isFr ? "Chargement..." : "Loading profile..."}
             </div>
           </ScrollReveal>
@@ -180,7 +180,7 @@ export default function ManageAccountPage() {
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-6">
               <ScrollReveal>
-                <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
+                <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <h2 className="text-2xl">{isFr ? "Profil" : "Profile details"}</h2>
                     {!editing && (
@@ -304,7 +304,7 @@ export default function ManageAccountPage() {
                 </div>
               </ScrollReveal>
               <ScrollReveal>
-                <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
+                <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
                   <h2 className="text-2xl">{isFr ? "Configurations" : "Saved configurations"}</h2>
                   <p className="mt-3 text-foreground/70">
                     {isFr
@@ -315,7 +315,7 @@ export default function ManageAccountPage() {
               </ScrollReveal>
             </div>
             <ScrollReveal>
-              <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
+              <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
                 <h2 className="text-2xl">{isFr ? "Commandes" : "Order history"}</h2>
                 <div className="mt-4 space-y-3">
                   {orders.length === 0 ? (

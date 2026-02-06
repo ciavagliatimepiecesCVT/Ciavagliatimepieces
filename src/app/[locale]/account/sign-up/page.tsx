@@ -81,7 +81,7 @@ export default function SignUpPage() {
     <section className="px-6">
       <div className="mx-auto grid max-w-5xl gap-10 md:grid-cols-[1.1fr_0.9fr]">
         <ScrollReveal>
-          <div className="rounded-[32px] border border-white/70 bg-white/80 p-10 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+          <div className="rounded-[32px] border border-white/70 bg-white/80 p-10 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
             <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">
               {isFr ? "Creer un compte" : "Create account"}
             </p>
@@ -224,7 +224,7 @@ export default function SignUpPage() {
             </div>
           </ScrollReveal>
           <ScrollReveal>
-            <div className="rounded-[32px] border border-white/70 bg-white/80 p-8">
+            <div className="rounded-[32px] border border-white/70 bg-white/80 p-8 text-foreground">
               <p className="text-xs uppercase tracking-[0.3em] text-foreground/60">
                 {isFr ? "Confidentialite" : "Data policy"}
               </p>

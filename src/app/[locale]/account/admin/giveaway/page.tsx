@@ -170,7 +170,7 @@ export default function AdminGiveawayPage() {
       )}
 
       <ScrollReveal>
-        <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+        <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
           <h2 className="text-xl font-medium">
             {isFr ? "Annoncer le concours" : "Announce giveaway"}
           </h2>
@@ -318,7 +318,7 @@ export default function AdminGiveawayPage() {
               ? "Personnes ayant passé commande, avec montant. Triez par prix."
               : "People who placed orders, with amount. Sort by price."}
           </p>
-          <div className="mt-4 overflow-x-auto rounded-[28px] border border-white/70 bg-white/80 shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
+          <div className="mt-4 overflow-x-auto rounded-[28px] border border-white/70 bg-white/80 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
             {orders.length === 0 ? (
               <div className="p-10 text-center text-foreground/60">
                 {isFr ? "Aucune commande." : "No orders yet."}

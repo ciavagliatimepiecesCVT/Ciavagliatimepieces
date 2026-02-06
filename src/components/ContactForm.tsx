@@ -20,7 +20,7 @@ export default function ContactForm({ labels }: { labels: ContactLabels }) {
 
   if (submitted) {
     return (
-      <div className="rounded-[26px] border border-white/70 bg-white/80 p-8 text-center shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
+      <div className="rounded-[26px] border border-white/70 bg-white/80 p-8 text-center text-foreground shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
         <p className="text-lg text-foreground/90">{labels.success}</p>
       </div>
     );
@@ -29,7 +29,7 @@ export default function ContactForm({ labels }: { labels: ContactLabels }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-[26px] border border-white/70 bg-white/80 p-6 shadow-[0_20px_70px_rgba(15,20,23,0.1)] sm:p-8"
+      className="rounded-[26px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_20px_70px_rgba(15,20,23,0.1)] sm:p-8"
     >
       <div className="space-y-6">
         <div>

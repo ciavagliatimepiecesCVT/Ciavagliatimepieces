@@ -52,7 +52,7 @@ export default function CartToast({ locale }: { locale: string }) {
       <div
         role="status"
         aria-live="polite"
-        className="toast-in fixed bottom-6 right-6 z-[100] w-[min(22rem,calc(100vw-3rem))] rounded-2xl border border-foreground/15 bg-white p-4 shadow-lg ring-1 ring-foreground/10"
+        className="toast-in fixed bottom-6 right-6 z-[100] w-[min(22rem,calc(100vw-3rem))] rounded-2xl border border-foreground/15 bg-white p-4 text-foreground shadow-lg ring-1 ring-foreground/10"
       >
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15">
@@ -97,7 +97,7 @@ export default function CartToast({ locale }: { locale: string }) {
     <div
       role="status"
       aria-live="polite"
-      className="toast-in fixed bottom-6 right-6 z-[100] flex items-center gap-2 rounded-full border border-foreground/15 bg-white px-4 py-3 shadow-lg ring-1 ring-foreground/10"
+      className="toast-in fixed bottom-6 right-6 z-[100] flex items-center gap-2 rounded-full border border-foreground/15 bg-white px-4 py-3 text-foreground shadow-lg ring-1 ring-foreground/10"
     >
       <svg
         className="h-5 w-5 shrink-0 text-accent"

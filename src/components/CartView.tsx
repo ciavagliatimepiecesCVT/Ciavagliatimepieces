@@ -168,10 +168,10 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
   return (
     <section className="px-6 py-12">
       <div className="mx-auto max-w-2xl">
-        <h1 className="text-3xl font-medium">{labels.title}</h1>
+        <h1 className="text-3xl font-medium text-white">{labels.title}</h1>
 
         {items.length === 0 ? (
-          <div className="mt-10 rounded-[22px] border-2 border-foreground/15 bg-white/80 p-10 text-center">
+          <div className="mt-10 rounded-[22px] border-2 border-foreground/15 bg-white/80 p-10 text-center text-foreground">
             <p className="text-foreground/70">{labels.empty}</p>
             <Link
               href={`/${activeLocale}/shop`}
@@ -186,7 +186,7 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
               {items.map((item) => (
                 <li
                   key={item.id}
-                  className="flex flex-wrap items-center gap-4 rounded-[22px] border border-foreground/15 bg-white p-4 shadow-sm"
+                  className="flex flex-wrap items-center gap-4 rounded-[22px] border border-foreground/15 bg-white p-4 text-foreground shadow-sm"
                 >
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-foreground/5">
                     <Image
@@ -243,7 +243,7 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
               ))}
             </ul>
 
-            <div className="mt-10 flex flex-col items-end gap-4 rounded-[22px] border-2 border-foreground/15 bg-white p-6">
+            <div className="mt-10 flex flex-col items-end gap-4 rounded-[22px] border-2 border-foreground/15 bg-white p-6 text-foreground">
               {error && <p className="w-full text-sm text-red-600">{error}</p>}
               <p className="text-lg font-semibold">
                 {labels.subtotal}: ${subtotal.toLocaleString()}

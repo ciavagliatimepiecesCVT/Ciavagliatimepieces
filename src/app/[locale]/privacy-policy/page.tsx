@@ -26,13 +26,13 @@ export default async function PrivacyPolicyPage({ params }: { params: Promise<{ 
       <div className="mx-auto max-w-3xl space-y-10">
         <ScrollReveal>
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-foreground/50">
+            <p className="text-xs uppercase tracking-[0.4em] text-white/60">
               {isFr ? "Legal" : "Legal"}
             </p>
-            <h1 className="mt-4 text-4xl">
+            <h1 className="mt-4 text-4xl text-white">
               {isFr ? "Politique de confidentialité" : "Privacy Policy"}
             </h1>
-            <p className="mt-4 text-foreground/70">
+            <p className="mt-4 text-white/80">
               {isFr
                 ? "Ciavaglia Timepieces (« nous », « notre ») s'engage à protéger vos données."
                 : "Ciavaglia Timepieces (« we », « our ») is committed to protecting your data."}
