@@ -1,6 +1,25 @@
+import type { Metadata } from "next";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createAuthServerClient } from "@/lib/supabase/server";
 import { Locale } from "@/lib/i18n";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const isFr = locale === "fr";
+  return {
+    title: isFr ? "Journal | Histoires du studio" : "Journal | Stories from the Studio",
+    description: isFr
+      ? "Coulisses, philosophie du design et rituels horlogers Ciavaglia."
+      : "Behind-the-scenes notes, design philosophy, and watchmaking rituals from Ciavaglia.",
+    openGraph: {
+      title: isFr ? "Journal | Ciavaglia Timepieces" : "Journal | Ciavaglia Timepieces",
+    },
+  };
+}
 
 function formatDate(iso: string | null) {
   if (!iso) return "";

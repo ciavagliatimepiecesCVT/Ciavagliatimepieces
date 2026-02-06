@@ -1,4 +1,21 @@
+import type { Metadata } from "next";
 import ScrollReveal from "@/components/ScrollReveal";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const isFr = locale === "fr";
+  return {
+    title: isFr ? "Conditions d'utilisation" : "Terms of Service",
+    description: isFr
+      ? "Conditions d'utilisation du site et des achats Ciavaglia Timepieces."
+      : "Terms of use for the Ciavaglia Timepieces website and purchases.",
+    robots: { index: true, follow: true },
+  };
+}
 
 export default async function TermsOfServicePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

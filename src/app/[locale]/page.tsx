@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import Parallax from "@/components/Parallax";
@@ -8,6 +9,26 @@ import { getDictionary, Locale } from "@/lib/i18n";
 import { getWatchCategories } from "@/lib/watch-categories";
 import { getFeaturedSlides, getActiveGiveaway } from "@/app/[locale]/account/admin/actions";
 import { builtWatches } from "@/data/watches";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const isFr = locale === "fr";
+  return {
+    title: isFr
+      ? "Accueil | Montres de luxe sur mesure Montréal"
+      : "Home | Custom Luxury Watches Montreal",
+    description: isFr
+      ? "Bienvenue chez Ciavaglia Timepieces. Montres sur mesure, configurateur et collections prêtes à expédier."
+      : "Welcome to Ciavaglia Timepieces. Custom timepieces, watch configurator, and ready-to-ship collections.",
+    openGraph: {
+      title: isFr ? "Ciavaglia Timepieces | Accueil" : "Ciavaglia Timepieces | Home",
+    },
+  };
+}
 
 const heroFallbackImage =
   "https://images.unsplash.com/photo-1524592094714-0f0654e20314?w=1200&q=80";

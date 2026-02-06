@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { localeLabels, locales } from "@/lib/i18n";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { getGuestCartCount } from "@/lib/guest-cart";
 import type { User } from "@supabase/supabase-js";
 import type { WatchCategory } from "@/lib/watch-categories";
 
@@ -53,7 +54,7 @@ export default function NavBar({
 
   useEffect(() => {
     if (!user) {
-      setCartCount(0);
+      setCartCount(getGuestCartCount());
       return;
     }
     const supabase = createBrowserClient();
@@ -69,16 +70,19 @@ export default function NavBar({
 
   useEffect(() => {
     const onCartUpdate = () => {
-      if (!user) return;
-      const supabase = createBrowserClient();
-      supabase
-        .from("cart_items")
-        .select("quantity")
-        .eq("user_id", user.id)
-        .then(({ data }) => {
-          const total = (data ?? []).reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
-          setCartCount(total);
-        });
+      if (user) {
+        const supabase = createBrowserClient();
+        supabase
+          .from("cart_items")
+          .select("quantity")
+          .eq("user_id", user.id)
+          .then(({ data }) => {
+            const total = (data ?? []).reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
+            setCartCount(total);
+          });
+      } else {
+        setCartCount(getGuestCartCount());
+      }
     };
     window.addEventListener("cart-updated", onCartUpdate);
     return () => window.removeEventListener("cart-updated", onCartUpdate);
@@ -123,7 +127,7 @@ export default function NavBar({
 
   return (
     <header
-      className={`fixed left-0 right-0 top-0 z-50 w-full bg-white transition-transform duration-300 ${hidden ? "-translate-y-full" : "translate-y-0"}`}
+      className={`fixed left-0 right-0 top-0 z-50 w-full bg-[var(--logo-green)] transition-transform duration-300 ${hidden ? "-translate-y-full" : "translate-y-0"}`}
     >
       {/* Full-width top bar: left nav | center logo | right account + locale + cart */}
       <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-2.5">
@@ -132,7 +136,7 @@ export default function NavBar({
             <Link
               key={item.key}
               href={`/${activeLocale}/${item.href}`}
-              className="text-foreground/80 transition hover:text-foreground"
+              className="text-white/90 transition hover:text-white"
             >
               {labels[item.key as keyof NavLabels]}
             </Link>
@@ -140,7 +144,7 @@ export default function NavBar({
         </nav>
         <Link
           href={`/${activeLocale}`}
-          className="flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-foreground/30 rounded"
+          className="flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-white/50 rounded"
           aria-label="Ciavaglia Timepieces"
         >
           <Image
@@ -155,8 +159,8 @@ export default function NavBar({
         <div className="flex items-center justify-end gap-2 md:gap-4">
           {/* Cart: always visible on mobile; on desktop it's in the nav block below */}
           <Link
-            href={user ? `/${activeLocale}/cart` : `/${activeLocale}/account/login`}
-            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-foreground/20 text-foreground/80 transition hover:border-foreground hover:text-foreground md:hidden"
+            href={`/${activeLocale}/cart`}
+            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/40 text-white/90 transition hover:border-white hover:text-white md:hidden"
             aria-label={labels.cart}
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -164,7 +168,7 @@ export default function NavBar({
             </svg>
             {cartCount > 0 && (
               <span
-                className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--logo-green)] text-[10px] font-bold text-[var(--logo-gold)]"
+                className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold text-[var(--logo-gold)]"
                 aria-hidden
               >
                 {cartCount > 99 ? "99+" : cartCount}
@@ -174,7 +178,7 @@ export default function NavBar({
           <button
             type="button"
             onClick={() => setMobileOpen((prev) => !prev)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-foreground/20 text-foreground/80 transition hover:border-foreground hover:text-foreground md:hidden"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/40 text-white/90 transition hover:border-white hover:text-white md:hidden"
             aria-label="Toggle menu"
             aria-expanded={mobileOpen}
           >
@@ -187,14 +191,14 @@ export default function NavBar({
             <>
               <Link
                 href={`/${activeLocale}/account/manage`}
-                className="rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                className="rounded-full border border-white/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-white/90 transition hover:border-white hover:text-white"
               >
                 {labels.account}
               </Link>
               {isAdmin && (
                 <Link
                   href={`/${activeLocale}/account/admin`}
-                  className="btn-hover rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                  className="btn-hover rounded-full border border-white/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-white/90 transition hover:border-white hover:text-white"
                 >
                   Admin
                 </Link>
@@ -202,7 +206,7 @@ export default function NavBar({
               <button
                 type="button"
                 onClick={handleLogout}
-                className="btn-hover rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                className="btn-hover rounded-full border border-white/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-white/90 transition hover:border-white hover:text-white"
               >
                 {labels.logout}
               </button>
@@ -211,13 +215,13 @@ export default function NavBar({
             <>
               <Link
                 href={`/${activeLocale}/account/login`}
-                className="btn-hover rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                className="btn-hover rounded-full border border-white/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-white/90 transition hover:border-white hover:text-white"
               >
                 {labels.signIn}
               </Link>
               <Link
                 href={`/${activeLocale}/account/sign-up`}
-                className="btn-hover rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                className="btn-hover rounded-full border border-white/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-white/90 transition hover:border-white hover:text-white"
               >
                 {labels.createAccount}
               </Link>
@@ -225,15 +229,15 @@ export default function NavBar({
           )}
           <LocaleSwitcher currentLocale={activeLocale} />
           <Link
-            href={user ? `/${activeLocale}/cart` : `/${activeLocale}/account/login`}
-            className="relative flex items-center gap-2 rounded-full border border-foreground/20 px-3 py-2 text-xs uppercase tracking-[0.2em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+            href={`/${activeLocale}/cart`}
+            className="relative flex items-center gap-2 rounded-full border border-white/40 px-3 py-2 text-xs uppercase tracking-[0.2em] text-white/90 transition hover:border-white hover:text-white"
             aria-label={labels.cart}
           >
             <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
             <span
-              className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--logo-green)] px-1.5 text-[11px] font-bold text-[var(--logo-gold)]"
+              className="flex h-6 min-w-6 items-center justify-center rounded-full bg-white/20 px-1.5 text-[11px] font-bold text-[var(--logo-gold)]"
               aria-hidden
             >
               {cartCount > 99 ? "99+" : cartCount}
@@ -243,29 +247,29 @@ export default function NavBar({
         </div>
       </div>
       {mobileOpen && (
-        <div className="border-t border-foreground/10 bg-white px-6 py-6 md:hidden">
-          <div className="flex flex-col gap-4 text-sm uppercase tracking-[0.2em] text-foreground/80">
+        <div className="border-t border-white/20 bg-[var(--logo-green)] px-6 py-6 md:hidden">
+          <div className="flex flex-col gap-4 text-sm uppercase tracking-[0.2em] text-white/90">
             {navItems.map((item) => (
               <Link
                 key={item.key}
                 href={`/${activeLocale}/${item.href}`}
-                className="transition hover:text-foreground"
+                className="transition hover:text-white"
                 onClick={() => setMobileOpen(false)}
               >
                 {labels[item.key as keyof NavLabels]}
               </Link>
             ))}
-            <div className="h-px bg-foreground/10" />
+            <div className="h-px bg-white/20" />
             <Link
               href={`/${activeLocale}/configurator`}
-              className="transition hover:text-foreground"
+              className="transition hover:text-white"
               onClick={() => setMobileOpen(false)}
             >
               {labels.configurator}
             </Link>
             <Link
               href={`/${activeLocale}/shop`}
-              className="transition hover:text-foreground"
+              className="transition hover:text-white"
               onClick={() => setMobileOpen(false)}
             >
               {labels.shop}
@@ -276,7 +280,7 @@ export default function NavBar({
                 <Link
                   key={cat.id}
                   href={`/${activeLocale}/shop/${cat.slug}`}
-                  className="transition hover:text-foreground"
+                  className="transition hover:text-white"
                   onClick={() => setMobileOpen(false)}
                 >
                   {label}
@@ -285,17 +289,17 @@ export default function NavBar({
             })}
             <Link
               href={`/${activeLocale}/shop`}
-              className="transition hover:text-foreground"
+              className="transition hover:text-white"
               onClick={() => setMobileOpen(false)}
             >
               {labels.allWatches}
             </Link>
-            <div className="h-px bg-foreground/10" />
+            <div className="h-px bg-white/20" />
             {user ? (
               <>
                 <Link
                   href={`/${activeLocale}/account/manage`}
-                  className="transition hover:text-foreground"
+                  className="transition hover:text-white"
                   onClick={() => setMobileOpen(false)}
                 >
                   {labels.account}
@@ -303,7 +307,7 @@ export default function NavBar({
                 {isAdmin && (
                   <Link
                     href={`/${activeLocale}/account/admin`}
-                    className="transition hover:text-foreground"
+                    className="transition hover:text-white"
                     onClick={() => setMobileOpen(false)}
                   >
                     Admin
@@ -315,7 +319,7 @@ export default function NavBar({
                     setMobileOpen(false);
                     await handleLogout();
                   }}
-                  className="text-left transition hover:text-foreground"
+                  className="text-left transition hover:text-white"
                 >
                   {labels.logout}
                 </button>
@@ -324,14 +328,14 @@ export default function NavBar({
               <>
                 <Link
                   href={`/${activeLocale}/account/login`}
-                  className="transition hover:text-foreground"
+                  className="transition hover:text-white"
                   onClick={() => setMobileOpen(false)}
                 >
                   {labels.signIn}
                 </Link>
                 <Link
                   href={`/${activeLocale}/account/sign-up`}
-                  className="transition hover:text-foreground"
+                  className="transition hover:text-white"
                   onClick={() => setMobileOpen(false)}
                 >
                   {labels.createAccount}
@@ -339,35 +343,35 @@ export default function NavBar({
               </>
             )}
             <Link
-              href={user ? `/${activeLocale}/cart` : `/${activeLocale}/account/login`}
-              className="flex items-center gap-3 transition hover:text-foreground"
+              href={`/${activeLocale}/cart`}
+              className="flex items-center gap-3 transition hover:text-white"
               onClick={() => setMobileOpen(false)}
             >
               <span>{labels.cart}</span>
-              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--logo-green)] px-1.5 text-[11px] font-bold text-[var(--logo-gold)]">
+              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-white/20 px-1.5 text-[11px] font-bold text-[var(--logo-gold)]">
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             </Link>
-            <div className="h-px bg-foreground/10" />
+            <div className="h-px bg-white/20" />
             <LocaleSwitcher currentLocale={activeLocale} />
           </div>
         </div>
       )}
       {!isAdminCentre && (
         <>
-          <div className="border-t border-foreground/10" />
+          <div className="border-t border-white/20" />
           {/* Watch styles row – full width */}
-          <div className="border-t border-foreground/10 bg-white px-6 py-2">
+          <div className="border-t border-white/20 bg-[var(--logo-green)] px-6 py-2">
             <div className="flex w-full flex-wrap items-center justify-center gap-4 md:gap-6">
               <Link
                 href={`/${activeLocale}/configurator`}
-                className="text-xs uppercase tracking-[0.2em] text-foreground/70 transition hover:text-foreground"
+                className="text-xs uppercase tracking-[0.2em] text-white/80 transition hover:text-white"
               >
                 {labels.configurator}
               </Link>
               <Link
                 href={`/${activeLocale}/shop`}
-                className="text-xs uppercase tracking-[0.2em] text-foreground/70 transition hover:text-foreground"
+                className="text-xs uppercase tracking-[0.2em] text-white/80 transition hover:text-white"
               >
                 {labels.shop}
               </Link>
@@ -377,7 +381,7 @@ export default function NavBar({
                   <Link
                     key={cat.id}
                     href={`/${activeLocale}/shop/${cat.slug}`}
-                    className="text-xs uppercase tracking-[0.2em] text-foreground/70 transition hover:text-foreground"
+                    className="text-xs uppercase tracking-[0.2em] text-white/80 transition hover:text-white"
                   >
                     {label}
                   </Link>
@@ -385,7 +389,7 @@ export default function NavBar({
               })}
               <Link
                 href={`/${activeLocale}/shop`}
-                className="text-xs uppercase tracking-[0.2em] text-foreground/70 transition hover:text-foreground"
+                className="text-xs uppercase tracking-[0.2em] text-white/80 transition hover:text-white"
               >
                 {labels.allWatches}
               </Link>
@@ -403,12 +407,12 @@ function LocaleSwitcher({ currentLocale }: { currentLocale: string }) {
   const rest = segments.slice(1).join("/");
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-foreground/20 bg-foreground/5 px-2 py-1 text-xs uppercase tracking-[0.2em]">
+    <div className="flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-2 py-1 text-xs uppercase tracking-[0.2em]">
       {locales.map((locale) => (
         <Link
           key={locale}
           href={`/${locale}/${rest}`.replace(/\/$/, "")}
-          className={`px-2 py-1 transition ${currentLocale === locale ? "text-foreground" : "text-foreground/40"}`}
+          className={`px-2 py-1 transition ${currentLocale === locale ? "text-white" : "text-white/50"}`}
         >
           {localeLabels[locale].slice(0, 2)}
         </Link>

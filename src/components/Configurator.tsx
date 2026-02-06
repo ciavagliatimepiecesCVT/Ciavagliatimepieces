@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getPublicConfiguratorData } from "@/app/[locale]/account/admin/actions";
+import { addGuestCartItem } from "@/lib/guest-cart";
 
 // Use site theme from globals.css: --accent, --foreground, --background
 
@@ -216,10 +217,6 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
     try {
       const supabase = createBrowserClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push(`/${locale}/account/login?redirect=${encodeURIComponent(`/${locale}/configurator`)}`);
-        return;
-      }
       const extras = stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [];
       const res = await fetch("/api/checkout", {
         method: "POST",
@@ -227,7 +224,7 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
         body: JSON.stringify({
           locale,
           type: "custom",
-          userId: user.id,
+          userId: user?.id ?? null,
           configuration: {
             steps: stepsPayload,
             extras,
@@ -270,22 +267,39 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
     try {
       const supabase = createBrowserClient();
       const { data: { user } } = await supabase.auth.getUser();
+      const title = isFr ? "Montre sur mesure" : "Custom Build";
+      const configuration = {
+        steps: stepsPayload,
+        extras: stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [],
+        addonIds: addonIdsPayload,
+      };
+
       if (!user) {
-        window.location.href = `/${locale}/account/login?redirect=${encodeURIComponent(`/${locale}/configurator`)}`;
+        addGuestCartItem({
+          product_id: `custom-${crypto.randomUUID()}`,
+          quantity: 1,
+          price: total,
+          title,
+          image_url: "/images/configurator.svg",
+          configuration,
+        });
+        window.dispatchEvent(new CustomEvent("cart-updated"));
+        window.dispatchEvent(
+          new CustomEvent("cart-item-added", {
+            detail: { type: "custom", lineItems: totalLineItems },
+          })
+        );
+        setAddToCartLoading(false);
         return;
       }
+
       if (isEditMode && editCartItemId) {
-        const title = isFr ? "Montre sur mesure" : "Custom Build";
         const { error } = await supabase
           .from("cart_items")
           .update({
             price: total,
             title,
-            configuration: {
-              steps: stepsPayload,
-              extras: stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [],
-              addonIds: addonIdsPayload,
-            },
+            configuration,
           })
           .eq("id", editCartItemId)
           .eq("user_id", user.id);
@@ -298,7 +312,6 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
         return;
       }
       const productId = `custom-${crypto.randomUUID()}`;
-      const title = isFr ? "Montre sur mesure" : "Custom Build";
       const { data: inserted, error } = await supabase
         .from("cart_items")
         .insert({
@@ -308,11 +321,7 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
           price: total,
           title,
           image_url: "/images/configurator.svg",
-          configuration: {
-            steps: stepsPayload,
-            extras: stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [],
-            addonIds: addonIdsPayload,
-          },
+          configuration,
         })
         .select("id")
         .single();

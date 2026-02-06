@@ -5,6 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import {
+  getGuestCart,
+  setGuestCart,
+  updateGuestCartQuantity,
+  removeGuestCartItem,
+} from "@/lib/guest-cart";
 
 export type CartItem = {
   id: string;
@@ -13,6 +19,7 @@ export type CartItem = {
   price: number;
   title: string | null;
   image_url: string | null;
+  configuration?: unknown;
 };
 
 type CartLabels = {
@@ -34,25 +41,44 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
 
   const fetchCart = async () => {
     const supabase = createBrowserClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      setItems([]);
+      const guestItems = getGuestCart().map((g) => ({
+        id: g.id,
+        product_id: g.product_id,
+        quantity: g.quantity,
+        price: g.price,
+        title: g.title,
+        image_url: g.image_url,
+        configuration: g.configuration,
+      }));
+      setItems(guestItems);
+      setIsGuest(true);
       setLoading(false);
       return;
     }
+    setIsGuest(false);
     const { data, error: fetchError } = await supabase
       .from("cart_items")
-      .select("id, product_id, quantity, price, title, image_url")
+      .select("id, product_id, quantity, price, title, image_url, configuration")
       .eq("user_id", user.id)
       .order("created_at", { ascending: true });
     if (fetchError) {
       setError(fetchError.message);
       setItems([]);
     } else {
-      setItems((data ?? []).map((r) => ({ ...r, price: Number(r.price), quantity: Number(r.quantity) })));
+      setItems(
+        (data ?? []).map((r) => ({
+          ...r,
+          price: Number(r.price),
+          quantity: Number(r.quantity),
+          configuration: (r as { configuration?: unknown }).configuration,
+        }))
+      );
     }
     setLoading(false);
   };
@@ -65,6 +91,12 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
     if (quantity < 1) return;
     const item = items.find((i) => i.id === itemId);
     if (item?.product_id.startsWith("custom-") && quantity > 1) return;
+    if (isGuest) {
+      const next = updateGuestCartQuantity(itemId, quantity);
+      setItems(next);
+      window.dispatchEvent(new CustomEvent("cart-updated"));
+      return;
+    }
     const supabase = createBrowserClient();
     await supabase.from("cart_items").update({ quantity }).eq("id", itemId);
     setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity } : i)));
@@ -72,6 +104,12 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
   };
 
   const removeItem = async (itemId: string) => {
+    if (isGuest) {
+      const next = removeGuestCartItem(itemId);
+      setItems(next);
+      window.dispatchEvent(new CustomEvent("cart-updated"));
+      return;
+    }
     const supabase = createBrowserClient();
     await supabase.from("cart_items").delete().eq("id", itemId);
     setItems((prev) => prev.filter((i) => i.id !== itemId));
@@ -79,23 +117,35 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
   };
 
   const handleCheckout = async () => {
-    const supabase = createBrowserClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push(`/${activeLocale}/account/login`);
-      return;
-    }
     if (items.length === 0) return;
     setCheckoutLoading(true);
     setError(null);
     try {
+      const supabase = createBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      const body: Record<string, unknown> = {
+        locale: activeLocale,
+        type: "cart",
+      };
+      if (user) {
+        body.userId = user.id;
+      } else {
+        body.guestCart = items.map((i) => ({
+          product_id: i.product_id,
+          quantity: i.quantity,
+          price: i.price,
+          title: i.title,
+          configuration: i.configuration,
+        }));
+      }
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locale: activeLocale, type: "cart", userId: user.id }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data?.url) {
+        if (isGuest) setGuestCart([]);
         window.location.href = data.url;
         return;
       }
@@ -173,7 +223,7 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
                   </div>
                   <p className="w-20 text-right font-semibold">${(item.price * item.quantity).toLocaleString()}</p>
                   <div className="flex flex-wrap items-center gap-2">
-                    {item.product_id.startsWith("custom-") && (
+                    {item.product_id.startsWith("custom-") && !item.id.startsWith("guest-") && (
                       <Link
                         href={`/${activeLocale}/configurator?edit=${encodeURIComponent(item.id)}`}
                         className="btn-hover rounded-full border-2 border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/20"

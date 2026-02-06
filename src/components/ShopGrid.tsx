@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { addGuestCartItem } from "@/lib/guest-cart";
 
 type Watch = {
   id: string;
@@ -31,7 +32,15 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
       } = await supabase.auth.getUser();
 
       if (!user) {
-        window.location.href = `/${activeLocale}/account/login`;
+        addGuestCartItem({
+          product_id: watch.id,
+          quantity: 1,
+          price: watch.price,
+          title: watch.name,
+          image_url: watch.image,
+        });
+        window.dispatchEvent(new CustomEvent("cart-updated"));
+        window.dispatchEvent(new CustomEvent("cart-item-added"));
         return;
       }
 
@@ -86,9 +95,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
       const message =
         typeof data?.error === "string"
           ? data.error
-          : response.status === 401
-            ? isFr ? "Veuillez vous connecter." : "Please sign in."
-            : isFr ? "Impossible de lancer la commande. Réessayez." : "Could not start checkout. Please try again.";
+          : isFr ? "Impossible de lancer la commande. Réessayez." : "Could not start checkout. Please try again.";
       alert(message);
     } finally {
       setLoadingId(null);

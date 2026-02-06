@@ -152,6 +152,13 @@ export async function POST(request: NextRequest) {
     locale?: string;
     type?: string;
     userId?: string | null;
+    guestCart?: Array<{
+      product_id: string;
+      quantity: number;
+      price: number;
+      title?: string | null;
+      configuration?: unknown;
+    }>;
     configuration?: Record<string, string | number>;
     productId?: string;
   };
@@ -172,8 +179,8 @@ export async function POST(request: NextRequest) {
   if (type === "built" && !body.productId) {
     return NextResponse.json({ error: "Missing product" }, { status: 400 });
   }
-  if (type === "cart" && !userId) {
-    return NextResponse.json({ error: "Sign in to checkout your cart" }, { status: 401 });
+  if (type === "cart" && !userId && (!Array.isArray(body.guestCart) || body.guestCart.length === 0)) {
+    return NextResponse.json({ error: "Your cart is empty" }, { status: 400 });
   }
 
   try {
@@ -182,6 +189,7 @@ export async function POST(request: NextRequest) {
     let summary = "Ciavaglia timepiece";
     let amount = 0;
     let configurationId: string | null = null;
+    let guestCartProductQuantitiesJson: string | null = null;
     type LineItem = {
       quantity: number;
       price_data: {
@@ -354,6 +362,83 @@ export async function POST(request: NextRequest) {
       summary = `Cart · ${cartRows.length} item${cartRows.length === 1 ? "" : "s"}`;
     }
 
+    if (type === "cart" && !userId && Array.isArray(body.guestCart) && body.guestCart.length > 0) {
+      const guestCart = body.guestCart;
+      const builtProductIds = [...new Set(guestCart.filter((r) => !r.configuration && !r.product_id.startsWith("custom-")).map((r) => r.product_id))];
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, name, price, stock, active")
+        .in("id", builtProductIds);
+      const productMap = new Map((products ?? []).map((p) => [p.id, p]));
+      const cartProductQuantities: { product_id: string; quantity: number }[] = [];
+
+      for (const row of guestCart) {
+        const qty = Math.max(1, Number(row.quantity) || 1);
+        const isCustom = !!row.configuration || (typeof row.product_id === "string" && row.product_id.startsWith("custom-"));
+
+        if (isCustom) {
+          const cfg = row.configuration as Record<string, unknown> | undefined;
+          const unitPrice = Number(row.price) || 0;
+          if (unitPrice <= 0 && cfg && typeof (cfg as { price?: number }).price === "number") {
+            // use server-calculated price if client sent 0
+            const serverPrice = await calculateCustomBuildPrice(supabase, {
+              steps: Array.isArray(cfg?.steps) ? cfg.steps : [],
+              extras: Array.isArray(cfg?.extras) ? cfg.extras : [],
+              addonIds: Array.isArray(cfg?.addonIds) ? cfg.addonIds : [],
+            });
+            if (serverPrice > 0) {
+              lineItems.push({
+                quantity: qty,
+                price_data: {
+                  currency: "usd",
+                  product_data: { name: row.title ?? "Custom Build" },
+                  unit_amount: Math.round(serverPrice * 100),
+                },
+              });
+            }
+          } else if (unitPrice > 0) {
+            lineItems.push({
+              quantity: qty,
+              price_data: {
+                currency: "usd",
+                product_data: { name: row.title ?? "Custom Build" },
+                unit_amount: Math.round(unitPrice * 100),
+              },
+            });
+          }
+          continue;
+        }
+
+        const product = productMap.get(row.product_id);
+        if (!product || !product.active) {
+          return NextResponse.json(
+            { error: `Product "${row.title ?? row.product_id}" is no longer available` },
+            { status: 400 }
+          );
+        }
+        const stock = product.stock ?? 0;
+        if (stock < qty) {
+          return NextResponse.json(
+            { error: `Not enough stock for "${row.title ?? product.name}"` },
+            { status: 400 }
+          );
+        }
+        const unitPrice = Number(row.price ?? product.price);
+        lineItems.push({
+          quantity: qty,
+          price_data: {
+            currency: "usd",
+            product_data: { name: row.title ?? product.name },
+            unit_amount: Math.round(unitPrice * 100),
+          },
+        });
+        cartProductQuantities.push({ product_id: row.product_id, quantity: qty });
+      }
+
+      summary = `Cart · ${guestCart.length} item${guestCart.length === 1 ? "" : "s"}`;
+      guestCartProductQuantitiesJson = JSON.stringify(cartProductQuantities);
+    }
+
     if (lineItems.length === 0) {
       return NextResponse.json({ error: "Nothing to checkout" }, { status: 400 });
     }
@@ -389,6 +474,8 @@ export async function POST(request: NextRequest) {
         quantity: Number(r.quantity) || 1,
       }));
       metadata.cart_product_quantities = JSON.stringify(cartProductQuantities);
+    } else if (type === "cart" && guestCartProductQuantitiesJson) {
+      metadata.cart_product_quantities = guestCartProductQuantitiesJson;
     }
 
     const session = await stripe.checkout.sessions.create({

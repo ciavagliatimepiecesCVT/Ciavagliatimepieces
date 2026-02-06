@@ -52,6 +52,16 @@ const emailCopy = {
       trackCta: "You can track your order status anytime using the order number above.",
       cta: "We will be in touch if we need any details. If you have questions, reply to this email.",
     },
+    tracking: {
+      subject: "Your order has shipped — tracking info inside",
+      title: "Your order has shipped",
+      intro: "Your Ciavaglia Timepieces order is on its way. Use the details below to track your package.",
+      orderNumberLabel: "Order number",
+      trackingNumberLabel: "Tracking number",
+      carrierLabel: "Carrier",
+      trackLinkCta: "Track your package",
+      cta: "If you have any questions, reply to this email.",
+    },
   },
   fr: {
     footer: "Ciavaglia Timepieces — Créé avec soin",
@@ -79,6 +89,16 @@ const emailCopy = {
       orderNumberLabel: "Numéro de commande",
       trackCta: "Vous pouvez suivre le statut de votre commande à tout moment avec le numéro ci-dessus.",
       cta: "Nous vous contacterons si nous avons besoin de précisions. Pour toute question, répondez à cet e-mail.",
+    },
+    tracking: {
+      subject: "Votre commande a été expédiée — suivi à l'intérieur",
+      title: "Votre commande a été expédiée",
+      intro: "Votre commande Ciavaglia Timepieces est en route. Utilisez les informations ci-dessous pour suivre votre colis.",
+      orderNumberLabel: "Numéro de commande",
+      trackingNumberLabel: "Numéro de suivi",
+      carrierLabel: "Transporteur",
+      trackLinkCta: "Suivre votre colis",
+      cta: "Pour toute question, répondez à cet e-mail.",
     },
   },
 } as const;
@@ -260,4 +280,95 @@ export async function sendOrderEmails({
   }
 
   console.log("[Order email] Sent successfully");
+}
+
+/** Send tracking info email to the customer when admin adds tracking to an order. Works for both account and guest orders (uses order.customer_email). */
+export async function sendTrackingEmail({
+  to,
+  orderNumber,
+  trackingNumber,
+  trackingCarrier,
+  trackingUrl,
+  locale = "en",
+}: {
+  to: string;
+  orderNumber: string | null;
+  trackingNumber: string | null;
+  trackingCarrier: string | null;
+  trackingUrl: string | null;
+  locale?: "en" | "fr";
+}) {
+  const host = process.env.SMTP_HOST;
+  const port = process.env.SMTP_PORT;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM;
+
+  if (!host || !port || !user || !pass || !from) {
+    console.warn(
+      "Tracking email skipped: set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM to send tracking emails."
+    );
+    return;
+  }
+
+  if (!to?.trim()) return;
+
+  const lang = locale === "fr" ? emailCopy.fr : emailCopy.en;
+  const t = lang.tracking;
+  const links = getEmailFooterLinks(locale);
+
+  const orderRow =
+    orderNumber != null
+      ? `<tr><td style="padding:0 20px 8px;font-size:14px;color:#333;"><strong>${t.orderNumberLabel}</strong> — ${orderNumber}</td></tr>`
+      : "";
+  const trackingNumberRow =
+    trackingNumber != null && trackingNumber.trim()
+      ? `<tr><td style="padding:8px 20px;font-size:14px;color:#333;"><strong>${t.trackingNumberLabel}</strong> — ${trackingNumber.trim()}</td></tr>`
+      : "";
+  const carrierRow =
+    trackingCarrier != null && trackingCarrier.trim()
+      ? `<tr><td style="padding:0 20px 8px;font-size:14px;color:#333;"><strong>${t.carrierLabel}</strong> — ${trackingCarrier.trim()}</td></tr>`
+      : "";
+  const trackLinkRow =
+    trackingUrl != null && trackingUrl.trim()
+      ? `<tr><td style="padding:12px 20px 16px;font-size:14px;"><a href="${trackingUrl.trim()}" style="color:#1a1a1a;font-weight:600;text-decoration:underline;">${t.trackLinkCta}</a></td></tr>`
+      : "";
+
+  const content = `
+    <h2 style="margin:0 0 20px;font-size:22px;font-weight:600;color:#1a1a1a;">${t.title}</h2>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#444;">${t.intro}</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;border-collapse:collapse;background:#f9f9f9;border-radius:6px;">
+      ${orderRow}
+      ${trackingNumberRow}
+      ${carrierRow}
+      ${trackLinkRow}
+    </table>
+    <p style="margin:0 0 8px;font-size:14px;color:#666;">${t.cta}</p>
+    <p style="margin:0;font-size:13px;color:#888;"><a href="${links.track}" style="color:#666;text-decoration:underline;">${lang.emailFooter.trackOrder}</a></p>
+  `;
+
+  const portNum = Number(port);
+  const transporter = nodemailer.createTransport({
+    host,
+    port: portNum,
+    secure: portNum === 465,
+    auth: { user, pass },
+  });
+
+  try {
+    await transporter.verify();
+  } catch (verifyError) {
+    const msg = verifyError instanceof Error ? verifyError.message : String(verifyError);
+    console.error("[Tracking email] SMTP connection failed:", msg);
+    throw verifyError;
+  }
+
+  await transporter.sendMail({
+    from,
+    to: to.trim(),
+    subject: t.subject,
+    html: emailLayout(content, locale),
+  });
+
+  console.log("[Tracking email] Sent to customer:", to.trim());
 }

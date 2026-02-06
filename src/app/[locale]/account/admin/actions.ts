@@ -1173,13 +1173,42 @@ export async function updateOrderTracking(orderId: string, input: OrderTrackingI
   await requireAdmin();
   if (!orderId) throw new Error("Invalid order id");
   const supabase = createServerClient();
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("customer_email, order_number")
+    .eq("id", orderId)
+    .single();
+
   const updates: Record<string, string | null> = {};
   if (input.tracking_number !== undefined) updates.tracking_number = input.tracking_number || null;
   if (input.tracking_carrier !== undefined) updates.tracking_carrier = input.tracking_carrier || null;
   if (input.tracking_url !== undefined) updates.tracking_url = input.tracking_url || null;
   if (Object.keys(updates).length === 0) return;
+
   const { error } = await supabase.from("orders").update(updates).eq("id", orderId);
   if (error) throw error;
+
+  const customerEmail = (order as { customer_email?: string | null } | null)?.customer_email?.trim();
+  const orderNumber = (order as { order_number?: string | null } | null)?.order_number ?? null;
+  const trackingNumber = updates.tracking_number ?? input.tracking_number ?? null;
+  const trackingCarrier = updates.tracking_carrier ?? input.tracking_carrier ?? null;
+  const trackingUrl = updates.tracking_url ?? input.tracking_url ?? null;
+
+  if (customerEmail && (trackingNumber || trackingUrl)) {
+    const { sendTrackingEmail } = await import("@/lib/email");
+    sendTrackingEmail({
+      to: customerEmail,
+      orderNumber,
+      trackingNumber,
+      trackingCarrier,
+      trackingUrl,
+      locale: "en",
+    }).catch((e) => {
+      console.error("[updateOrderTracking] Failed to send tracking email:", e);
+    });
+  }
+
   revalidatePath("/[locale]/account/admin", "page");
   revalidatePath("/[locale]/account/admin/orders", "page");
 }

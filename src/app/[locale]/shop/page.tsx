@@ -1,7 +1,26 @@
+import type { Metadata } from "next";
 import ShopGrid from "@/components/ShopGrid";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createServerClient } from "@/lib/supabase/server";
 import { Locale } from "@/lib/i18n";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const isFr = locale === "fr";
+  return {
+    title: isFr ? "Boutique | Montres prêtes à expédier" : "Shop | Ready-to-Ship Watches",
+    description: isFr
+      ? "Montres Ciavaglia prêtes à expédier. Pièces assemblées à Montréal, quantités limitées."
+      : "Ciavaglia ready-to-ship watches. Built in Montreal, limited quantities.",
+    openGraph: {
+      title: isFr ? "Boutique | Ciavaglia Timepieces" : "Shop | Ciavaglia Timepieces",
+    },
+  };
+}
 
 export default async function ShopPage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;

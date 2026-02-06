@@ -7,11 +7,45 @@ import { isAdmin } from "@/lib/admin";
 import { getDictionary, Locale, locales } from "@/lib/i18n";
 import { createAuthServerClient } from "@/lib/supabase/server";
 import { getWatchCategories } from "@/lib/watch-categories";
+import {
+  SITE_NAME,
+  fullUrl,
+  LOCALE_DESCRIPTIONS,
+  organizationJsonLd,
+  websiteJsonLd,
+} from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Ciavaglia Timepieces",
-  description: "Custom watchmaking studio.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const desc = LOCALE_DESCRIPTIONS[locale] ?? LOCALE_DESCRIPTIONS.en;
+  const canonical = fullUrl(`/${locale}`);
+  const isFr = locale === "fr";
+
+  return {
+    title: isFr
+      ? "Montres de luxe sur mesure | Configurateur | Montréal"
+      : "Custom Luxury Watches | Watch Configurator | Montreal",
+    description: desc,
+    openGraph: {
+      title: `${SITE_NAME} | ${isFr ? "Montres sur mesure Montréal" : "Custom Watches Montreal"}`,
+      description: desc,
+      url: canonical,
+      locale: isFr ? "fr_CA" : "en_CA",
+      alternateLocale: isFr ? ["en_CA"] : ["fr_CA"],
+    },
+    alternates: {
+      canonical,
+      languages: {
+        "en-CA": fullUrl("/en"),
+        "fr-CA": fullUrl("/fr"),
+      },
+    },
+  };
+}
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -36,10 +70,25 @@ export default async function LocaleLayout({
   const isAdminUser = isAdmin(user?.id);
   const watchCategories = await getWatchCategories();
 
+  const orgJson = organizationJsonLd(locale);
+  const webJson = websiteJsonLd(locale);
+
   return (
     <div className="min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(orgJson),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(webJson),
+        }}
+      />
       <NavBar locale={locale} labels={dictionary.nav} isAdmin={isAdminUser} watchCategories={watchCategories} />
-      <main className="pt-28 md:pt-32">{children}</main>
+      <main className="pt-28 md:pt-32" id="main-content">{children}</main>
       <Footer locale={locale} />
       <CartToast locale={locale} />
     </div>

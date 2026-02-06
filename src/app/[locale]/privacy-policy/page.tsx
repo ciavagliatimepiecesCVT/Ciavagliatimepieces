@@ -1,4 +1,21 @@
+import type { Metadata } from "next";
 import ScrollReveal from "@/components/ScrollReveal";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const isFr = locale === "fr";
+  return {
+    title: isFr ? "Politique de confidentialité" : "Privacy Policy",
+    description: isFr
+      ? "Comment Ciavaglia Timepieces collecte, utilise et protège vos données personnelles."
+      : "How Ciavaglia Timepieces collects, uses, and protects your personal data.",
+    robots: { index: true, follow: true },
+  };
+}
 
 export default async function PrivacyPolicyPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

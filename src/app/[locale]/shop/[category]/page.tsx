@@ -1,9 +1,32 @@
+import type { Metadata } from "next";
 import ShopGrid from "@/components/ShopGrid";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createServerClient } from "@/lib/supabase/server";
 import { getWatchCategories } from "@/lib/watch-categories";
 import { Locale } from "@/lib/i18n";
 import { notFound } from "next/navigation";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale; category: string }>;
+}): Promise<Metadata> {
+  const { locale, category } = await params;
+  const categories = await getWatchCategories();
+  const cat = categories.find((c) => c.slug === category);
+  if (!cat) return { title: "Shop" };
+  const label = locale === "fr" ? cat.label_fr : cat.label_en;
+  const isFr = locale === "fr";
+  return {
+    title: isFr ? `${label} | Boutique` : `${label} | Shop`,
+    description: isFr
+      ? `Montres ${label} prêtes à expédier. Collection Ciavaglia Timepieces.`
+      : `${label} watches ready to ship. Ciavaglia Timepieces collection.`,
+    openGraph: {
+      title: `${label} | Ciavaglia Timepieces`,
+    },
+  };
+}
 
 export default async function ShopCategoryPage({
   params,
