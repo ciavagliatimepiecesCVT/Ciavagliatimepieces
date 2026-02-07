@@ -114,7 +114,7 @@ export default function AdminJournalPage() {
   if (loading) {
     return (
       <div className="py-12">
-        <p className="text-foreground/70">{isFr ? "Chargement..." : "Loading..."}</p>
+        <p className="text-white/90">{isFr ? "Chargement..." : "Loading..."}</p>
       </div>
     );
   }
@@ -123,7 +123,7 @@ export default function AdminJournalPage() {
     return (
       <div className="py-12">
         <p className="text-red-600">{error}</p>
-        <a href={`/${locale}/account/manage`} className="mt-4 inline-block text-sm underline">
+        <a href={`/${locale}/account/manage`} className="mt-4 inline-block text-sm text-white underline hover:text-white/90">
           {isFr ? "Retour au compte" : "Back to account"}
         </a>
       </div>
@@ -135,8 +135,8 @@ export default function AdminJournalPage() {
       <ScrollReveal>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold">{isFr ? "Journal" : "Journal"}</h1>
-            <p className="mt-1 text-foreground/70">
+            <h1 className="text-3xl font-semibold text-white">{isFr ? "Journal" : "Journal"}</h1>
+            <p className="mt-1 text-white/90">
               {isFr ? "Ajoutez et modifiez les articles du journal." : "Add and edit journal posts."}
             </p>
           </div>

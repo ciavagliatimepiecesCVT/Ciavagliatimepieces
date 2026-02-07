@@ -129,7 +129,7 @@ export default function AdminCategoriesPage() {
   if (loading) {
     return (
       <div className="py-12">
-        <p className="text-foreground/70">{isFr ? "Chargement..." : "Loading..."}</p>
+        <p className="text-white/90">{isFr ? "Chargement..." : "Loading..."}</p>
       </div>
     );
   }
@@ -138,7 +138,7 @@ export default function AdminCategoriesPage() {
     return (
       <div className="py-12">
         <p className="text-red-600">{error}</p>
-        <a href={`/${locale}/account/manage`} className="mt-4 inline-block text-sm underline">
+        <a href={`/${locale}/account/manage`} className="mt-4 inline-block text-sm text-white underline hover:text-white/90">
           {isFr ? "Retour au compte" : "Back to account"}
         </a>
       </div>
@@ -150,8 +150,8 @@ export default function AdminCategoriesPage() {
       <ScrollReveal>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold">{isFr ? "Catégories" : "Categories"}</h1>
-            <p className="mt-1 text-foreground/70">
+            <h1 className="text-3xl font-semibold text-white">{isFr ? "Catégories" : "Categories"}</h1>
+            <p className="mt-1 text-white/90">
               {isFr ? "Ajoutez des catégories et assignez des montres." : "Add categories and assign watches to them."}
             </p>
           </div>

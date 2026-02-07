@@ -14,7 +14,7 @@ export default function AdminPage() {
 
   return (
     <div className="py-12">
-      <p className="text-foreground/70">Redirecting…</p>
+      <p className="text-white/90">Redirecting…</p>
     </div>
   );
 }

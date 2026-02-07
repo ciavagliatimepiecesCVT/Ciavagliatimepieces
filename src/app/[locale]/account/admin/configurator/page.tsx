@@ -406,7 +406,7 @@ export default function AdminConfiguratorPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-[var(--background)]">
-        <p className="text-foreground/70">{isFr ? "Chargement..." : "Loading..."}</p>
+        <p className="text-white/90">{isFr ? "Chargement..." : "Loading..."}</p>
       </div>
     );
   }

@@ -472,7 +472,10 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
             const optionImage = opt?.image_url || opt?.preview_image_url;
             const stepMeta = currentStepId ? stepIdToMeta.get(currentStepId) : null;
             const stepImage = (stepMeta as { image_url?: string } | undefined)?.image_url;
-            const previewUrl = optionImage || stepImage;
+            const isExtraStepForGmtOrSub =
+              currentStepKey === "extra" && (functionId === "gmt" || functionId === "submariner");
+            const extraStepImage = isExtraStepForGmtOrSub ? "/images/configuratorextra.png" : null;
+            const previewUrl = optionImage || stepImage || extraStepImage;
             if (previewUrl) {
               return (
                 <Image

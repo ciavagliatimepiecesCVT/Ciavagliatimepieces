@@ -134,7 +134,7 @@ export default function AdminGiveawayPage() {
   if (loading) {
     return (
       <div className="py-12">
-        <p className="text-foreground/70">{isFr ? "Chargement..." : "Loading..."}</p>
+        <p className="text-white/90">{isFr ? "Chargement..." : "Loading..."}</p>
       </div>
     );
   }
@@ -143,7 +143,7 @@ export default function AdminGiveawayPage() {
     return (
       <div className="py-12">
         <p className="text-red-600">{error}</p>
-        <a href={`/${locale}/account/manage`} className="mt-4 inline-block text-sm underline">
+        <a href={`/${locale}/account/manage`} className="mt-4 inline-block text-sm text-white underline hover:text-white/90">
           {isFr ? "Retour au compte" : "Back to account"}
         </a>
       </div>
@@ -154,8 +154,8 @@ export default function AdminGiveawayPage() {
     <div className="space-y-8">
       <ScrollReveal>
         <div>
-          <h1 className="text-3xl font-semibold">{isFr ? "Concours" : "Giveaway"}</h1>
-          <p className="mt-1 text-foreground/70">
+          <h1 className="text-3xl font-semibold text-white">{isFr ? "Concours" : "Giveaway"}</h1>
+          <p className="mt-1 text-white/90">
             {isFr
               ? "Annoncez un concours : il apparaîtra en tête de la page d'accueil. Consultez les achats par montant."
               : "Announce a giveaway and it will appear at the top of the homepage. View customers who bought, by amount."}
@@ -310,10 +310,10 @@ export default function AdminGiveawayPage() {
 
       <ScrollReveal>
         <div>
-          <h2 className="text-xl font-medium">
+          <h2 className="text-xl font-medium text-white">
             {isFr ? "Achats (participants)" : "Purchases (eligible customers)"}
           </h2>
-          <p className="mt-1 text-sm text-foreground/70">
+          <p className="mt-1 text-sm text-white/90">
             {isFr
               ? "Personnes ayant passé commande, avec montant. Triez par prix."
               : "People who placed orders, with amount. Sort by price."}

@@ -216,7 +216,7 @@ export default function AdminOrdersPage() {
   if (loading) {
     return (
       <div className="py-12">
-        <p className="text-foreground/70">{isFr ? "Chargement..." : "Loading..."}</p>
+        <p className="text-white/90">{isFr ? "Chargement..." : "Loading..."}</p>
       </div>
     );
   }
@@ -235,8 +235,8 @@ export default function AdminOrdersPage() {
     <div className="space-y-8">
       <ScrollReveal>
         <div>
-          <h1 className="text-3xl font-semibold">{isFr ? "Commandes" : "Orders"}</h1>
-          <p className="mt-1 text-foreground/70">
+          <h1 className="text-3xl font-semibold text-white">{isFr ? "Commandes" : "Orders"}</h1>
+          <p className="mt-1 text-white/90">
             {isFr
               ? "Consultez et gérez les commandes et les adresses de livraison."
               : "View and manage orders and shipping addresses."}
@@ -248,14 +248,14 @@ export default function AdminOrdersPage() {
 
       {/* Tabs */}
       <ScrollReveal>
-        <div className="flex gap-2 border-b border-foreground/10">
+        <div className="flex gap-2 border-b border-white/20">
           <button
             type="button"
             onClick={() => setActiveTab("new")}
             className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
               activeTab === "new"
-                ? "border-foreground text-foreground"
-                : "border-transparent text-foreground/60 hover:text-foreground"
+                ? "border-white text-white"
+                : "border-transparent text-white/80 hover:text-white"
             }`}
           >
             {isFr ? "Nouvelles" : "New"} ({newOrders.length})
@@ -265,8 +265,8 @@ export default function AdminOrdersPage() {
             onClick={() => setActiveTab("shipped")}
             className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
               activeTab === "shipped"
-                ? "border-foreground text-foreground"
-                : "border-transparent text-foreground/60 hover:text-foreground"
+                ? "border-white text-white"
+                : "border-transparent text-white/80 hover:text-white"
             }`}
           >
             {isFr ? "Expédiées et terminées" : "Shipped & Completed"} ({shippedOrders.length})

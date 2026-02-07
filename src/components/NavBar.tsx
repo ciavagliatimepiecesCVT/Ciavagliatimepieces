@@ -49,8 +49,22 @@ export default function NavBar({
   const [user, setUser] = useState<User | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
+  /** On mobile: navbar stays hidden until user taps the menu button; scroll (any direction) hides it again. */
+  const [mobileNavRevealed, setMobileNavRevealed] = useState(false);
   const lastScrollY = useRef(0);
   const scrollThreshold = 10;
+  const [isMobileView, setIsMobileView] = useState(false);
+  const isMobileRef = useRef(false);
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    const update = () => {
+      isMobileRef.current = mql.matches;
+      setIsMobileView(mql.matches);
+    };
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -91,10 +105,14 @@ export default function NavBar({
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY.current && currentScrollY > scrollThreshold) {
-        setHidden(true);
-      } else if (currentScrollY < lastScrollY.current) {
-        setHidden(false);
+      if (isMobileRef.current) {
+        setMobileNavRevealed(false);
+      } else {
+        if (currentScrollY > lastScrollY.current && currentScrollY > scrollThreshold) {
+          setHidden(true);
+        } else if (currentScrollY < lastScrollY.current) {
+          setHidden(false);
+        }
       }
       lastScrollY.current = currentScrollY;
     };
@@ -104,6 +122,7 @@ export default function NavBar({
 
   useEffect(() => {
     setMobileOpen(false);
+    setMobileNavRevealed(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -125,9 +144,23 @@ export default function NavBar({
     router.push(`/${activeLocale}`);
   };
 
+  const headerHidden = isMobileView ? !mobileNavRevealed : hidden;
+
   return (
+    <>
+      {/* Mobile: floating menu button when navbar is hidden */}
+      <button
+        type="button"
+        onClick={() => setMobileNavRevealed(true)}
+        className={`fixed top-4 right-4 z-[60] flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-[var(--logo-green)] text-white shadow-lg transition hover:border-white hover:text-white md:hidden ${headerHidden ? "" : "hidden"}`}
+        aria-label="Open menu"
+      >
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
     <header
-      className={`fixed left-0 right-0 top-0 z-50 w-full bg-[var(--logo-green)] transition-transform duration-300 ${hidden ? "-translate-y-full" : "translate-y-0"}`}
+      className={`fixed left-0 right-0 top-0 z-50 w-full bg-[var(--logo-green)] transition-transform duration-300 ${headerHidden ? "-translate-y-full" : "translate-y-0"}`}
     >
       {/* Full-width top bar: left nav | center logo | right account + locale + cart */}
       <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-2.5">
@@ -398,6 +431,7 @@ export default function NavBar({
         </>
       )}
     </header>
+    </>
   );
 }
 

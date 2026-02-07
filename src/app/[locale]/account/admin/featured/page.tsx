@@ -111,7 +111,7 @@ export default function AdminFeaturedPage() {
   if (loading) {
     return (
       <div className="py-12">
-        <p className="text-foreground/70">{isFr ? "Chargement..." : "Loading..."}</p>
+        <p className="text-white/90">{isFr ? "Chargement..." : "Loading..."}</p>
       </div>
     );
   }
@@ -120,7 +120,7 @@ export default function AdminFeaturedPage() {
     return (
       <div className="py-12">
         <p className="text-red-600">{error}</p>
-        <a href={`/${locale}/account/manage`} className="mt-4 inline-block text-sm underline">
+        <a href={`/${locale}/account/manage`} className="mt-4 inline-block text-sm text-white underline hover:text-white/90">
           {isFr ? "Retour au compte" : "Back to account"}
         </a>
       </div>
@@ -132,8 +132,8 @@ export default function AdminFeaturedPage() {
       <ScrollReveal>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold">{isFr ? "À la une" : "Featured"}</h1>
-            <p className="mt-1 text-foreground/70">
+            <h1 className="text-3xl font-semibold text-white">{isFr ? "À la une" : "Featured"}</h1>
+            <p className="mt-1 text-white/90">
               {isFr
                 ? "Séquences de la page d'accueil. Définissez les images, le titre, la description et le lien d'achat."
                 : "Homepage feature sequences. Set images, title, description, and purchase URL."}
