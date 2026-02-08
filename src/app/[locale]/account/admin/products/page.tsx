@@ -40,7 +40,7 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [formData, setFormData] = useState<Partial<Product> & { stock?: number; category?: string; specifications?: string; original_price?: number | "" }>({});
+  const [formData, setFormData] = useState<Partial<Product> & { stock?: number; category?: string; specifications?: string }>({});
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<{ id: string; url: string; sort_order: number }[]>([]);
@@ -103,7 +103,7 @@ export default function AdminProductsPage() {
         description: formData.description ?? "",
         specifications: formData.specifications ?? null,
         price: Number(formData.price) ?? 0,
-        original_price: formData.original_price != null && formData.original_price !== "" ? Number(formData.original_price) : null,
+        original_price: formData.original_price != null ? Number(formData.original_price) : null,
         image: formData.image ?? "",
         stock: Number(formData.stock) ?? 0,
         active: formData.active ?? true,
@@ -131,7 +131,7 @@ export default function AdminProductsPage() {
         description: formData.description ?? "",
         specifications: formData.specifications ?? null,
         price: Number(formData.price) ?? 0,
-        original_price: formData.original_price != null && formData.original_price !== "" ? Number(formData.original_price) : null,
+        original_price: formData.original_price != null ? Number(formData.original_price) : null,
         image: formData.image ?? "/images/hero-1.svg",
         stock: Number(formData.stock) ?? 0,
         active: formData.active ?? true,
@@ -273,7 +273,7 @@ export default function AdminProductsPage() {
                   type="number"
                   min={0}
                   value={formData.original_price ?? ""}
-                  onChange={(e) => setFormData((p) => ({ ...p, original_price: e.target.value === "" ? "" : Number(e.target.value) }))}
+                  onChange={(e) => setFormData((p) => ({ ...p, original_price: e.target.value === "" ? undefined : Number(e.target.value) }))}
                   placeholder="—"
                   className="mt-2 w-full rounded-full border border-foreground/20 bg-white px-4 py-2"
                 />
@@ -466,7 +466,7 @@ export default function AdminProductsPage() {
                       </div>
                       <div>
                         <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">{isFr ? "Prix d'origine ($)" : "Original price ($)"}</label>
-                        <input type="number" min={0} value={formData.original_price ?? ""} onChange={(e) => setFormData((prev) => ({ ...prev, original_price: e.target.value === "" ? "" : Number(e.target.value) }))} placeholder="—" className="mt-1 w-full rounded-full border border-foreground/20 bg-white px-3 py-2 text-sm" />
+                        <input type="number" min={0} value={formData.original_price ?? ""} onChange={(e) => setFormData((prev) => ({ ...prev, original_price: e.target.value === "" ? undefined : Number(e.target.value) }))} placeholder="—" className="mt-1 w-full rounded-full border border-foreground/20 bg-white px-3 py-2 text-sm" />
                       </div>
                       <div className="sm:col-span-2">
                         <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">Description</label>

@@ -772,7 +772,7 @@ export default function AdminConfiguratorPage() {
                       const effective = d > 0 ? p * (1 - d / 100) : p;
                       return effective.toLocaleString();
                     })()}
-                    {(opt as { discount_percent?: number }).discount_percent > 0 && (
+                    {((opt as { discount_percent?: number }).discount_percent ?? 0) > 0 && (
                       <span className="ml-1.5 text-xs text-foreground/50 line-through">${Number(opt.price).toLocaleString()}</span>
                     )}
                   </span>

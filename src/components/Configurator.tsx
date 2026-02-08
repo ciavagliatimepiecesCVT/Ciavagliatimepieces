@@ -567,7 +567,7 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
                   <span className="mt-2 block w-full truncate text-center text-sm font-medium text-foreground">{label}</span>
                   <span className="text-sm font-medium text-[var(--accent)]">
                     ${optionEffectivePrice(opt).toLocaleString()}
-                    {(opt as { discount_percent?: number }).discount_percent > 0 && (
+                    {((opt as { discount_percent?: number }).discount_percent ?? 0) > 0 && (
                       <span className="ml-1.5 text-xs text-foreground/60 line-through">${Number(opt.price).toLocaleString()}</span>
                     )}
                   </span>
