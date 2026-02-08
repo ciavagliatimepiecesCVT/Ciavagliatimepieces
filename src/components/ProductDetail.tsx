@@ -8,6 +8,13 @@ import { useCurrency } from "@/components/CurrencyContext";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { addGuestCartItem } from "@/lib/guest-cart";
 
+type Band = {
+  id: string;
+  title: string;
+  image_url: string;
+  sort_order: number;
+};
+
 type ProductDetailProps = {
   product: {
     id: string;
@@ -21,16 +28,18 @@ type ProductDetailProps = {
     category: string | null;
   };
   images: { id: string; url: string; sort_order: number }[];
+  bands?: Band[];
   locale: string;
   categoryLabel?: string;
 };
 
-export default function ProductDetail({ product, images, locale, categoryLabel }: ProductDetailProps) {
+export default function ProductDetail({ product, images, bands = [], locale, categoryLabel }: ProductDetailProps) {
   const pathname = usePathname();
   const { currency, formatPrice } = useCurrency();
   const activeLocale = locale || pathname?.split("/").filter(Boolean)[0] || "en";
   const isFr = activeLocale === "fr";
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedBand, setSelectedBand] = useState<Band | null>(bands.length > 0 ? bands[0]! : null);
   const [loading, setLoading] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxZoom, setLightboxZoom] = useState(1);
@@ -80,8 +89,17 @@ export default function ProductDetail({ product, images, locale, categoryLabel }
   }, [lightboxOpen]);
 
   const mainImage = product.image ?? "/images/hero-1.svg";
-  const allImages = [mainImage, ...images.map((i) => i.url)];
-  const displayImage = allImages[selectedIndex] ?? mainImage;
+  const primaryImage = selectedBand ? selectedBand.image_url : mainImage;
+  const allImages =
+    selectedBand
+      ? [selectedBand.image_url, ...images.map((i) => i.url)]
+      : [mainImage, ...images.map((i) => i.url)];
+  const displayImage = allImages[selectedIndex] ?? primaryImage;
+  const cartImage = selectedBand ? selectedBand.image_url : mainImage;
+  const cartTitle = selectedBand ? `${product.name} — ${selectedBand.title}` : product.name;
+  const bandConfig = selectedBand
+    ? { band_id: selectedBand.id, band_title: selectedBand.title, band_image_url: selectedBand.image_url }
+    : undefined;
   const isExternal = displayImage.startsWith("http");
   const specLines = (product.specifications ?? "").trim().split(/\r?\n/).filter(Boolean);
   const outOfStock = (product.stock ?? 0) < 1;
@@ -100,8 +118,9 @@ export default function ProductDetail({ product, images, locale, categoryLabel }
           product_id: product.id,
           quantity: 1,
           price: product.price,
-          title: product.name,
-          image_url: mainImage,
+          title: cartTitle,
+          image_url: cartImage,
+          configuration: bandConfig ?? undefined,
         });
         window.dispatchEvent(new CustomEvent("cart-updated"));
         window.dispatchEvent(new CustomEvent("cart-item-added"));
@@ -110,20 +129,32 @@ export default function ProductDetail({ product, images, locale, categoryLabel }
 
       const { data: existing } = await supabase
         .from("cart_items")
-        .select("quantity")
+        .select("id, quantity, configuration")
         .eq("user_id", user.id)
-        .eq("product_id", product.id)
-        .maybeSingle();
-      const newQty = (existing?.quantity ?? 0) + 1;
+        .eq("product_id", product.id);
+      const configMatch = (a: unknown, b: unknown) =>
+        a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+      const match = (existing ?? []).find((r) =>
+        configMatch(bandConfig ?? null, (r as { configuration?: unknown }).configuration)
+      );
+      const newQty = match ? (Number(match.quantity) || 0) + 1 : 1;
 
-      await supabase.from("cart_items").upsert({
-        user_id: user.id,
-        product_id: product.id,
-        quantity: newQty,
-        price: product.price,
-        title: product.name,
-        image_url: mainImage,
-      });
+      if (match) {
+        await supabase
+          .from("cart_items")
+          .update({ quantity: newQty })
+          .eq("id", (match as { id: string }).id);
+      } else {
+        await supabase.from("cart_items").insert({
+          user_id: user.id,
+          product_id: product.id,
+          quantity: 1,
+          price: product.price,
+          title: cartTitle,
+          image_url: cartImage,
+          configuration: bandConfig ?? null,
+        });
+      }
       window.dispatchEvent(new CustomEvent("cart-updated"));
       window.dispatchEvent(new CustomEvent("cart-item-added"));
     } finally {
@@ -139,6 +170,50 @@ export default function ProductDetail({ product, images, locale, categoryLabel }
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      if (selectedBand) {
+        if (!user) {
+          addGuestCartItem({
+            product_id: product.id,
+            quantity: 1,
+            price: product.price,
+            title: cartTitle,
+            image_url: cartImage,
+            configuration: bandConfig ?? undefined,
+          });
+          window.dispatchEvent(new CustomEvent("cart-updated"));
+        } else {
+          const { data: existing } = await supabase
+            .from("cart_items")
+            .select("id, quantity, configuration")
+            .eq("user_id", user.id)
+            .eq("product_id", product.id);
+          const configMatch = (a: unknown, b: unknown) =>
+            a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+          const match = (existing ?? []).find((r) =>
+            configMatch(bandConfig ?? null, (r as { configuration?: unknown }).configuration)
+          );
+          if (match) {
+            await supabase
+              .from("cart_items")
+              .update({ quantity: (Number(match.quantity) || 0) + 1 })
+              .eq("id", (match as { id: string }).id);
+          } else {
+            await supabase.from("cart_items").insert({
+              user_id: user.id,
+              product_id: product.id,
+              quantity: 1,
+              price: product.price,
+              title: cartTitle,
+              image_url: cartImage,
+              configuration: bandConfig ?? null,
+            });
+          }
+          window.dispatchEvent(new CustomEvent("cart-updated"));
+        }
+        window.location.href = `/${activeLocale}/cart`;
+        return;
+      }
 
       const response = await fetch("/api/checkout", {
         method: "POST",
@@ -205,6 +280,41 @@ export default function ProductDetail({ product, images, locale, categoryLabel }
               {isFr ? "Cliquez pour agrandir" : "Click to enlarge"}
             </span>
           </button>
+          {bands.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium uppercase tracking-wider text-white/70">
+                {isFr ? "Bracelet / coloris" : "Band / colorway"}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {bands.map((band) => (
+                  <button
+                    key={band.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedBand(band);
+                      setSelectedIndex(0);
+                    }}
+                    className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 transition ${
+                      selectedBand?.id === band.id ? "border-[var(--logo-gold)] ring-2 ring-[var(--logo-gold)]/30" : "border-foreground/20 hover:border-foreground/40"
+                    }`}
+                    title={band.title}
+                  >
+                    <Image
+                      src={band.image_url}
+                      alt={band.title}
+                      fill
+                      className="object-cover"
+                      sizes="64px"
+                      unoptimized={band.image_url.startsWith("http") && !band.image_url.includes("supabase")}
+                    />
+                  </button>
+                ))}
+              </div>
+              {selectedBand && (
+                <p className="text-sm text-white/80">{selectedBand.title}</p>
+              )}
+            </div>
+          )}
           {allImages.length > 1 && (
             <div className="flex flex-wrap gap-2">
               {allImages.map((url, i) => (

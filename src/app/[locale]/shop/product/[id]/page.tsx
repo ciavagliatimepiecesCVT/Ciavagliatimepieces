@@ -43,11 +43,18 @@ export default async function ProductPage({ params }: Props) {
 
   if (productError || !product) notFound();
 
-  const { data: productImages } = await supabase
-    .from("product_images")
-    .select("id, url, sort_order")
-    .eq("product_id", id)
-    .order("sort_order", { ascending: true });
+  const [{ data: productImages }, { data: productBands }] = await Promise.all([
+    supabase
+      .from("product_images")
+      .select("id, url, sort_order")
+      .eq("product_id", id)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("product_bands")
+      .select("id, title, image_url, sort_order")
+      .eq("product_id", id)
+      .order("sort_order", { ascending: true }),
+  ]);
 
   const categories = await getWatchCategories();
   const row = product as Record<string, unknown>;
@@ -76,10 +83,18 @@ export default async function ProductPage({ params }: Props) {
     sort_order: Number((row as { sort_order?: number }).sort_order ?? 0),
   }));
 
+  const bands = (productBands ?? []).map((row) => ({
+    id: (row as { id: string }).id,
+    title: (row as { title: string }).title,
+    image_url: (row as { image_url: string }).image_url,
+    sort_order: Number((row as { sort_order?: number }).sort_order ?? 0),
+  }));
+
   return (
     <ProductDetail
       product={productData}
       images={images}
+      bands={bands}
       locale={locale}
       categoryLabel={categoryLabel}
     />

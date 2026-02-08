@@ -49,6 +49,10 @@ export function setGuestCart(items: GuestCartItem[]): void {
   localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
 }
 
+function configEqual(a: unknown, b: unknown): boolean {
+  return a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
 export function addGuestCartItem(
   item: Omit<GuestCartItem, "id">
 ): GuestCartItem[] {
@@ -56,7 +60,7 @@ export function addGuestCartItem(
   const isCustom = item.product_id.startsWith("custom-");
   if (!isCustom) {
     const existing = cart.find(
-      (i) => i.product_id === item.product_id && !i.configuration
+      (i) => i.product_id === item.product_id && configEqual(i.configuration, item.configuration)
     );
     if (existing) {
       existing.quantity += item.quantity;

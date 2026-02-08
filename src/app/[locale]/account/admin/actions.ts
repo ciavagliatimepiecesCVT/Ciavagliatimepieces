@@ -397,6 +397,80 @@ export async function setProductImagesOrder(productId: string, imageIdsInOrder: 
   revalidatePath("/[locale]/account/admin", "page");
 }
 
+// ——— Product bands (watch bands / colorways for pre-built products) ———
+export type ProductBandRow = {
+  id: string;
+  product_id: string;
+  title: string;
+  image_url: string;
+  sort_order: number;
+};
+
+export async function getAdminProductBands(productId: string): Promise<ProductBandRow[]> {
+  await requireAdmin();
+  if (!productId) return [];
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("product_bands")
+    .select("id, product_id, title, image_url, sort_order")
+    .eq("product_id", productId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: (r as { id: string }).id,
+    product_id: (r as { product_id: string }).product_id,
+    title: (r as { title: string }).title,
+    image_url: (r as { image_url: string }).image_url,
+    sort_order: Number((r as { sort_order?: number }).sort_order ?? 0),
+  }));
+}
+
+export async function addProductBand(productId: string, title: string, imageUrl: string, sortOrder?: number) {
+  await requireAdmin();
+  if (!productId || productId.length > 100) throw new Error("Invalid product ID");
+  if (!title || title.length > 200) throw new Error("Title must be 1–200 characters");
+  if (!imageUrl || imageUrl.length > 2000) throw new Error("Invalid image URL");
+  const supabase = createServerClient();
+  const { error } = await supabase.from("product_bands").insert({
+    product_id: productId,
+    title: title.trim(),
+    image_url: imageUrl.trim(),
+    sort_order: sortOrder ?? 0,
+  });
+  if (error) throw error;
+  revalidatePath("/[locale]/shop", "page");
+  revalidatePath("/[locale]/shop/product/[id]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+export async function updateProductBand(bandId: string, input: { title?: string; image_url?: string }) {
+  await requireAdmin();
+  if (!bandId) throw new Error("Invalid band ID");
+  if (input.title !== undefined && (input.title.length > 200 || !input.title.trim())) throw new Error("Title must be 1–200 characters");
+  if (input.image_url !== undefined && (input.image_url.length > 2000 || !input.image_url.trim())) throw new Error("Invalid image URL");
+  const supabase = createServerClient();
+  const updates: { title?: string; image_url?: string } = {};
+  if (input.title !== undefined) updates.title = input.title.trim();
+  if (input.image_url !== undefined) updates.image_url = input.image_url.trim();
+  if (Object.keys(updates).length === 0) return;
+  const { error } = await supabase.from("product_bands").update(updates).eq("id", bandId);
+  if (error) throw error;
+  revalidatePath("/[locale]/shop", "page");
+  revalidatePath("/[locale]/shop/product/[id]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+export async function deleteProductBand(bandId: string) {
+  await requireAdmin();
+  if (!bandId) throw new Error("Invalid band ID");
+  const supabase = createServerClient();
+  const { error } = await supabase.from("product_bands").delete().eq("id", bandId);
+  if (error) throw error;
+  revalidatePath("/[locale]/shop", "page");
+  revalidatePath("/[locale]/shop/product/[id]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
 // ——— Featured slides (landing hero carousel) ———
 export type FeaturedSlideRow = {
   id: string;
