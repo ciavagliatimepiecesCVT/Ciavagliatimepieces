@@ -56,31 +56,37 @@ This document outlines the security measures in place to protect the Ciavaglia T
 
 ## 🔒 Additional Recommendations
 
-### For Production Deployment:
+### Implemented (Hardening)
 
-1. **Rate Limiting** (not implemented yet)
-   - Add rate limiting to prevent brute force attacks
-   - Consider Vercel Edge Config or Upstash Redis for rate limiting
-   - Limit admin actions, checkout, and auth endpoints
+1. **Rate Limiting** (`src/middleware.ts`)
+   - **Checkout:** 15 requests/minute per IP
+   - **Track order:** 60 requests/minute per IP
+   - **Login / Sign-up pages:** 30 requests/minute per IP (limits automated probing)
+   - Uses in-memory store per Edge instance; for strict cross-instance limits, add Upstash Redis
 
-2. **CORS Configuration**
+2. **Security Headers** (`next.config.ts`)
+   - **X-Frame-Options:** DENY (clickjacking)
+   - **X-Content-Type-Options:** nosniff
+   - **Referrer-Policy:** strict-origin-when-cross-origin
+   - **Permissions-Policy:** camera, microphone, geolocation disabled
+   - **Content-Security-Policy:** Restricts scripts, frames, connections to self, Supabase, Stripe
+
+### For Production Deployment (Optional)
+
+1. **CORS Configuration**
    - Ensure API routes only accept requests from your domain
-   - Configure in `next.config.ts` or API middleware
+   - Configure in `next.config.ts` or API middleware if you need stricter CORS
 
-3. **Content Security Policy (CSP)**
-   - Add CSP headers to prevent XSS attacks
-   - Configure in `next.config.ts`
-
-4. **Monitoring & Alerts**
+2. **Monitoring & Alerts**
    - Set up Sentry or similar for error tracking
    - Monitor failed admin login attempts
    - Alert on unusual Stripe webhook activity
 
-5. **Regular Updates**
+3. **Regular Updates**
    - Keep dependencies updated (`npm audit`, `npm update`)
    - Monitor Supabase and Stripe security advisories
 
-6. **Backup Strategy**
+4. **Backup Strategy**
    - Enable Supabase automatic backups
    - Export product data regularly
 
