@@ -1,6 +1,7 @@
 import Link from "next/link";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createServerClient } from "@/lib/supabase/server";
+import { getStripe } from "@/lib/stripe";
 
 /** Order is only created by the Stripe webhook after payment is verified. */
 async function getOrderByStripeSessionId(sessionId: string | null) {
@@ -19,6 +20,22 @@ async function getOrderByStripeSessionId(sessionId: string | null) {
   }
 }
 
+/** Get invoice PDF or hosted URL from completed Checkout Session (for download link). */
+async function getInvoiceUrlFromSession(sessionId: string | null): Promise<string | null> {
+  if (!sessionId?.trim()) return null;
+  try {
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.retrieve(sessionId.trim(), {
+      expand: ["invoice"],
+    });
+    if (session.payment_status !== "paid" || !session.invoice) return null;
+    const invoice = session.invoice as { invoice_pdf?: string | null; hosted_invoice_url?: string | null };
+    return invoice.invoice_pdf ?? invoice.hosted_invoice_url ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function CheckoutSuccess({
   params,
   searchParams,
@@ -32,6 +49,7 @@ export default async function CheckoutSuccess({
 
   const order = await getOrderByStripeSessionId(session_id ?? null);
   const verified = !!order && order.status === "paid";
+  const invoiceUrl = await getInvoiceUrlFromSession(session_id ?? null);
 
   return (
     <section className="px-6">
@@ -55,6 +73,18 @@ export default async function CheckoutSuccess({
                   {order.summary} · ${Number(order.total).toLocaleString()}
                 </p>
               )}
+              {invoiceUrl && (
+                <p className="mt-4">
+                  <a
+                    href={invoiceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block rounded-full border border-foreground/30 px-6 py-2.5 text-sm font-medium text-foreground/80 transition hover:bg-foreground/5"
+                  >
+                    {isFr ? "Télécharger la facture" : "Download invoice"}
+                  </a>
+                </p>
+              )}
             </>
           ) : session_id ? (
             <>
@@ -69,6 +99,18 @@ export default async function CheckoutSuccess({
                   ? "Nous vérifions votre transaction et confirmerons votre commande sous peu. Vous recevrez un e-mail dès que ce sera fait."
                   : "We are verifying your transaction and will confirm your order shortly. You will receive an email once it is confirmed."}
               </p>
+              {invoiceUrl && (
+                <p className="mt-4">
+                  <a
+                    href={invoiceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block rounded-full border border-foreground/30 px-6 py-2.5 text-sm font-medium text-foreground/80 transition hover:bg-foreground/5"
+                  >
+                    {isFr ? "Télécharger la facture" : "Download invoice"}
+                  </a>
+                </p>
+              )}
             </>
           ) : (
             <>

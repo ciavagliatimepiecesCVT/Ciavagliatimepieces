@@ -503,6 +503,8 @@ export async function POST(request: NextRequest) {
       billing_address_collection: "required",
       shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "FR", "DE", "IT", "ES", "CH", "AU", "JP"] },
       allow_promotion_codes: true,
+      automatic_tax: { enabled: true },
+      invoice_creation: { enabled: true },
     });
 
     return NextResponse.json({ url: session.url });
