@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { getWatchCategories } from "@/lib/watch-categories";
+import { getProductAddonsWithOptions } from "@/app/[locale]/account/admin/actions";
 import ProductDetail from "@/components/ProductDetail";
 import type { Locale } from "@/lib/i18n";
 
@@ -43,7 +44,7 @@ export default async function ProductPage({ params }: Props) {
 
   if (productError || !product) notFound();
 
-  const [{ data: productImages }, { data: productBands }] = await Promise.all([
+  const [{ data: productImages }, { data: productBands }, addonsWithOptions] = await Promise.all([
     supabase
       .from("product_images")
       .select("id, url, sort_order")
@@ -54,6 +55,7 @@ export default async function ProductPage({ params }: Props) {
       .select("id, title, image_url, sort_order")
       .eq("product_id", id)
       .order("sort_order", { ascending: true }),
+    getProductAddonsWithOptions(id),
   ]);
 
   const categories = await getWatchCategories();
@@ -90,11 +92,14 @@ export default async function ProductPage({ params }: Props) {
     sort_order: Number((row as { sort_order?: number }).sort_order ?? 0),
   }));
 
+  const addons = addonsWithOptions ?? [];
+
   return (
     <ProductDetail
       product={productData}
       images={images}
       bands={bands}
+      addons={addons}
       locale={locale}
       categoryLabel={categoryLabel}
     />

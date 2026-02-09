@@ -11,6 +11,14 @@ import {
   getAdminProductBands,
   addProductBand,
   deleteProductBand,
+  getAdminProductAddons,
+  getProductAddonOptions,
+  createProductAddon,
+  updateProductAddon,
+  deleteProductAddon,
+  createProductAddonOption,
+  updateProductAddonOption,
+  deleteProductAddonOption,
   updateProduct,
   createProduct,
   deleteProduct,
@@ -18,7 +26,7 @@ import {
   addProductImage,
   removeProductImage,
 } from "../actions";
-import type { WatchCategoryRow, ProductBandRow } from "../actions";
+import type { WatchCategoryRow, ProductBandRow, ProductAddonRow, ProductAddonOptionRow } from "../actions";
 
 type Product = {
   id: string;
@@ -31,6 +39,7 @@ type Product = {
   stock: number | null;
   active: boolean | null;
   category: string | null;
+  free_shipping: boolean | null;
 };
 
 export default function AdminProductsPage() {
@@ -48,11 +57,18 @@ export default function AdminProductsPage() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<{ id: string; url: string; sort_order: number }[]>([]);
   const [productBands, setProductBands] = useState<ProductBandRow[]>([]);
+  const [productAddons, setProductAddons] = useState<ProductAddonRow[]>([]);
+  const [addonOptionsByAddon, setAddonOptionsByAddon] = useState<Record<string, ProductAddonOptionRow[]>>({});
   const [newProductExtraImages, setNewProductExtraImages] = useState<string[]>([]);
   const [newProductExtraUrlInput, setNewProductExtraUrlInput] = useState("");
   const [newBandTitle, setNewBandTitle] = useState("");
   const [newBandImageUrl, setNewBandImageUrl] = useState("");
   const [newBandImageUploading, setNewBandImageUploading] = useState(false);
+  const [newAddonLabelEn, setNewAddonLabelEn] = useState("");
+  const [newAddonLabelFr, setNewAddonLabelFr] = useState("");
+  const [newAddonImageUrl, setNewAddonImageUrl] = useState("");
+  const [newAddonImageUploading, setNewAddonImageUploading] = useState(false);
+  const [newOptionByAddon, setNewOptionByAddon] = useState<Record<string, { label_en: string; label_fr: string; price: string }>>({});
 
   useEffect(() => {
     const load = async () => {
@@ -84,18 +100,31 @@ export default function AdminProductsPage() {
       stock: p.stock ?? 0,
       active: p.active ?? true,
       category: p.category ?? undefined,
+      free_shipping: p.free_shipping ?? false,
     });
     setError(null);
     try {
-      const [images, bands] = await Promise.all([
+      const [images, bands, addons] = await Promise.all([
         getAdminProductImages(p.id),
         getAdminProductBands(p.id),
+        getAdminProductAddons(p.id),
       ]);
       setProductImages(images.map((i) => ({ id: i.id, url: i.url, sort_order: i.sort_order })));
       setProductBands(bands);
+      setProductAddons(addons);
+      const optionIdsByAddon: Record<string, ProductAddonOptionRow[]> = {};
+      await Promise.all(
+        addons.map(async (a) => {
+          const opts = await getProductAddonOptions(a.id);
+          optionIdsByAddon[a.id] = opts;
+        })
+      );
+      setAddonOptionsByAddon(optionIdsByAddon);
     } catch {
       setProductImages([]);
       setProductBands([]);
+      setProductAddons([]);
+      setAddonOptionsByAddon({});
     }
   };
 
@@ -104,6 +133,8 @@ export default function AdminProductsPage() {
     setFormData({});
     setProductImages([]);
     setProductBands([]);
+    setProductAddons([]);
+    setAddonOptionsByAddon({});
   };
 
   const handleSave = async () => {
@@ -121,6 +152,7 @@ export default function AdminProductsPage() {
         stock: Number(formData.stock) ?? 0,
         active: formData.active ?? true,
         category: formData.category ?? null,
+        free_shipping: formData.free_shipping ?? false,
       });
       setProducts(await getAdminProducts());
       cancelEdit();
@@ -149,6 +181,7 @@ export default function AdminProductsPage() {
         stock: Number(formData.stock) ?? 0,
         active: formData.active ?? true,
         category: formData.category ?? null,
+        free_shipping: formData.free_shipping ?? false,
       });
       const newId = getProductIdFromName(formData.name);
       for (let i = 0; i < newProductExtraImages.length; i++) {
@@ -221,6 +254,75 @@ export default function AdminProductsPage() {
     }
   };
 
+  const handleAddAddon = async () => {
+    if (!editingId || !newAddonLabelEn.trim()) return;
+    setError(null);
+    try {
+      await createProductAddon({
+        product_id: editingId,
+        label_en: newAddonLabelEn.trim(),
+        label_fr: newAddonLabelFr.trim() || newAddonLabelEn.trim(),
+        image_url: newAddonImageUrl.trim() || "/images/hero-1.svg",
+        sort_order: productAddons.length,
+      });
+      const addons = await getAdminProductAddons(editingId);
+      setProductAddons(addons);
+      setNewAddonLabelEn("");
+      setNewAddonLabelFr("");
+      setNewAddonImageUrl("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to add add-on");
+    }
+  };
+
+  const handleDeleteAddon = async (addonId: string) => {
+    setError(null);
+    try {
+      await deleteProductAddon(addonId);
+      setProductAddons((prev) => prev.filter((a) => a.id !== addonId));
+      setAddonOptionsByAddon((prev) => {
+        const next = { ...prev };
+        delete next[addonId];
+        return next;
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete add-on");
+    }
+  };
+
+  const handleAddAddonOption = async (addonId: string) => {
+    const entry = newOptionByAddon[addonId];
+    if (!entry?.label_en?.trim()) return;
+    setError(null);
+    try {
+      await createProductAddonOption({
+        addon_id: addonId,
+        label_en: entry.label_en.trim(),
+        label_fr: entry.label_fr.trim() || entry.label_en.trim(),
+        price: Number(entry.price) || 0,
+        sort_order: (addonOptionsByAddon[addonId] ?? []).length,
+      });
+      const opts = await getProductAddonOptions(addonId);
+      setAddonOptionsByAddon((prev) => ({ ...prev, [addonId]: opts }));
+      setNewOptionByAddon((prev) => ({ ...prev, [addonId]: { label_en: "", label_fr: "", price: "" } }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to add option");
+    }
+  };
+
+  const handleDeleteAddonOption = async (addonId: string, optionId: string) => {
+    setError(null);
+    try {
+      await deleteProductAddonOption(optionId);
+      setAddonOptionsByAddon((prev) => ({
+        ...prev,
+        [addonId]: (prev[addonId] ?? []).filter((o) => o.id !== optionId),
+      }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete option");
+    }
+  };
+
   if (loading) {
     return (
       <div className="py-12">
@@ -264,6 +366,7 @@ export default function AdminProductsPage() {
                 stock: 0,
                 active: true,
                 category: undefined,
+                free_shipping: false,
               });
               setNewProductExtraImages([]);
               setNewProductExtraUrlInput("");
@@ -469,6 +572,16 @@ export default function AdminProductsPage() {
                   ))}
                 </select>
               </div>
+              <div className="flex items-center gap-2 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  id="new-free-shipping"
+                  checked={formData.free_shipping ?? false}
+                  onChange={(e) => setFormData((p) => ({ ...p, free_shipping: e.target.checked }))}
+                  className="h-4 w-4 rounded"
+                />
+                <label htmlFor="new-free-shipping" className="text-sm">{isFr ? "Livraison gratuite" : "Free shipping"}</label>
+              </div>
             </div>
             <div className="mt-4 flex gap-3">
               <button type="button" onClick={handleAdd} className="btn-hover rounded-full bg-foreground px-6 py-2 text-xs uppercase tracking-[0.2em] text-white">
@@ -622,6 +735,64 @@ export default function AdminProductsPage() {
                           </div>
                         </div>
                       )}
+                      {editingId && (
+                        <div className="sm:col-span-2">
+                          <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">{isFr ? "Extras sur mesure (add-ons)" : "Tailored Extras (add-ons)"}</label>
+                          <p className="mt-1 text-xs text-foreground/50">{isFr ? "Ex. Extra bracelet caoutchouc, gravure. Chaque add-on peut avoir plusieurs options (label + prix)." : "E.g. Extra rubber strap, engraving. Each add-on can have multiple options (label + price)."}</p>
+                          <div className="mt-2 space-y-4">
+                            {productAddons.map((addon) => (
+                              <div key={addon.id} className="rounded-xl border border-foreground/15 bg-white/50 p-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-foreground/5">
+                                    <img src={addon.image_url} alt="" className="h-full w-full object-cover" />
+                                  </div>
+                                  <span className="min-w-0 font-medium text-foreground">{addon.label_en}</span>
+                                  <button type="button" onClick={() => handleDeleteAddon(addon.id)} className="shrink-0 rounded-full bg-red-500 px-2 py-0.5 text-xs text-white hover:bg-red-600">×</button>
+                                </div>
+                                <div className="mt-2 ml-14 space-y-1">
+                                  <p className="text-xs text-foreground/60">{isFr ? "Options" : "Options"}</p>
+                                  {(addonOptionsByAddon[addon.id] ?? []).map((opt) => (
+                                    <div key={opt.id} className="flex items-center gap-2 text-sm">
+                                      <span className="text-foreground">{isFr ? opt.label_fr : opt.label_en}</span>
+                                      <span className="font-medium">C${opt.price}</span>
+                                      <button type="button" onClick={() => handleDeleteAddonOption(addon.id, opt.id)} className="text-red-600 hover:underline">×</button>
+                                    </div>
+                                  ))}
+                                  <div className="flex flex-wrap gap-2 pt-1">
+                                    <input value={newOptionByAddon[addon.id]?.label_en ?? ""} onChange={(e) => setNewOptionByAddon((prev) => ({ ...prev, [addon.id]: { ...(prev[addon.id] ?? { label_en: "", label_fr: "", price: "" }), label_en: e.target.value } }))} placeholder={isFr ? "Label (EN)" : "Label (EN)"} className="w-28 rounded border border-foreground/20 px-2 py-1 text-xs" />
+                                    <input value={newOptionByAddon[addon.id]?.label_fr ?? ""} onChange={(e) => setNewOptionByAddon((prev) => ({ ...prev, [addon.id]: { ...(prev[addon.id] ?? { label_en: "", label_fr: "", price: "" }), label_fr: e.target.value } }))} placeholder={isFr ? "Label (FR)" : "Label (FR)"} className="w-28 rounded border border-foreground/20 px-2 py-1 text-xs" />
+                                    <input type="number" min={0} value={newOptionByAddon[addon.id]?.price ?? ""} onChange={(e) => setNewOptionByAddon((prev) => ({ ...prev, [addon.id]: { ...(prev[addon.id] ?? { label_en: "", label_fr: "", price: "" }), price: e.target.value } }))} placeholder="Price" className="w-20 rounded border border-foreground/20 px-2 py-1 text-xs" />
+                                    <button type="button" onClick={() => handleAddAddonOption(addon.id)} disabled={!newOptionByAddon[addon.id]?.label_en?.trim()} className="rounded bg-foreground/10 px-2 py-1 text-xs font-medium text-foreground disabled:opacity-50">{isFr ? "Ajouter" : "Add"}</button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            <div className="flex flex-wrap gap-2 rounded-xl border border-dashed border-foreground/20 bg-white/30 p-2">
+                              <input value={newAddonLabelEn} onChange={(e) => setNewAddonLabelEn(e.target.value)} placeholder={isFr ? "Add-on (EN)" : "Add-on (EN)"} className="w-36 rounded border border-foreground/20 px-2 py-1 text-xs" />
+                              <input value={newAddonLabelFr} onChange={(e) => setNewAddonLabelFr(e.target.value)} placeholder={isFr ? "Add-on (FR)" : "Add-on (FR)"} className="w-36 rounded border border-foreground/20 px-2 py-1 text-xs" />
+                              <input value={newAddonImageUrl} onChange={(e) => setNewAddonImageUrl(e.target.value)} placeholder={isFr ? "URL image" : "Image URL"} className="w-40 rounded border border-foreground/20 px-2 py-1 text-xs" />
+                              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="block max-w-[140px] text-xs file:mr-1 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground" disabled={newAddonImageUploading} onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file || !editingId) return;
+                                setNewAddonImageUploading(true);
+                                setError(null);
+                                try {
+                                  const fd = new FormData();
+                                  fd.append("image", file);
+                                  const { url } = await uploadProductImage(fd);
+                                  setNewAddonImageUrl(url);
+                                } catch (err) {
+                                  setError(err instanceof Error ? err.message : "Upload failed");
+                                } finally {
+                                  setNewAddonImageUploading(false);
+                                  e.target.value = "";
+                                }
+                              }} />
+                              <button type="button" onClick={handleAddAddon} disabled={!newAddonLabelEn.trim()} className="rounded bg-foreground/10 px-2 py-1 text-xs font-medium text-foreground disabled:opacity-50">{isFr ? "Ajouter add-on" : "Add add-on"}</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <div>
                         <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">{isFr ? "Stock" : "Stock"}</label>
                         <input type="number" min={0} value={formData.stock ?? ""} onChange={(e) => setFormData((prev) => ({ ...prev, stock: Number(e.target.value) }))} className="mt-1 w-full rounded-full border border-foreground/20 bg-white px-3 py-2 text-sm" />
@@ -638,6 +809,10 @@ export default function AdminProductsPage() {
                       <div className="flex items-center gap-2 pt-2">
                         <input type="checkbox" id={`active-${p.id}`} checked={formData.active ?? true} onChange={(e) => setFormData((prev) => ({ ...prev, active: e.target.checked }))} className="h-4 w-4 rounded" />
                         <label htmlFor={`active-${p.id}`} className="text-sm">{isFr ? "Visible en boutique" : "Visible in shop"}</label>
+                      </div>
+                      <div className="flex items-center gap-2 pt-2">
+                        <input type="checkbox" id={`free-shipping-${p.id}`} checked={formData.free_shipping ?? false} onChange={(e) => setFormData((prev) => ({ ...prev, free_shipping: e.target.checked }))} className="h-4 w-4 rounded" />
+                        <label htmlFor={`free-shipping-${p.id}`} className="text-sm">{isFr ? "Livraison gratuite" : "Free shipping"}</label>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -660,6 +835,7 @@ export default function AdminProductsPage() {
                         {isFr ? "Stock" : "Stock"}: {p.stock ?? 0}
                         {p.category && <span className="ml-2">· {watchCategories.find((c) => c.slug === p.category)?.label_en ?? p.category}</span>}
                         {!p.active && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">{isFr ? "Masqué" : "Hidden"}</span>}
+                        {p.free_shipping && <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-green-800">{isFr ? "Livraison gratuite" : "Free shipping"}</span>}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col gap-2">

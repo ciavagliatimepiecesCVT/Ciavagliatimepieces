@@ -37,6 +37,29 @@ export default function LoginPage() {
 
       if (redirectTo && redirectTo.startsWith("/")) {
         router.push(redirectTo);
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push(`/${locale}/account/manage`);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, shipping_address, phone")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const hasSetupProfile =
+        profile &&
+        [profile.full_name, profile.shipping_address, profile.phone].some(
+          (v) => v != null && String(v).trim() !== ""
+        );
+
+      if (hasSetupProfile) {
+        router.push(`/${locale}`);
       } else {
         router.push(`/${locale}/account/manage`);
       }

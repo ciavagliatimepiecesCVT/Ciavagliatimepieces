@@ -22,6 +22,8 @@ import {
   uploadProductImage,
   getConfiguratorDiscount,
   setConfiguratorDiscount,
+  getConfiguratorFreeShipping,
+  setConfiguratorFreeShipping,
 } from "../actions";
 import type {
   ConfiguratorStepRow,
@@ -53,6 +55,8 @@ export default function AdminConfiguratorPage() {
   const [error, setError] = useState<string | null>(null);
   const [configuratorDiscountPercent, setConfiguratorDiscountPercent] = useState<number>(0);
   const [configuratorDiscountSaving, setConfiguratorDiscountSaving] = useState(false);
+  const [configuratorFreeShipping, setConfiguratorFreeShippingState] = useState<boolean>(false);
+  const [configuratorFreeShippingSaving, setConfiguratorFreeShippingSaving] = useState(false);
 
   /** Which watch type we're "editing as" — step bar and options match customer view for this type */
   const [selectedFunctionId, setSelectedFunctionId] = useState<string | null>(null);
@@ -125,6 +129,8 @@ export default function AdminConfiguratorPage() {
       setAddonsWithOptions(optionIdsByAddon);
       const discount = await getConfiguratorDiscount();
       setConfiguratorDiscountPercent(discount);
+      const freeShip = await getConfiguratorFreeShipping();
+      setConfiguratorFreeShippingState(freeShip);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unauthorized");
     } finally {
@@ -485,6 +491,35 @@ export default function AdminConfiguratorPage() {
           </button>
           <span className="text-xs text-white/70">
             {isFr ? "Appliqué au total des builds sur mesure au checkout." : "Applied to custom build total at checkout."}
+          </span>
+        </div>
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-4 border-t border-white/20 pt-3 mt-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-white">
+            <input
+              type="checkbox"
+              checked={configuratorFreeShipping}
+              disabled={configuratorFreeShippingSaving}
+              onChange={async (e) => {
+                const checked = e.target.checked;
+                setConfiguratorFreeShippingState(checked);
+                setConfiguratorFreeShippingSaving(true);
+                setError(null);
+                try {
+                  await setConfiguratorFreeShipping(checked);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Failed to save");
+                  setConfiguratorFreeShippingState(!checked);
+                } finally {
+                  setConfiguratorFreeShippingSaving(false);
+                }
+              }}
+              className="rounded border-white/30"
+            />
+            {isFr ? "Livraison gratuite pour les builds configurateur" : "Free shipping for configurator builds"}
+          </label>
+          {configuratorFreeShippingSaving && <span className="text-xs text-white/60">{isFr ? "Enregistrement…" : "Saving…"}</span>}
+          <span className="text-xs text-white/70">
+            {isFr ? "Au checkout Stripe, une ligne « Livraison — Gratuite » sera ajoutée." : "At Stripe checkout, a « Shipping — Free » line will be added."}
           </span>
         </div>
       </div>

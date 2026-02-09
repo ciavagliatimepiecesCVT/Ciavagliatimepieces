@@ -20,6 +20,7 @@ type ProductInput = {
   stock: number;
   active: boolean;
   category?: string | null;
+  free_shipping?: boolean;
 };
 
 async function requireAdmin() {
@@ -65,9 +66,13 @@ export async function updateProduct(input: ProductInput & { id: string }) {
   }
   const supabase = createServerClient();
   const { id, ...rest } = input;
+  const updatePayload: Record<string, unknown> = { ...rest, updated_at: new Date().toISOString() };
+  if (typeof (rest as { free_shipping?: boolean }).free_shipping === "boolean") {
+    updatePayload.free_shipping = (rest as { free_shipping: boolean }).free_shipping;
+  }
   const { error } = await supabase
     .from("products")
-    .update({ ...rest, updated_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq("id", id);
   if (error) throw error;
   revalidatePath("/[locale]/shop", "page");
@@ -116,6 +121,7 @@ export async function createProduct(input: ProductInput) {
     stock: input.stock ?? 0,
     active: input.active ?? true,
     category: input.category || null,
+    free_shipping: input.free_shipping ?? false,
   });
   if (error) throw error;
   revalidatePath("/[locale]/shop", "page");
@@ -467,6 +473,206 @@ export async function deleteProductBand(bandId: string) {
   const { error } = await supabase.from("product_bands").delete().eq("id", bandId);
   if (error) throw error;
   revalidatePath("/[locale]/shop", "page");
+  revalidatePath("/[locale]/shop/product/[id]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+// ——— Product add-ons (Tailored Extras: Extra Strap, Engraving, etc.) ———
+export type ProductAddonOptionRow = {
+  id: string;
+  addon_id: string;
+  label_en: string;
+  label_fr: string;
+  price: number;
+  sort_order: number;
+};
+
+export type ProductAddonRow = {
+  id: string;
+  product_id: string;
+  label_en: string;
+  label_fr: string;
+  image_url: string;
+  sort_order: number;
+};
+
+export type ProductAddonWithOptionsRow = ProductAddonRow & { options: ProductAddonOptionRow[] };
+
+/** Fetch add-ons with options for a product (for product page). */
+export async function getProductAddonsWithOptions(productId: string): Promise<ProductAddonWithOptionsRow[]> {
+  if (!productId) return [];
+  const supabase = createServerClient();
+  const { data: addons, error: addonsError } = await supabase
+    .from("product_addons")
+    .select("id, product_id, label_en, label_fr, image_url, sort_order")
+    .eq("product_id", productId)
+    .order("sort_order", { ascending: true });
+  if (addonsError || !addons?.length) return [];
+  const { data: optionsRows } = await supabase
+    .from("product_addon_options")
+    .select("id, addon_id, label_en, label_fr, price, sort_order")
+    .in("addon_id", addons.map((a) => (a as { id: string }).id))
+    .order("sort_order", { ascending: true });
+  const optionsByAddon: Record<string, ProductAddonOptionRow[]> = {};
+  addons.forEach((a) => (optionsByAddon[(a as { id: string }).id] = []));
+  (optionsRows ?? []).forEach((r) => {
+    const row = r as { id: string; addon_id: string; label_en: string; label_fr: string; price: number; sort_order: number };
+    const opt: ProductAddonOptionRow = {
+      id: row.id,
+      addon_id: row.addon_id,
+      label_en: row.label_en,
+      label_fr: row.label_fr,
+      price: Number(row.price),
+      sort_order: Number(row.sort_order ?? 0),
+    };
+    if (optionsByAddon[row.addon_id]) optionsByAddon[row.addon_id].push(opt);
+  });
+  return addons.map((a) => {
+    const row = a as { id: string; product_id: string; label_en: string; label_fr: string; image_url: string; sort_order: number };
+    return {
+      ...row,
+      sort_order: Number(row.sort_order ?? 0),
+      options: optionsByAddon[row.id] ?? [],
+    };
+  });
+}
+
+export async function getAdminProductAddons(productId: string): Promise<ProductAddonRow[]> {
+  await requireAdmin();
+  if (!productId) return [];
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("product_addons")
+    .select("id, product_id, label_en, label_fr, image_url, sort_order")
+    .eq("product_id", productId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: (r as { id: string }).id,
+    product_id: (r as { product_id: string }).product_id,
+    label_en: (r as { label_en: string }).label_en,
+    label_fr: (r as { label_fr: string }).label_fr,
+    image_url: (r as { image_url: string }).image_url,
+    sort_order: Number((r as { sort_order?: number }).sort_order ?? 0),
+  }));
+}
+
+export async function getProductAddonOptions(addonId: string): Promise<ProductAddonOptionRow[]> {
+  await requireAdmin();
+  if (!addonId) return [];
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("product_addon_options")
+    .select("id, addon_id, label_en, label_fr, price, sort_order")
+    .eq("addon_id", addonId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: (r as { id: string }).id,
+    addon_id: (r as { addon_id: string }).addon_id,
+    label_en: (r as { label_en: string }).label_en,
+    label_fr: (r as { label_fr: string }).label_fr,
+    price: Number((r as { price: number }).price),
+    sort_order: Number((r as { sort_order?: number }).sort_order ?? 0),
+  }));
+}
+
+export async function createProductAddon(input: {
+  product_id: string;
+  label_en: string;
+  label_fr: string;
+  image_url: string;
+  sort_order?: number;
+}) {
+  await requireAdmin();
+  if (!input.product_id || !input.label_en?.trim()) throw new Error("Product and label required");
+  const supabase = createServerClient();
+  const { error } = await supabase.from("product_addons").insert({
+    product_id: input.product_id,
+    label_en: input.label_en.trim(),
+    label_fr: (input.label_fr ?? input.label_en).trim(),
+    image_url: (input.image_url ?? "").trim() || "/images/hero-1.svg",
+    sort_order: input.sort_order ?? 0,
+  });
+  if (error) throw error;
+  revalidatePath("/[locale]/shop/product/[id]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+export async function updateProductAddon(
+  id: string,
+  input: { label_en?: string; label_fr?: string; image_url?: string }
+) {
+  await requireAdmin();
+  if (!id) throw new Error("Invalid addon id");
+  const supabase = createServerClient();
+  const updates: Record<string, unknown> = {};
+  if (input.label_en !== undefined) updates.label_en = input.label_en.trim();
+  if (input.label_fr !== undefined) updates.label_fr = input.label_fr.trim();
+  if (input.image_url !== undefined) updates.image_url = input.image_url.trim();
+  if (Object.keys(updates).length === 0) return;
+  const { error } = await supabase.from("product_addons").update(updates).eq("id", id);
+  if (error) throw error;
+  revalidatePath("/[locale]/shop/product/[id]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+export async function deleteProductAddon(id: string) {
+  await requireAdmin();
+  if (!id) throw new Error("Invalid addon id");
+  const supabase = createServerClient();
+  const { error } = await supabase.from("product_addons").delete().eq("id", id);
+  if (error) throw error;
+  revalidatePath("/[locale]/shop/product/[id]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+export async function createProductAddonOption(input: {
+  addon_id: string;
+  label_en: string;
+  label_fr: string;
+  price: number;
+  sort_order?: number;
+}) {
+  await requireAdmin();
+  if (!input.addon_id || !input.label_en?.trim()) throw new Error("Addon and label required");
+  const supabase = createServerClient();
+  const { error } = await supabase.from("product_addon_options").insert({
+    addon_id: input.addon_id,
+    label_en: input.label_en.trim(),
+    label_fr: (input.label_fr ?? input.label_en).trim(),
+    price: Math.max(0, Number(input.price ?? 0)),
+    sort_order: input.sort_order ?? 0,
+  });
+  if (error) throw error;
+  revalidatePath("/[locale]/shop/product/[id]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+export async function updateProductAddonOption(
+  id: string,
+  input: { label_en?: string; label_fr?: string; price?: number }
+) {
+  await requireAdmin();
+  if (!id) throw new Error("Invalid option id");
+  const supabase = createServerClient();
+  const updates: Record<string, unknown> = {};
+  if (input.label_en !== undefined) updates.label_en = input.label_en.trim();
+  if (input.label_fr !== undefined) updates.label_fr = input.label_fr.trim();
+  if (input.price !== undefined) updates.price = Math.max(0, Number(input.price));
+  if (Object.keys(updates).length === 0) return;
+  const { error } = await supabase.from("product_addon_options").update(updates).eq("id", id);
+  if (error) throw error;
+  revalidatePath("/[locale]/shop/product/[id]", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+export async function deleteProductAddonOption(id: string) {
+  await requireAdmin();
+  if (!id) throw new Error("Invalid option id");
+  const supabase = createServerClient();
+  const { error } = await supabase.from("product_addon_options").delete().eq("id", id);
+  if (error) throw error;
   revalidatePath("/[locale]/shop/product/[id]", "page");
   revalidatePath("/[locale]/account/admin", "page");
 }
@@ -1361,6 +1567,25 @@ export async function setConfiguratorDiscount(percent: number): Promise<void> {
   const p = Math.min(100, Math.max(0, Number(percent)));
   const supabase = createServerClient();
   await supabase.from("site_settings").upsert({ key: CONFIGURATOR_DISCOUNT_KEY, value: String(p), updated_at: new Date().toISOString() }, { onConflict: "key" });
+  revalidatePath("/[locale]/configurator", "page");
+  revalidatePath("/[locale]/account/admin/configurator", "page");
+}
+
+// ——— Configurator free shipping (site-wide for custom builds) ———
+const CONFIGURATOR_FREE_SHIPPING_KEY = "configurator_free_shipping";
+
+export async function getConfiguratorFreeShipping(): Promise<boolean> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data } = await supabase.from("site_settings").select("value").eq("key", CONFIGURATOR_FREE_SHIPPING_KEY).single();
+  const val = (data as { value?: string } | null)?.value;
+  return val === "true" || val === "1";
+}
+
+export async function setConfiguratorFreeShipping(enabled: boolean): Promise<void> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  await supabase.from("site_settings").upsert({ key: CONFIGURATOR_FREE_SHIPPING_KEY, value: enabled ? "true" : "false", updated_at: new Date().toISOString() }, { onConflict: "key" });
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin/configurator", "page");
 }

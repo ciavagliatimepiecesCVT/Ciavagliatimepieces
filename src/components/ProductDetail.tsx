@@ -15,6 +15,33 @@ type Band = {
   sort_order: number;
 };
 
+type ProductAddonOption = {
+  id: string;
+  addon_id: string;
+  label_en: string;
+  label_fr: string;
+  price: number;
+  sort_order: number;
+};
+
+type ProductAddon = {
+  id: string;
+  product_id: string;
+  label_en: string;
+  label_fr: string;
+  image_url: string;
+  sort_order: number;
+  options: ProductAddonOption[];
+};
+
+export type SelectedAddonEntry = {
+  addon_id: string;
+  option_id: string;
+  option_label_en: string;
+  option_label_fr: string;
+  price: number;
+};
+
 type ProductDetailProps = {
   product: {
     id: string;
@@ -29,31 +56,46 @@ type ProductDetailProps = {
   };
   images: { id: string; url: string; sort_order: number }[];
   bands?: Band[];
+  addons?: ProductAddon[];
   locale: string;
   categoryLabel?: string;
 };
 
-export default function ProductDetail({ product, images, bands = [], locale, categoryLabel }: ProductDetailProps) {
+export default function ProductDetail({ product, images, bands = [], addons = [], locale, categoryLabel }: ProductDetailProps) {
   const pathname = usePathname();
   const { currency, formatPrice } = useCurrency();
   const activeLocale = locale || pathname?.split("/").filter(Boolean)[0] || "en";
   const isFr = activeLocale === "fr";
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedBand, setSelectedBand] = useState<Band | null>(bands.length > 0 ? bands[0]! : null);
+  const [selectedAddons, setSelectedAddons] = useState<SelectedAddonEntry[]>([]);
+  const [selectedOptionByAddon, setSelectedOptionByAddon] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
+  const [lightboxAlt, setLightboxAlt] = useState("");
   const [lightboxZoom, setLightboxZoom] = useState(1);
   const [lightboxPan, setLightboxPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   const openLightbox = () => {
+    setLightboxImageUrl(null);
+    setLightboxAlt(product.name);
+    setLightboxZoom(1);
+    setLightboxPan({ x: 0, y: 0 });
+    setLightboxOpen(true);
+  };
+  const openLightboxWithImage = (imageUrl: string, alt: string) => {
+    setLightboxImageUrl(imageUrl);
+    setLightboxAlt(alt);
     setLightboxZoom(1);
     setLightboxPan({ x: 0, y: 0 });
     setLightboxOpen(true);
   };
   const closeLightbox = () => {
     setLightboxOpen(false);
+    setLightboxImageUrl(null);
     setLightboxZoom(1);
     setLightboxPan({ x: 0, y: 0 });
   };
@@ -88,6 +130,14 @@ export default function ProductDetail({ product, images, bands = [], locale, cat
     };
   }, [lightboxOpen]);
 
+  useEffect(() => {
+    const initial: Record<string, string> = {};
+    addons.forEach((a) => {
+      if (a.options[0]) initial[a.id] = a.options[0].id;
+    });
+    setSelectedOptionByAddon((prev) => ({ ...initial, ...prev }));
+  }, [addons]);
+
   const mainImage = product.image ?? "/images/hero-1.svg";
   const primaryImage = selectedBand ? selectedBand.image_url : mainImage;
   const allImages =
@@ -97,10 +147,45 @@ export default function ProductDetail({ product, images, bands = [], locale, cat
   const displayImage = allImages[selectedIndex] ?? primaryImage;
   const cartImage = selectedBand ? selectedBand.image_url : mainImage;
   const cartTitle = selectedBand ? `${product.name} — ${selectedBand.title}` : product.name;
+  const addonsTotal = selectedAddons.reduce((sum, a) => sum + a.price, 0);
+  const totalPrice = product.price + addonsTotal;
   const bandConfig = selectedBand
     ? { band_id: selectedBand.id, band_title: selectedBand.title, band_image_url: selectedBand.image_url }
     : undefined;
+  const configWithAddons =
+    selectedAddons.length > 0
+      ? {
+          ...bandConfig,
+          addons: selectedAddons.map((a) => ({
+            addon_id: a.addon_id,
+            option_id: a.option_id,
+            option_label_en: a.option_label_en,
+            option_label_fr: a.option_label_fr,
+            price: a.price,
+          })),
+        }
+      : bandConfig;
   const isExternal = displayImage.startsWith("http");
+
+  const handleAddAddon = (addon: ProductAddon) => {
+    const optionId = selectedOptionByAddon[addon.id] ?? addon.options[0]?.id;
+    const option = addon.options.find((o) => o.id === optionId) ?? addon.options[0];
+    if (!option) return;
+    setSelectedAddons((prev) => [
+      ...prev,
+      {
+        addon_id: addon.id,
+        option_id: option.id,
+        option_label_en: option.label_en,
+        option_label_fr: option.label_fr,
+        price: option.price,
+      },
+    ]);
+  };
+
+  const removeAddonAt = (index: number) => {
+    setSelectedAddons((prev) => prev.filter((_, i) => i !== index));
+  };
   const specLines = (product.specifications ?? "").trim().split(/\r?\n/).filter(Boolean);
   const outOfStock = (product.stock ?? 0) < 1;
 
@@ -117,10 +202,10 @@ export default function ProductDetail({ product, images, bands = [], locale, cat
         addGuestCartItem({
           product_id: product.id,
           quantity: 1,
-          price: product.price,
+          price: totalPrice,
           title: cartTitle,
           image_url: cartImage,
-          configuration: bandConfig ?? undefined,
+          configuration: configWithAddons ?? undefined,
         });
         window.dispatchEvent(new CustomEvent("cart-updated"));
         window.dispatchEvent(new CustomEvent("cart-item-added"));
@@ -135,7 +220,7 @@ export default function ProductDetail({ product, images, bands = [], locale, cat
       const configMatch = (a: unknown, b: unknown) =>
         a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
       const match = (existing ?? []).find((r) =>
-        configMatch(bandConfig ?? null, (r as { configuration?: unknown }).configuration)
+        configMatch(configWithAddons ?? null, (r as { configuration?: unknown }).configuration)
       );
       const newQty = match ? (Number(match.quantity) || 0) + 1 : 1;
 
@@ -149,10 +234,10 @@ export default function ProductDetail({ product, images, bands = [], locale, cat
           user_id: user.id,
           product_id: product.id,
           quantity: 1,
-          price: product.price,
+          price: totalPrice,
           title: cartTitle,
           image_url: cartImage,
-          configuration: bandConfig ?? null,
+          configuration: configWithAddons ?? null,
         });
       }
       window.dispatchEvent(new CustomEvent("cart-updated"));
@@ -171,15 +256,15 @@ export default function ProductDetail({ product, images, bands = [], locale, cat
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (selectedBand) {
+      if (selectedBand || selectedAddons.length > 0) {
         if (!user) {
           addGuestCartItem({
             product_id: product.id,
             quantity: 1,
-            price: product.price,
+            price: totalPrice,
             title: cartTitle,
             image_url: cartImage,
-            configuration: bandConfig ?? undefined,
+            configuration: configWithAddons ?? undefined,
           });
           window.dispatchEvent(new CustomEvent("cart-updated"));
         } else {
@@ -191,7 +276,7 @@ export default function ProductDetail({ product, images, bands = [], locale, cat
           const configMatch = (a: unknown, b: unknown) =>
             a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
           const match = (existing ?? []).find((r) =>
-            configMatch(bandConfig ?? null, (r as { configuration?: unknown }).configuration)
+            configMatch(configWithAddons ?? null, (r as { configuration?: unknown }).configuration)
           );
           if (match) {
             await supabase
@@ -203,10 +288,10 @@ export default function ProductDetail({ product, images, bands = [], locale, cat
               user_id: user.id,
               product_id: product.id,
               quantity: 1,
-              price: product.price,
+              price: totalPrice,
               title: cartTitle,
               image_url: cartImage,
-              configuration: bandConfig ?? null,
+              configuration: configWithAddons ?? null,
             });
           }
           window.dispatchEvent(new CustomEvent("cart-updated"));
@@ -393,15 +478,25 @@ export default function ProductDetail({ product, images, bands = [], locale, cat
                   }}
                   onMouseDown={lightboxZoom > 1 ? handleLightboxMouseDown : undefined}
                 >
-                  <Image
-                    src={displayImage}
-                    alt={product.name}
-                    width={1200}
-                    height={1200}
-                    className="max-h-[90vh] w-auto max-w-[90vw] object-contain"
-                    draggable={false}
-                    unoptimized={isExternal && !displayImage.includes("supabase")}
-                  />
+                  {lightboxImageUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={lightboxImageUrl}
+                      alt={lightboxAlt}
+                      className="max-h-[90vh] w-auto max-w-[90vw] object-contain"
+                      draggable={false}
+                    />
+                  ) : (
+                    <Image
+                      src={displayImage}
+                      alt={lightboxAlt || product.name}
+                      width={1200}
+                      height={1200}
+                      className="max-h-[90vh] w-auto max-w-[90vw] object-contain"
+                      draggable={false}
+                      unoptimized={isExternal && !displayImage.includes("supabase")}
+                    />
+                  )}
                 </div>
               </div>
               <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center text-sm text-white/60">
@@ -446,6 +541,111 @@ export default function ProductDetail({ product, images, bands = [], locale, cat
                   <li key={i}>{line.trim()}</li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {addons.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-white/70 mb-4">
+                {isFr ? "Extras sur mesure !" : "Tailored Extras!"}
+              </h2>
+              <div className="space-y-4">
+                {addons.map((addon) => {
+                  const optionId = selectedOptionByAddon[addon.id] ?? addon.options[0]?.id;
+                  const selectedOption = addon.options.find((o) => o.id === optionId) ?? addon.options[0];
+                  const addonLabel = isFr ? addon.label_fr : addon.label_en;
+                  return (
+                    <div
+                      key={addon.id}
+                      className="flex flex-wrap items-center gap-3 rounded-xl border border-foreground/15 bg-white/80 p-4 shadow-[0_24px_90px_rgba(15,20,23,0.06)]"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openLightboxWithImage(addon.image_url || "/images/hero-1.svg", addonLabel)}
+                        className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-foreground/5 ring-2 ring-transparent transition hover:ring-foreground/30 focus:outline-none focus:ring-2 focus:ring-[var(--logo-gold)]"
+                        title={isFr ? "Cliquez pour agrandir" : "Click to enlarge"}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={addon.image_url || "/images/hero-1.svg"}
+                          alt={addonLabel}
+                          className="h-full w-full object-cover"
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/30">
+                          <svg className="h-6 w-6 text-white opacity-0 drop-shadow-md transition group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                          </svg>
+                        </span>
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground">{addonLabel}</p>
+                        {addon.options.length > 1 ? (
+                          <select
+                            value={optionId ?? ""}
+                            onChange={(e) => setSelectedOptionByAddon((prev) => ({ ...prev, [addon.id]: e.target.value }))}
+                            className="mt-1.5 w-full max-w-[220px] rounded-lg border border-foreground/20 bg-white px-3 py-2 text-sm text-foreground"
+                          >
+                            {addon.options.map((opt) => (
+                              <option key={opt.id} value={opt.id}>
+                                {isFr ? opt.label_fr : opt.label_en} — {formatPrice(opt.price)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : addon.options.length === 1 ? (
+                          <p className="mt-1 text-sm text-foreground/70">
+                            {isFr ? addon.options[0]!.label_fr : addon.options[0]!.label_en} · {formatPrice(addon.options[0]!.price)}
+                          </p>
+                        ) : null}
+                      </div>
+                      {addon.options.length > 0 ? (
+                        <>
+                          <p className="shrink-0 text-sm font-semibold text-[var(--logo-gold)]">
+                            {formatPrice(selectedOption?.price ?? 0)}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleAddAddon(addon)}
+                            disabled={!selectedOption}
+                            className="btn-hover shrink-0 rounded-full bg-foreground px-4 py-2 text-xs font-medium uppercase tracking-[0.2em] text-white transition hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isFr ? "Ajouter l'extra" : "ADD ADDON"}
+                          </button>
+                        </>
+                      ) : (
+                        <p className="text-xs text-foreground/60 shrink-0">{isFr ? "Aucune option. Ajoutez des options dans l’admin." : "No options. Add options in admin."}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {selectedAddons.length > 0 && (
+                <div className="mt-4 rounded-xl border border-foreground/15 bg-white/60 p-3">
+                  <p className="text-xs uppercase tracking-wider text-white/70 mb-2">
+                    {isFr ? "Extras ajoutés" : "Added extras"}
+                  </p>
+                  <ul className="space-y-1.5">
+                    {selectedAddons.map((entry, idx) => (
+                      <li key={`${entry.addon_id}-${entry.option_id}-${idx}`} className="flex items-center justify-between gap-2 text-sm text-foreground">
+                        <span>{isFr ? entry.option_label_fr : entry.option_label_en}</span>
+                        <span className="flex items-center gap-2">
+                          <span className="font-medium">{formatPrice(entry.price)}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeAddonAt(idx)}
+                            className="rounded-full p-1 text-red-600 hover:bg-red-50"
+                            aria-label={isFr ? "Retirer" : "Remove"}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-sm font-semibold text-foreground">
+                    {isFr ? "Total avec extras" : "Total with extras"}: {formatPrice(totalPrice)}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

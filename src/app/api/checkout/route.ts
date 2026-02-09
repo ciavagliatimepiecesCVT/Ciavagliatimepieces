@@ -208,6 +208,7 @@ export async function POST(request: NextRequest) {
       };
     };
     const lineItems: LineItem[] = [];
+    let freeShippingApplicable = false;
 
     if (type === "custom" && body.configuration) {
       const cfg = body.configuration as Record<string, unknown>;
@@ -264,12 +265,18 @@ export async function POST(request: NextRequest) {
           unit_amount: Math.round(amount * 100),
         },
       });
+      const { data: freeShipRow } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "configurator_free_shipping")
+        .single();
+      freeShippingApplicable = (freeShipRow as { value?: string } | null)?.value === "true" || (freeShipRow as { value?: string } | null)?.value === "1";
     }
 
     if (type === "built" && body.productId) {
       const { data: product, error: productError } = await supabase
         .from("products")
-        .select("id, name, price, stock")
+        .select("id, name, price, stock, free_shipping")
         .eq("id", body.productId)
         .eq("active", true)
         .single();
@@ -311,6 +318,7 @@ export async function POST(request: NextRequest) {
           unit_amount: Math.round(amount * 100),
         },
       });
+      freeShippingApplicable = !!(product as { free_shipping?: boolean }).free_shipping;
     }
 
     if (type === "cart" && userId) {
@@ -326,7 +334,7 @@ export async function POST(request: NextRequest) {
       const builtProductIds = [...new Set(cartRows.filter((r) => !r.configuration).map((r) => r.product_id))];
       const { data: products } = await supabase
         .from("products")
-        .select("id, name, price, stock, active")
+        .select("id, name, price, stock, active, free_shipping")
         .in("id", builtProductIds);
 
       const productMap = new Map((products ?? []).map((p) => [p.id, p]));
@@ -377,6 +385,18 @@ export async function POST(request: NextRequest) {
         cartProductQuantities.push({ product_id: row.product_id, quantity: qty });
       }
 
+      const hasCustomItems = cartRows.some((r) => !!r.configuration || (typeof r.product_id === "string" && r.product_id.startsWith("custom-")));
+      const allBuiltFreeShipping = cartRows
+        .filter((r) => !r.configuration && !(typeof r.product_id === "string" && r.product_id.startsWith("custom-")))
+        .every((r) => (productMap.get(r.product_id) as { free_shipping?: boolean } | undefined)?.free_shipping);
+      if (hasCustomItems) {
+        const { data: freeShipRow } = await supabase.from("site_settings").select("value").eq("key", "configurator_free_shipping").single();
+        const configuratorFree = (freeShipRow as { value?: string } | null)?.value === "true" || (freeShipRow as { value?: string } | null)?.value === "1";
+        freeShippingApplicable = allBuiltFreeShipping && configuratorFree;
+      } else {
+        freeShippingApplicable = allBuiltFreeShipping;
+      }
+
       summary = `Cart · ${cartRows.length} item${cartRows.length === 1 ? "" : "s"}`;
     }
 
@@ -385,7 +405,7 @@ export async function POST(request: NextRequest) {
       const builtProductIds = [...new Set(guestCart.filter((r) => !r.configuration && !r.product_id.startsWith("custom-")).map((r) => r.product_id))];
       const { data: products } = await supabase
         .from("products")
-        .select("id, name, price, stock, active")
+        .select("id, name, price, stock, active, free_shipping")
         .in("id", builtProductIds);
       const productMap = new Map((products ?? []).map((p) => [p.id, p]));
       const cartProductQuantities: { product_id: string; quantity: number }[] = [];
@@ -453,8 +473,31 @@ export async function POST(request: NextRequest) {
         cartProductQuantities.push({ product_id: row.product_id, quantity: qty });
       }
 
+      const hasCustomItems = guestCart.some((r) => !!r.configuration || (typeof r.product_id === "string" && r.product_id.startsWith("custom-")));
+      const allBuiltFreeShipping = guestCart
+        .filter((r) => !r.configuration && !(typeof r.product_id === "string" && r.product_id.startsWith("custom-")))
+        .every((r) => (productMap.get(r.product_id) as { free_shipping?: boolean } | undefined)?.free_shipping);
+      if (hasCustomItems) {
+        const { data: freeShipRow } = await supabase.from("site_settings").select("value").eq("key", "configurator_free_shipping").single();
+        const configuratorFree = (freeShipRow as { value?: string } | null)?.value === "true" || (freeShipRow as { value?: string } | null)?.value === "1";
+        freeShippingApplicable = allBuiltFreeShipping && configuratorFree;
+      } else {
+        freeShippingApplicable = allBuiltFreeShipping;
+      }
+
       summary = `Cart · ${guestCart.length} item${guestCart.length === 1 ? "" : "s"}`;
       guestCartProductQuantitiesJson = JSON.stringify(cartProductQuantities);
+    }
+
+    if (freeShippingApplicable) {
+      lineItems.push({
+        quantity: 1,
+        price_data: {
+          currency: "cad",
+          product_data: { name: "Shipping", description: "Free shipping" },
+          unit_amount: 0,
+        },
+      });
     }
 
     if (lineItems.length === 0) {
