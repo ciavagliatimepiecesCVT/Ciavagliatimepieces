@@ -3,6 +3,18 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getUsdToCadRate } from "@/lib/currency";
 import { getSiteUrl, getStripe } from "@/lib/stripe";
 
+/** Stripe line item name: include chosen variant so checkout clearly shows what they're buying. */
+function getBuiltProductLineItemName(
+  baseName: string,
+  configuration: unknown
+): string {
+  if (!configuration || typeof configuration !== "object") return baseName;
+  const cfg = configuration as Record<string, unknown>;
+  const variant = cfg.bracelet_title && typeof cfg.bracelet_title === "string" ? cfg.bracelet_title : "";
+  if (!variant) return baseName;
+  return `${baseName} · ${variant}`;
+}
+
 /** Build Stripe line-item description for a built product with bracelet/addons (so customers see what they're buying). */
 function getBuiltProductConfigDescription(
   configuration: unknown,
@@ -13,7 +25,7 @@ function getBuiltProductConfigDescription(
   const lines: string[] = [];
   const labelKey = locale === "fr" ? "option_label_fr" : "option_label_en";
   if (cfg.bracelet_title && typeof cfg.bracelet_title === "string") {
-    lines.push(`${locale === "fr" ? "Bracelet" : "Style"}: ${cfg.bracelet_title}`);
+    lines.push(`${locale === "fr" ? "Variante" : "Variant"}: ${cfg.bracelet_title}`);
   }
   const addons = Array.isArray(cfg.addons) ? cfg.addons : [];
   if (addons.length > 0) {
@@ -407,6 +419,7 @@ export async function POST(request: NextRequest) {
           );
         }
         const unitPrice = Number(row.price ?? product.price);
+        const baseName = row.title ?? product.name;
         const configDescription = row.configuration
           ? getBuiltProductConfigDescription(row.configuration, localeSegment)
           : undefined;
@@ -415,7 +428,7 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: "cad",
             product_data: {
-              name: row.title ?? product.name,
+              name: getBuiltProductLineItemName(baseName, row.configuration),
               ...(configDescription ? { description: configDescription } : {}),
             },
             unit_amount: Math.round(unitPrice * 100),
@@ -503,6 +516,7 @@ export async function POST(request: NextRequest) {
           );
         }
         const unitPrice = Number(row.price ?? product.price);
+        const baseName = row.title ?? product.name;
         const configDescription = row.configuration
           ? getBuiltProductConfigDescription(row.configuration, localeSegment)
           : undefined;
@@ -511,7 +525,7 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: "cad",
             product_data: {
-              name: row.title ?? product.name,
+              name: getBuiltProductLineItemName(baseName, row.configuration),
               ...(configDescription ? { description: configDescription } : {}),
             },
             unit_amount: Math.round(unitPrice * 100),
