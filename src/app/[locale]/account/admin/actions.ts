@@ -1175,7 +1175,7 @@ export async function getProductIdsWithAddonTemplate(templateId: string): Promis
 }
 
 /** Apply a template (add-on + all options) to selected products. Replaces current assignments: unchecked products lose the add-on. */
-export async function applyAddonTemplateToProducts(templateId: string, productIds: string[]): Promise<{ applied: number }> {
+export async function applyAddonTemplateToProducts(templateId: string, productIds: string[]): Promise<{ applied: number; removedAll?: boolean }> {
   await requireAdmin();
   if (!templateId || !Array.isArray(productIds)) return { applied: 0, removedAll: false };
   const supabase = createServerClient();
