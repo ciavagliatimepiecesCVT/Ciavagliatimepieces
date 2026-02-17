@@ -1628,6 +1628,8 @@ export type ConfiguratorOptionRow = {
   discount_percent?: number | null;
   image_url: string | null;
   preview_image_url: string | null;
+  layer_image_url?: string | null;
+  layer_z_index?: number;
   sort_order: number;
 };
 
@@ -1750,8 +1752,8 @@ export async function getAdminConfiguratorOptions(stepId?: string | null, parent
   const supabase = createServerClient();
   let q = supabase
     .from("configurator_options")
-    .select("id, step_id, parent_option_id, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, sort_order")
-    .order("sort_order", { ascending: true });
+.select("id, step_id, parent_option_id, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index, sort_order")
+  .order("sort_order", { ascending: true });
   if (stepId) q = q.eq("step_id", stepId);
   if (parentOptionId === null) q = q.is("parent_option_id", null);
   else if (parentOptionId != null) q = q.eq("parent_option_id", parentOptionId);
@@ -1826,6 +1828,8 @@ export async function createConfiguratorOption(input: {
   discount_percent?: number | null;
   image_url?: string | null;
   preview_image_url?: string | null;
+  layer_image_url?: string | null;
+  layer_z_index?: number;
   sort_order?: number;
 }) {
   await requireAdmin();
@@ -1842,6 +1846,8 @@ export async function createConfiguratorOption(input: {
     discount_percent: discount,
     image_url: input.image_url ?? null,
     preview_image_url: input.preview_image_url ?? null,
+    layer_image_url: input.layer_image_url ?? null,
+    layer_z_index: input.layer_z_index ?? 0,
     sort_order: input.sort_order ?? 0,
   });
   if (error) throw error;
@@ -1859,6 +1865,8 @@ export async function updateConfiguratorOption(
     discount_percent?: number | null;
     image_url?: string | null;
     preview_image_url?: string | null;
+    layer_image_url?: string | null;
+    layer_z_index?: number;
     sort_order?: number;
     parent_option_id?: string | null;
   }
@@ -1874,6 +1882,8 @@ export async function updateConfiguratorOption(
   if (input.discount_percent !== undefined) updates.discount_percent = input.discount_percent == null ? 0 : Math.min(100, Math.max(0, Number(input.discount_percent)));
   if (input.image_url !== undefined) updates.image_url = input.image_url;
   if (input.preview_image_url !== undefined) updates.preview_image_url = input.preview_image_url;
+  if (input.layer_image_url !== undefined) updates.layer_image_url = input.layer_image_url;
+  if (input.layer_z_index !== undefined) updates.layer_z_index = input.layer_z_index;
   if (input.sort_order !== undefined) updates.sort_order = input.sort_order;
   if (input.parent_option_id !== undefined) updates.parent_option_id = input.parent_option_id;
   if (Object.keys(updates).length === 0) return;
@@ -2028,7 +2038,7 @@ export type PublicConfiguratorData = {
   stepsMeta: { id: string; step_key: string | null; label_en: string; label_fr: string; optional: boolean; sort_order: number; image_url: string | null }[];
   functionOptions: { id: string; label_en: string; label_fr: string; letter: string; price: number; discount_percent: number }[];
   functionStepsMap: Record<string, string[]>;
-  options: { id: string; step_id: string; parent_option_id: string | null; label_en: string; label_fr: string; letter: string; price: number; discount_percent: number; image_url: string | null; preview_image_url: string | null }[];
+  options: { id: string; step_id: string; parent_option_id: string | null; label_en: string; label_fr: string; letter: string; price: number; discount_percent: number; image_url: string | null; preview_image_url: string | null; layer_image_url: string | null; layer_z_index: number }[];
   addons: { id: string; step_id: string; label_en: string; label_fr: string; price: number; option_ids: string[] }[];
   configuratorDiscountPercent: number;
 };
@@ -2058,7 +2068,7 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
 
     const { data: allOptions, error: optErr } = await supabase
       .from("configurator_options")
-      .select("id, step_id, parent_option_id, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url")
+      .select("id, step_id, parent_option_id, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index")
       .order("sort_order", { ascending: true });
     if (optErr) return null;
 
@@ -2117,6 +2127,8 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
       discount_percent: Number((o as { discount_percent?: number }).discount_percent ?? 0),
       image_url: (o as { image_url?: string }).image_url ?? null,
       preview_image_url: (o as { preview_image_url?: string }).preview_image_url ?? null,
+      layer_image_url: (o as { layer_image_url?: string }).layer_image_url ?? null,
+      layer_z_index: Number((o as { layer_z_index?: number }).layer_z_index ?? 0),
     }));
 
     const { data: discountRow } = await supabase

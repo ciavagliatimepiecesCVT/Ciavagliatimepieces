@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { WatchPreview } from "@/components/WatchPreview";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCurrency } from "@/components/CurrencyContext";
@@ -475,34 +476,21 @@ export default function Configurator({ locale, editCartItemId }: { locale: strin
       </div>
 
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 lg:flex-row lg:gap-12">
-        <div className="relative flex min-h-[320px] flex-1 items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white/70 shadow-[var(--shadow)] lg:min-h-[420px]">
-          {(() => {
-            const opt = optionsForCurrentStep.find((o) => o.id === selectedId) as { image_url?: string; preview_image_url?: string } | undefined;
-            const optionImage = opt?.image_url || opt?.preview_image_url;
-            const stepMeta = currentStepId ? stepIdToMeta.get(currentStepId) : null;
-            const stepImage = (stepMeta as { image_url?: string } | undefined)?.image_url;
-            const isExtraStepForGmtOrSub =
-              currentStepKey === "extra" && (functionId === "gmt" || functionId === "submariner");
-            const extraStepImage = isExtraStepForGmtOrSub ? "/images/configuratorextra.png" : null;
-            const previewUrl = optionImage || stepImage || extraStepImage;
-            if (previewUrl) {
-              return (
-                <Image
-                  src={previewUrl}
-                  alt=""
-                  fill
-                  className="object-contain p-4"
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  unoptimized={previewUrl.startsWith("http") && !previewUrl.includes("supabase")}
-                />
-              );
+        <div className="relative flex min-h-[320px] flex-1 items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)] lg:min-h-[420px]">
+          <WatchPreview
+            selections={selections}
+            options={options}
+            stepsForFunction={stepsForFunction}
+            functionId={functionId}
+            stepIdsForFunction={stepIdsForFunction}
+            functionStepId={functionStep?.id}
+            isExtraStepForGmtOrSub={
+              (currentStepKey === "extra" || stepsForFunction.includes("extra")) &&
+              (functionId === "gmt" || functionId === "submariner")
             }
-            return (
-              <span className="text-sm font-medium uppercase tracking-widest text-foreground/40">
-                {isFr ? "Aperçu" : "Preview"}
-              </span>
-            );
-          })()}
+            extraStepImage="/images/configuratorextra.png"
+            locale={locale}
+          />
         </div>
 
         <div className="min-w-0 flex-1">

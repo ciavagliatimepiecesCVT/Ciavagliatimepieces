@@ -72,6 +72,8 @@ export default function AdminConfiguratorPage() {
     discount_percent: 0,
     image_url: "",
     preview_image_url: "",
+    layer_image_url: "",
+    layer_z_index: 0,
   });
   const [showAddOption, setShowAddOption] = useState(false);
 
@@ -94,7 +96,7 @@ export default function AdminConfiguratorPage() {
   const [stepImageForm, setStepImageForm] = useState({ image_url: "" });
   const [savingStepImage, setSavingStepImage] = useState(false);
   const [uploadingStepImage, setUploadingStepImage] = useState(false);
-  const [uploadingOptionImage, setUploadingOptionImage] = useState<"image" | "preview" | null>(null);
+  const [uploadingOptionImage, setUploadingOptionImage] = useState<"image" | "preview" | "layer" | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const load = async () => {
@@ -330,6 +332,8 @@ export default function AdminConfiguratorPage() {
         parent_option_id: optionForm.parent_option_id || null,
         image_url: optionForm.image_url.trim() || null,
         preview_image_url: optionForm.preview_image_url.trim() || null,
+        layer_image_url: optionForm.layer_image_url.trim() || null,
+        layer_z_index: optionForm.layer_z_index,
       });
       await load();
       setEditingOptionId(null);
@@ -352,6 +356,8 @@ export default function AdminConfiguratorPage() {
         discount_percent: optionForm.discount_percent || null,
         image_url: optionForm.image_url.trim() || null,
         preview_image_url: optionForm.preview_image_url.trim() || null,
+        layer_image_url: optionForm.layer_image_url.trim() || null,
+        layer_z_index: optionForm.layer_z_index,
       });
       await load();
       setShowAddOption(false);
@@ -365,6 +371,8 @@ export default function AdminConfiguratorPage() {
         discount_percent: 0,
         image_url: "",
         preview_image_url: "",
+        layer_image_url: "",
+        layer_z_index: 0,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to add");
@@ -832,6 +840,8 @@ export default function AdminConfiguratorPage() {
                           discount_percent: (opt as { discount_percent?: number }).discount_percent ?? 0,
                           image_url: (opt as { image_url?: string }).image_url ?? "",
                           preview_image_url: (opt as { preview_image_url?: string }).preview_image_url ?? "",
+                          layer_image_url: (opt as { layer_image_url?: string }).layer_image_url ?? "",
+                          layer_z_index: (opt as { layer_z_index?: number }).layer_z_index ?? 0,
                         });
                         setShowAddOption(false);
                       }}
@@ -859,7 +869,7 @@ export default function AdminConfiguratorPage() {
             {currentStepKey === "function" ? (
               <button
                 type="button"
-                onClick={() => { if (!functionStep) return; setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: functionStep.id, parent_option_id: null, label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "" }); }}
+                onClick={() => { if (!functionStep) return; setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: functionStep.id, parent_option_id: null, label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "", layer_image_url: "", layer_z_index: 0 }); }}
                 disabled={!functionStep}
                 className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-foreground/30 bg-white/60 p-4 text-foreground/60 transition hover:border-foreground/50 hover:bg-white/80 hover:text-foreground/80 disabled:opacity-50"
               >
@@ -869,7 +879,7 @@ export default function AdminConfiguratorPage() {
             ) : currentStepRow ? (
               <button
                 type="button"
-                onClick={() => { setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: currentStepRow.id, parent_option_id: selectedFunctionId, label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "" }); }}
+                onClick={() => { setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: currentStepRow.id, parent_option_id: selectedFunctionId, label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "", layer_image_url: "", layer_z_index: 0 }); }}
                 className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-foreground/30 bg-white/60 p-4 text-foreground/60 transition hover:border-foreground/50 hover:bg-white/80 hover:text-foreground/80"
               >
                 <span className="text-2xl">+</span>
@@ -918,17 +928,17 @@ export default function AdminConfiguratorPage() {
 
           {/* Case step: Frosted Finish (optional, only for certain colours) */}
           {currentStepKey === "case" && (
-            <div className="mt-10 rounded-xl border border-foreground/15 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.06)]">
+            <div className="mt-10 rounded-xl border border-foreground/15 bg-white p-6 shadow-[0_24px_90px_rgba(15,20,23,0.06)]">
                   <h3 className="text-lg font-semibold text-foreground">
                     {isFr ? "Fini givré (optionnel)" : "Frosted Finish (optional)"}
                   </h3>
-                  <p className="mt-1 text-sm text-foreground/60">
+                  <p className="mt-1 text-sm text-foreground/85">
                     {isFr
                       ? "La seule option facultative. Proposée uniquement pour les couleurs de boîtier cochées ci-dessous."
                       : "The only optional add-on. Shown only for the case colours you check below."}
                   </p>
                   {caseAddons.length === 0 ? (
-                    <p className="mt-4 text-sm text-foreground/50">
+                    <p className="mt-4 text-sm text-foreground/80">
                       {isFr ? "Aucun add-on. Créez « Frosted Finish » via l’API ou la base de données (configurator_addons, step_id = Case)." : "No add-on. Create « Frosted Finish » via the API or database (configurator_addons, step_id = Case)."}
                     </p>
                   ) : (
@@ -938,40 +948,40 @@ export default function AdminConfiguratorPage() {
                           <div className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                               <div>
-                                <label className="text-xs uppercase text-foreground/60">Label (EN)</label>
+                                <label className="text-xs font-medium uppercase tracking-wider text-foreground">Label (EN)</label>
                                 <input
                                   value={addonForm.label_en}
                                   onChange={(e) => setAddonForm((p) => ({ ...p, label_en: e.target.value }))}
-                                  className="mt-1 w-full rounded-lg border border-foreground/20 px-3 py-2"
+                                  className="mt-1 w-full rounded-lg border border-foreground/25 bg-white px-3 py-2 text-foreground"
                                 />
                               </div>
                               <div>
-                                <label className="text-xs uppercase text-foreground/60">Label (FR)</label>
+                                <label className="text-xs font-medium uppercase tracking-wider text-foreground">Label (FR)</label>
                                 <input
                                   value={addonForm.label_fr}
                                   onChange={(e) => setAddonForm((p) => ({ ...p, label_fr: e.target.value }))}
-                                  className="mt-1 w-full rounded-lg border border-foreground/20 px-3 py-2"
+                                  className="mt-1 w-full rounded-lg border border-foreground/25 bg-white px-3 py-2 text-foreground"
                                 />
                               </div>
                               <div>
-                                <label className="text-xs uppercase text-foreground/60">Price (CAD)</label>
+                                <label className="text-xs font-medium uppercase tracking-wider text-foreground">Price (CAD)</label>
                                 <input
                                   type="number"
                                   value={addonForm.price}
                                   onChange={(e) => setAddonForm((p) => ({ ...p, price: Number(e.target.value) }))}
-                                  className="mt-1 w-full rounded-lg border border-foreground/20 px-3 py-2"
+                                  className="mt-1 w-full rounded-lg border border-foreground/25 bg-white px-3 py-2 text-foreground"
                                 />
                               </div>
                             </div>
                             <div>
-                              <label className="text-xs uppercase text-foreground/60">
+                              <label className="text-xs font-medium uppercase tracking-wider text-foreground">
                                 {isFr ? "Proposé pour ces couleurs de boîtier (cochez)" : "Offered for these case colours (check)"}
                               </label>
                               <div className="mt-2 flex flex-wrap gap-2">
                                 {caseOptions.map((opt) => (
                                   <label
                                     key={opt.id}
-                                    className="flex cursor-pointer items-center gap-2 rounded-full border border-foreground/20 bg-white px-3 py-2"
+                                    className="flex cursor-pointer items-center gap-2 rounded-full border border-foreground/25 bg-white px-3 py-2 text-foreground"
                                   >
                                     <input
                                       type="checkbox"
@@ -988,16 +998,16 @@ export default function AdminConfiguratorPage() {
                               <button type="button" onClick={handleSaveAddon} className="rounded-lg bg-foreground px-4 py-2 text-sm text-white">
                                 {isFr ? "Enregistrer" : "Save"}
                               </button>
-                              <button type="button" onClick={() => setEditingAddonId(null)} className="rounded-lg border border-foreground/20 px-4 py-2 text-sm">
+                              <button type="button" onClick={() => setEditingAddonId(null)} className="rounded-lg border border-foreground/25 px-4 py-2 text-sm text-foreground hover:bg-foreground/5">
                                 {isFr ? "Annuler" : "Cancel"}
                               </button>
                             </div>
                           </div>
                         ) : (
-                          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-foreground/10 bg-white p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-foreground/15 bg-white p-4">
                             <div>
-                              <p className="font-medium">{addon.label_en}</p>
-                              <p className="text-sm text-foreground/60">
+                              <p className="font-medium text-foreground">{addon.label_en}</p>
+                              <p className="text-sm text-foreground/80">
                                 C${addon.price} · {(addonsWithOptions[addon.id] ?? []).length} {isFr ? "couleurs" : "colours"}
                               </p>
                             </div>
@@ -1161,6 +1171,55 @@ export default function AdminConfiguratorPage() {
                     />
                   </div>
                   {uploadingOptionImage === "preview" && <p className="mt-1 text-xs text-foreground/60">{isFr ? "Upload…" : "Uploading…"}</p>}
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-medium uppercase tracking-wider text-foreground">{isFr ? "Image couche (aperçu composite)" : "Layer image (composite preview)"}</label>
+                  <p className="mt-0.5 text-xs text-foreground/60">{isFr ? "PNG transparent pour superposition. 0=base, 10=cadran, 20=boîtier, 30=aiguilles, 40=bracelet." : "Transparent PNG for stacking. Use for composite watch preview."}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/png,image/webp"
+                      className="block max-w-[180px] text-xs text-foreground file:mr-2 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground"
+                      disabled={uploadingOptionImage !== null}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadError(null);
+                        setUploadingOptionImage("layer");
+                        try {
+                          const fd = new FormData();
+                          fd.append("image", file);
+                          const { url } = await uploadProductImage(fd);
+                          setOptionForm((p) => ({ ...p, layer_image_url: url }));
+                        } catch (err) {
+                          setUploadError(err instanceof Error ? err.message : "Upload failed");
+                        } finally {
+                          setUploadingOptionImage(null);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                    <input
+                      value={optionForm.layer_image_url}
+                      onChange={(e) => setOptionForm((p) => ({ ...p, layer_image_url: e.target.value }))}
+                      placeholder={isFr ? "Ou URL" : "Or URL"}
+                      className="min-w-[200px] flex-1 rounded-lg border border-foreground/25 bg-white px-3 py-2 text-sm text-foreground placeholder:text-neutral-500"
+                    />
+                  </div>
+                  {uploadingOptionImage === "layer" && <p className="mt-1 text-xs text-foreground/60">{isFr ? "Upload…" : "Uploading…"}</p>}
+                </div>
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wider text-foreground">{isFr ? "Z-index couche" : "Layer z-index"}</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={optionForm.layer_z_index}
+                    onChange={(e) => setOptionForm((p) => ({ ...p, layer_z_index: Math.min(100, Math.max(0, Number(e.target.value) || 0)) }))}
+                    placeholder="0"
+                    className="mt-1 w-full rounded-lg border border-foreground/25 bg-white px-3 py-2 text-foreground placeholder:text-neutral-500"
+                  />
+                  <p className="mt-0.5 text-xs text-foreground/60">{isFr ? "0=base, 10=boîtier, 20=cadran, 30=aiguilles, 40=bracelet" : "0=base, 10=case, 20=dial, 30=hands, 40=strap"}</p>
                 </div>
                 {uploadError && <p className="mt-1 text-xs text-red-600">{uploadError}</p>}
               </div>

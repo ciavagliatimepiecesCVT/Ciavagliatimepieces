@@ -137,6 +137,8 @@ create table if not exists configurator_options (
   price numeric not null default 0,
   image_url text,
   preview_image_url text,
+  layer_image_url text,
+  layer_z_index int default 0,
   sort_order int default 0,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
