@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import Image from "next/image";
 import Link from "next/link";
 import ScrollReveal from "@/components/ScrollReveal";
 import FeaturedScroll from "@/components/FeaturedScroll";
 import StorySection from "@/components/StorySection";
 import HomeStyleCardsSection from "@/components/HomeStyleCardsSection";
-import HomeBestOfSection from "@/components/HomeBestOfSection";
 import { getDictionary, Locale } from "@/lib/i18n";
 import { getWatchCategories } from "@/lib/watch-categories";
 import { createAuthServerClient } from "@/lib/supabase/server";
 import { isAdmin } from "@/lib/admin";
-import { getFeaturedSlides, getActiveGiveaway, getHomeStyleCards, getHomeBestOf } from "@/app/[locale]/account/admin/actions";
+import { getFeaturedSlides, getActiveGiveaway, getHomeStyleCards } from "@/app/[locale]/account/admin/actions";
 
 export async function generateMetadata({
   params,
@@ -42,13 +40,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
   const hero = dictionary.hero;
   const home = dictionary.home;
   const isFr = locale === "fr";
-  const [watchCategories, featuredSlidesRaw, activeGiveaway, cookieStore, styleCards, bestOfItems, supabase] = await Promise.all([
+  const [watchCategories, featuredSlidesRaw, activeGiveaway, cookieStore, styleCards, supabase] = await Promise.all([
     getWatchCategories(),
     getFeaturedSlides(),
     getActiveGiveaway(),
     cookies(),
     getHomeStyleCards(),
-    getHomeBestOf(),
     createAuthServerClient(),
   ]);
   const { data: { user } } = await supabase.auth.getUser();
@@ -94,20 +91,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
           styleCards={styleCards}
           categories={watchCategories.filter((c) => c.slug !== "womens")}
           sectionHeading={home.selectStyle}
-        />
-      </StorySection>
-
-      <StorySection
-        minHeight="100vh"
-        className="bg-white/50 text-foreground"
-        contentCenter={false}
-      >
-        <HomeBestOfSection
-          locale={locale}
-          isAdmin={!!isAdminUser}
-          items={bestOfItems}
-          sectionHeading={home.bestOfAtelier}
-          seeMoreLabel={home.seeMore}
         />
       </StorySection>
 

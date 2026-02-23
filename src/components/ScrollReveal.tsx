@@ -18,7 +18,11 @@ export default function ScrollReveal({ children, className = "" }: { children: R
       ([entry]) => {
         node.classList.toggle("is-visible", entry.isIntersecting);
       },
-      { threshold: 0.15 }
+      {
+        threshold: 0.15,
+        // Extend viewport downward so content below the fold (e.g. watches on mobile) reveals on load
+        rootMargin: "0px 0px 30vh 0px",
+      }
     );
 
     observer.observe(node);
