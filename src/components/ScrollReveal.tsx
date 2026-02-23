@@ -21,7 +21,7 @@ export default function ScrollReveal({ children, className = "" }: { children: R
       {
         threshold: 0.15,
         // Extend viewport downward so content below the fold (e.g. watches on mobile) reveals on load
-        rootMargin: "0px 0px 30vh 0px",
+        rootMargin: "0px 0px 30% 0px",
       }
     );
 
