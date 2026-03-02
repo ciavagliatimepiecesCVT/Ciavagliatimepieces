@@ -134,7 +134,7 @@ export default function FeaturedScroll({
               showWelcome={index === 0}
               locale={locale}
               slideIndex={index}
-              scrollProgress={1}
+              scrollProgress={index}
               totalSlides={items.length}
             />
           </div>
