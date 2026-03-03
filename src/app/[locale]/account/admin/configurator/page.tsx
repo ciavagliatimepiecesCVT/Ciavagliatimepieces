@@ -109,6 +109,10 @@ export default function AdminConfiguratorPage() {
   const [previewSelections, setPreviewSelections] = useState<Partial<Record<string, string>>>({});
   const [layerOffsets, setLayerOffsets] = useState<Record<string, { x: number; y: number }>>({});
   const [layerScales, setLayerScales] = useState<Record<string, number>>({});
+  /** Pending edit for a single layer: only this layer moves until Save. Others stay at saved values. */
+  const [pendingLayerKey, setPendingLayerKey] = useState<string | null>(null);
+  const [pendingOffset, setPendingOffset] = useState<{ x: number; y: number } | null>(null);
+  const [pendingScale, setPendingScale] = useState<number | null>(null);
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [cropModalImageSource, setCropModalImageSource] = useState<string | null>(null);
   const [cropModalOnSave, setCropModalOnSave] = useState<((url: string) => void) | null>(null);
@@ -279,9 +283,12 @@ export default function AdminConfiguratorPage() {
   /** Effective watch type: from preview selection, dropdown, or first option. Drives steps and options. */
   const effectiveFunctionId = previewSelections.function ?? selectedFunctionId ?? functionOptions[0]?.id ?? "";
 
-  /** Reset "this layer only" when switching watch type */
+  /** Reset "this layer only" and pending edits when switching watch type */
   useEffect(() => {
     setLastEditedLayerKey(null);
+    setPendingLayerKey(null);
+    setPendingOffset(null);
+    setPendingScale(null);
   }, [effectiveFunctionId]);
 
   /** Load saved layer transforms when switching watch type */
@@ -310,22 +317,34 @@ export default function AdminConfiguratorPage() {
     };
   }, [effectiveFunctionId]);
 
+  /** Merged offsets/scales: saved values, with pending applied only for the layer being edited. Other layers never change until Save. */
+  const layerOffsetsMerged = useMemo(() => {
+    const merged = { ...layerOffsets };
+    if (pendingLayerKey != null && pendingOffset != null) merged[pendingLayerKey] = pendingOffset;
+    return merged;
+  }, [layerOffsets, pendingLayerKey, pendingOffset]);
+  const layerScalesMerged = useMemo(() => {
+    const merged = { ...layerScales };
+    if (pendingLayerKey != null && pendingScale != null) merged[pendingLayerKey] = pendingScale;
+    return merged;
+  }, [layerScales, pendingLayerKey, pendingScale]);
+
   const handleSaveLayerTransforms = useCallback(async () => {
     if (!effectiveFunctionId) return;
     setSavingLayerTransforms(true);
     try {
       const prefix = `${effectiveFunctionId}:`;
       const keys = new Set<string>([
-        ...Object.keys(layerOffsets).filter((k) => k.startsWith(prefix)),
-        ...Object.keys(layerScales).filter((k) => k.startsWith(prefix)),
+        ...Object.keys(layerOffsetsMerged).filter((k) => k.startsWith(prefix)),
+        ...Object.keys(layerScalesMerged).filter((k) => k.startsWith(prefix)),
       ]);
       const transforms: { step_id: string; offset_x: number; offset_y: number; scale: number }[] = [];
       keys.forEach((key) => {
         const stepKey = key.slice(prefix.length);
         const stepId = stepKeyToId.get(stepKey);
         if (!stepId) return;
-        const off = layerOffsets[key];
-        const scale = layerScales[key] ?? 1;
+        const off = layerOffsetsMerged[key];
+        const scale = layerScalesMerged[key] ?? 1;
         transforms.push({
           step_id: stepId,
           offset_x: off?.x ?? 0,
@@ -337,12 +356,26 @@ export default function AdminConfiguratorPage() {
       setError(null);
       setLayerSaveSuccess(true);
       setTimeout(() => setLayerSaveSuccess(false), 4000);
+      // Commit pending into saved state so next edit starts from current positions
+      setLayerOffsets((prev) => {
+        const next = { ...prev };
+        if (pendingLayerKey != null && pendingOffset != null) next[pendingLayerKey] = pendingOffset;
+        return next;
+      });
+      setLayerScales((prev) => {
+        const next = { ...prev };
+        if (pendingLayerKey != null && pendingScale != null) next[pendingLayerKey] = pendingScale;
+        return next;
+      });
+      setPendingLayerKey(null);
+      setPendingOffset(null);
+      setPendingScale(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save layer positions");
     } finally {
       setSavingLayerTransforms(false);
     }
-  }, [effectiveFunctionId, layerOffsets, layerScales, stepKeyToId]);
+  }, [effectiveFunctionId, layerOffsetsMerged, layerScalesMerged, stepKeyToId, pendingLayerKey, pendingOffset, pendingScale]);
 
   const handleSaveSingleLayerTransform = useCallback(async () => {
     if (!effectiveFunctionId || !lastEditedLayerKey) return;
@@ -351,8 +384,8 @@ export default function AdminConfiguratorPage() {
     const stepKey = lastEditedLayerKey.slice(prefix.length);
     const stepId = stepKeyToId.get(stepKey);
     if (!stepId) return;
-    const off = layerOffsets[lastEditedLayerKey];
-    const scale = layerScales[lastEditedLayerKey] ?? 1;
+    const off = layerOffsetsMerged[lastEditedLayerKey];
+    const scale = layerScalesMerged[lastEditedLayerKey] ?? 1;
     setSavingLayerTransforms(true);
     try {
       await setLayerTransformForStep(
@@ -365,12 +398,25 @@ export default function AdminConfiguratorPage() {
       setError(null);
       setLayerSaveSuccess(true);
       setTimeout(() => setLayerSaveSuccess(false), 4000);
+      setLayerOffsets((prev) => {
+        const next = { ...prev };
+        next[lastEditedLayerKey] = { x: off?.x ?? 0, y: off?.y ?? 0 };
+        return next;
+      });
+      setLayerScales((prev) => {
+        const next = { ...prev };
+        next[lastEditedLayerKey] = scale;
+        return next;
+      });
+      setPendingLayerKey(null);
+      setPendingOffset(null);
+      setPendingScale(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save layer position");
     } finally {
       setSavingLayerTransforms(false);
     }
-  }, [effectiveFunctionId, lastEditedLayerKey, layerOffsets, layerScales, stepKeyToId]);
+  }, [effectiveFunctionId, lastEditedLayerKey, layerOffsetsMerged, layerScalesMerged, stepKeyToId]);
 
   /** Step IDs (and keys) for the effective watch type — same as customer sees */
   const stepIdsForFunction = effectiveFunctionId ? (functionStepsMap[effectiveFunctionId] ?? []) : [];
@@ -941,21 +987,19 @@ export default function AdminConfiguratorPage() {
             }
             extraStepImage="/images/configuratorextra.png"
             locale={locale}
-            layerOffsets={layerOffsets}
+            layerOffsets={layerOffsetsMerged}
             onLayerOffsetChange={(key, offset) => {
               setLastEditedLayerKey(key);
-              setLayerOffsets((prev) => ({
-                ...prev,
-                [key]: offset,
-              }));
+              if (key !== pendingLayerKey) setPendingScale(null);
+              setPendingLayerKey(key);
+              setPendingOffset(offset);
             }}
-            layerScales={layerScales}
+            layerScales={layerScalesMerged}
             onLayerScaleChange={(key, scale) => {
               setLastEditedLayerKey(key);
-              setLayerScales((prev) => ({
-                ...prev,
-                [key]: scale,
-              }));
+              if (key !== pendingLayerKey) setPendingOffset(null);
+              setPendingLayerKey(key);
+              setPendingScale(scale);
             }}
           />
         </div>
