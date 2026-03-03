@@ -518,9 +518,9 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
       </div>
 
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 lg:flex-row lg:gap-12">
-        <div className="flex flex-1 flex-col items-center gap-2">
+        <div className="group flex flex-1 flex-col items-center gap-2">
           <div
-            className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)]"
+            className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)] cursor-zoom-in transition-transform duration-300 ease-out group-hover:scale-[1.15] group-hover:shadow-[0_40px_120px_rgba(0,0,0,0.55)]"
             style={{
               width: CONFIGURATOR_PREVIEW_SIZE_PX,
               height: CONFIGURATOR_PREVIEW_SIZE_PX,
@@ -578,7 +578,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
                 >
                   <div className="relative">
                     {(opt as { image_url?: string }).image_url || (opt as { preview_image_url?: string }).preview_image_url ? (
-                      <div className={`relative h-14 w-14 overflow-hidden rounded-full ${selected ? "ring-2 ring-[var(--accent)]" : ""}`}>
+                      <div className={`relative h-14 w-14 overflow-hidden rounded-full bg-white ${selected ? "ring-2 ring-[var(--accent)]" : ""}`}>
                         <Image
                           src={(opt as { image_url?: string }).image_url || (opt as { preview_image_url?: string }).preview_image_url!}
                           alt=""

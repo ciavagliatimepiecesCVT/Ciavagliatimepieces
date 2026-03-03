@@ -178,7 +178,7 @@ export default function HomeStyleCardsSection({
                 href={`/${locale}/configurator`}
                 className="group flex flex-col rounded-[28px] border-2 border-dashed border-foreground/25 bg-foreground/5 p-6 transition hover:border-foreground/40 hover:bg-foreground/10"
               >
-                <div className="relative h-52 overflow-hidden rounded-[22px] bg-white/60">
+                <div className="relative h-52 overflow-hidden rounded-[22px] bg-white">
                   {styleCards.custom_build.image_url ? (
                     <Image src={styleCards.custom_build.image_url} alt="" fill className="object-cover transition duration-500 group-hover:scale-[1.02]" />
                   ) : (

@@ -2090,6 +2090,32 @@ export async function setLayerTransforms(
   revalidatePath("/[locale]/account/admin", "page");
 }
 
+/** Admin: set a single layer transform for one step (upsert). Use to save only the moved layer. */
+export async function setLayerTransformForStep(
+  functionOptionId: string,
+  stepId: string,
+  offset_x: number,
+  offset_y: number,
+  scale: number
+): Promise<void> {
+  await requireAdmin();
+  if (!functionOptionId || !stepId) throw new Error("Function option id and step id required");
+  const supabase = createServerClient();
+  const row = {
+    function_option_id: functionOptionId,
+    step_id: stepId,
+    offset_x,
+    offset_y,
+    scale: Math.max(0.5, Math.min(2, scale)),
+  };
+  const { error } = await supabase
+    .from("configurator_layer_transforms")
+    .upsert(row, { onConflict: "function_option_id,step_id" });
+  if (error) throw error;
+  revalidatePath("/[locale]/configurator", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
 /** Per-step layer transform for configurator preview (admin-set, used on public configurator). */
 export type LayerTransformRow = {
   step_key: string;

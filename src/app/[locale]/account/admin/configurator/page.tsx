@@ -30,6 +30,7 @@ import {
   setConfiguratorFreeShipping,
   getLayerTransformsForFunction,
   setLayerTransforms,
+  setLayerTransformForStep,
 } from "../actions";
 import type {
   ConfiguratorStepRow,
@@ -112,9 +113,13 @@ export default function AdminConfiguratorPage() {
   const [cropModalImageSource, setCropModalImageSource] = useState<string | null>(null);
   const [cropModalOnSave, setCropModalOnSave] = useState<((url: string) => void) | null>(null);
   const [cropModalBackgroundUrl, setCropModalBackgroundUrl] = useState<string | null>(null);
+  /** Which option image field is being cropped: layer image saves as PNG to preserve transparency. */
+  const [cropModalForField, setCropModalForField] = useState<"image" | "preview" | "layer" | null>(null);
   const [cropModalCapturing, setCropModalCapturing] = useState(false);
   const [savingLayerTransforms, setSavingLayerTransforms] = useState(false);
   const [layerSaveSuccess, setLayerSaveSuccess] = useState(false);
+  /** Last layer key that was moved/resized (e.g. "functionId:step_key"). Used for "Save this layer only". */
+  const [lastEditedLayerKey, setLastEditedLayerKey] = useState<string | null>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
   const openCropModalFromFile = useCallback((file: File, onSave: (url: string) => void) => {
@@ -135,7 +140,8 @@ export default function AdminConfiguratorPage() {
   }, []);
 
   const openCropModalWithPreview = useCallback(
-    async (imageSource: string, onSave: (url: string) => void) => {
+    async (imageSource: string, onSave: (url: string) => void, forField: "image" | "preview" | "layer" = "image") => {
+      setCropModalForField(forField);
       setCropModalOnSave(() => onSave);
       setCropModalImageSource(imageSource);
       setUploadError(null);
@@ -164,17 +170,17 @@ export default function AdminConfiguratorPage() {
   );
 
   const openCropModalFromFileWithPreview = useCallback(
-    async (file: File, onSave: (url: string) => void) => {
+    async (file: File, onSave: (url: string) => void, forField: "image" | "preview" | "layer" = "image") => {
       const url = URL.createObjectURL(file);
-      await openCropModalWithPreview(url, onSave);
+      await openCropModalWithPreview(url, onSave, forField);
     },
     [openCropModalWithPreview]
   );
 
   const openCropModalFromUrlWithPreview = useCallback(
-    async (url: string, onSave: (url: string) => void) => {
+    async (url: string, onSave: (url: string) => void, forField: "image" | "preview" | "layer" = "image") => {
       if (!url) return;
-      await openCropModalWithPreview(url, onSave);
+      await openCropModalWithPreview(url, onSave, forField);
     },
     [openCropModalWithPreview]
   );
@@ -187,6 +193,7 @@ export default function AdminConfiguratorPage() {
     setCropModalImageSource(null);
     setCropModalOnSave(null);
     setCropModalBackgroundUrl(null);
+    setCropModalForField(null);
   }, [cropModalImageSource]);
 
   const handleCropSave = useCallback(
@@ -272,6 +279,11 @@ export default function AdminConfiguratorPage() {
   /** Effective watch type: from preview selection, dropdown, or first option. Drives steps and options. */
   const effectiveFunctionId = previewSelections.function ?? selectedFunctionId ?? functionOptions[0]?.id ?? "";
 
+  /** Reset "this layer only" when switching watch type */
+  useEffect(() => {
+    setLastEditedLayerKey(null);
+  }, [effectiveFunctionId]);
+
   /** Load saved layer transforms when switching watch type */
   useEffect(() => {
     if (!effectiveFunctionId) return;
@@ -331,6 +343,34 @@ export default function AdminConfiguratorPage() {
       setSavingLayerTransforms(false);
     }
   }, [effectiveFunctionId, layerOffsets, layerScales, stepKeyToId]);
+
+  const handleSaveSingleLayerTransform = useCallback(async () => {
+    if (!effectiveFunctionId || !lastEditedLayerKey) return;
+    const prefix = `${effectiveFunctionId}:`;
+    if (!lastEditedLayerKey.startsWith(prefix)) return;
+    const stepKey = lastEditedLayerKey.slice(prefix.length);
+    const stepId = stepKeyToId.get(stepKey);
+    if (!stepId) return;
+    const off = layerOffsets[lastEditedLayerKey];
+    const scale = layerScales[lastEditedLayerKey] ?? 1;
+    setSavingLayerTransforms(true);
+    try {
+      await setLayerTransformForStep(
+        effectiveFunctionId,
+        stepId,
+        off?.x ?? 0,
+        off?.y ?? 0,
+        scale
+      );
+      setError(null);
+      setLayerSaveSuccess(true);
+      setTimeout(() => setLayerSaveSuccess(false), 4000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save layer position");
+    } finally {
+      setSavingLayerTransforms(false);
+    }
+  }, [effectiveFunctionId, lastEditedLayerKey, layerOffsets, layerScales, stepKeyToId]);
 
   /** Step IDs (and keys) for the effective watch type — same as customer sees */
   const stepIdsForFunction = effectiveFunctionId ? (functionStepsMap[effectiveFunctionId] ?? []) : [];
@@ -902,30 +942,44 @@ export default function AdminConfiguratorPage() {
             extraStepImage="/images/configuratorextra.png"
             locale={locale}
             layerOffsets={layerOffsets}
-            onLayerOffsetChange={(key, offset) =>
+            onLayerOffsetChange={(key, offset) => {
+              setLastEditedLayerKey(key);
               setLayerOffsets((prev) => ({
                 ...prev,
                 [key]: offset,
-              }))
-            }
+              }));
+            }}
             layerScales={layerScales}
-            onLayerScaleChange={(key, scale) =>
+            onLayerScaleChange={(key, scale) => {
+              setLastEditedLayerKey(key);
               setLayerScales((prev) => ({
                 ...prev,
                 [key]: scale,
-              }))
-            }
+              }));
+            }}
           />
         </div>
         <div className="flex flex-col items-start gap-2">
-          <button
-            type="button"
-            onClick={handleSaveLayerTransforms}
-            disabled={savingLayerTransforms || !effectiveFunctionId}
-            className="rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-50"
-          >
-            {savingLayerTransforms ? "…" : isFr ? "Enregistrer les positions des calques" : "Save layer positions"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSaveLayerTransforms}
+              disabled={savingLayerTransforms || !effectiveFunctionId}
+              className="rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-50"
+            >
+              {savingLayerTransforms ? "…" : isFr ? "Enregistrer toutes les positions" : "Save all layer positions"}
+            </button>
+            {lastEditedLayerKey && (
+              <button
+                type="button"
+                onClick={handleSaveSingleLayerTransform}
+                disabled={savingLayerTransforms || !effectiveFunctionId}
+                className="rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-50"
+              >
+                {savingLayerTransforms ? "…" : isFr ? "Enregistrer ce calque seulement" : "Save this layer only"}
+              </button>
+            )}
+          </div>
           {layerSaveSuccess && (
             <span className="text-xs text-emerald-300">
               {isFr ? "Positions enregistrées. Sur le configurateur public, choisissez le même type de montre (ex. Chrono), puis actualisez ou revenez sur l’onglet." : "Layer positions saved. On the public configurator, select the same watch type (e.g. Chronograph), then refresh or switch to that tab."}
@@ -1026,7 +1080,7 @@ export default function AdminConfiguratorPage() {
                   }`}
                 >
                   {(opt as { image_url?: string }).image_url ? (
-                    <div className="relative h-14 w-14 overflow-hidden rounded-full bg-foreground/10">
+                    <div className="relative h-14 w-14 overflow-hidden rounded-full bg-white">
                       <img
                         src={(opt as { image_url: string }).image_url}
                         alt=""
@@ -1377,7 +1431,7 @@ export default function AdminConfiguratorPage() {
                       className="block max-w-[180px] text-xs text-foreground file:mr-2 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) openCropModalFromFileWithPreview(file, (url) => setOptionForm((p) => ({ ...p, image_url: url })));
+                        if (file) openCropModalFromFileWithPreview(file, (url) => setOptionForm((p) => ({ ...p, image_url: url })), "image");
                         e.target.value = "";
                       }}
                     />
@@ -1391,7 +1445,7 @@ export default function AdminConfiguratorPage() {
                       <button
                         type="button"
                         disabled={cropModalCapturing}
-                        onClick={() => openCropModalFromUrlWithPreview(optionForm.image_url, (url) => setOptionForm((p) => ({ ...p, image_url: url })))}
+                        onClick={() => openCropModalFromUrlWithPreview(optionForm.image_url, (url) => setOptionForm((p) => ({ ...p, image_url: url })), "image")}
                         className="rounded-lg border border-foreground/25 px-3 py-1.5 text-xs text-foreground hover:bg-foreground/5"
                       >
                         {cropModalCapturing ? (isFr ? "Capture…" : "Capturing…") : isFr ? "Recadrer l'image" : "Crop image"}
@@ -1408,7 +1462,7 @@ export default function AdminConfiguratorPage() {
                       className="block max-w-[180px] text-xs text-foreground file:mr-2 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) openCropModalFromFileWithPreview(file, (url) => setOptionForm((p) => ({ ...p, preview_image_url: url })));
+                        if (file) openCropModalFromFileWithPreview(file, (url) => setOptionForm((p) => ({ ...p, preview_image_url: url })), "preview");
                         e.target.value = "";
                       }}
                     />
@@ -1422,7 +1476,7 @@ export default function AdminConfiguratorPage() {
                       <button
                         type="button"
                         disabled={cropModalCapturing}
-                        onClick={() => openCropModalFromUrlWithPreview(optionForm.preview_image_url, (url) => setOptionForm((p) => ({ ...p, preview_image_url: url })))}
+                        onClick={() => openCropModalFromUrlWithPreview(optionForm.preview_image_url, (url) => setOptionForm((p) => ({ ...p, preview_image_url: url })), "preview")}
                         className="rounded-lg border border-foreground/25 px-3 py-1.5 text-xs text-foreground hover:bg-foreground/5"
                       >
                         {cropModalCapturing ? (isFr ? "Capture…" : "Capturing…") : isFr ? "Recadrer l'image" : "Crop image"}
@@ -1432,7 +1486,7 @@ export default function AdminConfiguratorPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="text-xs font-medium uppercase tracking-wider text-foreground">{isFr ? "Image couche (aperçu composite)" : "Layer image (composite preview)"}</label>
-                  <p className="mt-0.5 text-xs text-foreground/60">{isFr ? "PNG transparent pour superposition. 0=base, 10=cadran, 20=boîtier, 30=aiguilles, 40=bracelet. Si le fond est noir, le configurateur tente de le rendre transparent." : "Transparent PNG for stacking. If the image has a black background instead of transparency, the preview will treat black as transparent."}</p>
+                  <p className="mt-0.5 text-xs text-foreground/60">{isFr ? "PNG avec transparence réelle (canal alpha) pour superposition. 0=base, 10=cadran, 20=boîtier, 30=aiguilles, 40=bracelet. Exportez avec fond transparent depuis votre outil 3D." : "PNG with real transparency (alpha channel) for stacking. 0=base, 10=case, 20=dial, 30=hands, 40=strap. Export with transparent background from your 3D tool so the preview shows correctly."}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <input
                       type="file"
@@ -1440,7 +1494,7 @@ export default function AdminConfiguratorPage() {
                       className="block max-w-[180px] text-xs text-foreground file:mr-2 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) openCropModalFromFileWithPreview(file, (url) => setOptionForm((p) => ({ ...p, layer_image_url: url })));
+                        if (file) openCropModalFromFileWithPreview(file, (url) => setOptionForm((p) => ({ ...p, layer_image_url: url })), "layer");
                         e.target.value = "";
                       }}
                     />
@@ -1454,7 +1508,7 @@ export default function AdminConfiguratorPage() {
                       <button
                         type="button"
                         disabled={cropModalCapturing}
-                        onClick={() => openCropModalFromUrlWithPreview(optionForm.layer_image_url, (url) => setOptionForm((p) => ({ ...p, layer_image_url: url })))}
+                        onClick={() => openCropModalFromUrlWithPreview(optionForm.layer_image_url, (url) => setOptionForm((p) => ({ ...p, layer_image_url: url })), "layer")}
                         className="rounded-lg border border-foreground/25 px-3 py-1.5 text-xs text-foreground hover:bg-foreground/5"
                       >
                         {cropModalCapturing ? (isFr ? "Capture…" : "Capturing…") : isFr ? "Recadrer l'image" : "Crop image"}
@@ -1520,6 +1574,7 @@ export default function AdminConfiguratorPage() {
         backgroundImageUrl={cropModalBackgroundUrl}
         minZoom={0.3}
         maxZoom={3}
+        outputMimeType={cropModalForField === "layer" ? "image/png" : "image/jpeg"}
       />
     </div>
   );

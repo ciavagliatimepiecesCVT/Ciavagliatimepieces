@@ -19,6 +19,10 @@ type AdminImageEditorProps = {
   minZoom?: number;
   /** Max zoom (default 3) */
   maxZoom?: number;
+  /** Output format: PNG preserves transparency for layer images; JPEG for thumbnails. */
+  outputMimeType?: "image/jpeg" | "image/png";
+  /** Quality for JPEG (0–1). Ignored when outputMimeType is image/png. */
+  outputQuality?: number;
 };
 
 const DEFAULT_MIN_ZOOM = 0.3;
@@ -37,6 +41,8 @@ export default function AdminImageEditor({
   backgroundImageUrl = null,
   minZoom = DEFAULT_MIN_ZOOM,
   maxZoom = DEFAULT_MAX_ZOOM,
+  outputMimeType = "image/jpeg",
+  outputQuality = 0.9,
 }: AdminImageEditorProps) {
   const isFr = locale === "fr";
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -61,8 +67,17 @@ export default function AdminImageEditor({
     setError(null);
     setSaving(true);
     try {
-      const blob = await getCroppedImageBlob(imageSource, croppedAreaPixels);
-      const file = new File([blob], "cropped.jpg", { type: "image/jpeg" });
+      const mimeType = outputMimeType ?? "image/jpeg";
+      const quality = mimeType === "image/png" ? undefined : (outputQuality ?? 0.9);
+      const blob = await getCroppedImageBlob(
+        imageSource,
+        croppedAreaPixels,
+        0,
+        mimeType,
+        quality ?? 0.9
+      );
+      const ext = mimeType === "image/png" ? "png" : "jpg";
+      const file = new File([blob], `cropped.${ext}`, { type: mimeType });
       const formData = new FormData();
       formData.append("image", file);
       const { url } = await onUpload(formData);
@@ -73,7 +88,7 @@ export default function AdminImageEditor({
     } finally {
       setSaving(false);
     }
-  }, [imageSource, croppedAreaPixels, onUpload, onSave, onClose]);
+  }, [imageSource, croppedAreaPixels, onUpload, onSave, onClose, outputMimeType, outputQuality]);
 
   if (!open) return null;
 

@@ -1,5 +1,13 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { FooterSettings } from "@/lib/footer-settings";
+
+const PAYMENT_LOGOS = [
+  { src: "/images/payments/visa.svg", alt: "Visa" },
+  { src: "/images/payments/mastercard.svg", alt: "Mastercard" },
+  { src: "/images/payments/amex.svg", alt: "American Express" },
+  { src: "/images/payments/discover.svg", alt: "Discover" },
+] as const;
 
 function isExternal(path: string) {
   return path.startsWith("http://") || path.startsWith("https://");
@@ -84,6 +92,18 @@ export default function Footer({
             <a href={`tel:${contactPhone.replace(/\s/g, "")}`} className="transition hover:text-white">{contactPhone}</a>
             <span>{contactCity}</span>
           </div>
+        </div>
+      </div>
+      <div className="mx-auto mt-10 flex max-w-6xl flex-col items-center justify-center gap-4 text-[0.68rem] uppercase tracking-[0.25em] text-white/60 sm:flex-row sm:justify-center sm:gap-6">
+        <p className="text-center sm:text-left">
+          {isFr ? "Paiement sécurisé via Stripe" : "Secure Stripe checkout"}
+        </p>
+        <div className="flex flex-wrap justify-center items-center gap-2">
+          {PAYMENT_LOGOS.map(({ src, alt }) => (
+            <div key={alt} className="flex h-8 items-center rounded-md bg-white/95 px-3 py-1.5">
+              <Image src={src} alt={alt} width={56} height={24} className="h-full w-auto object-contain" />
+            </div>
+          ))}
         </div>
       </div>
       <p className="mt-12 text-center text-xs uppercase tracking-[0.3em] text-white/40">

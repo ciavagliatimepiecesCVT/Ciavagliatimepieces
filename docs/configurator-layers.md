@@ -16,10 +16,10 @@ The configurator composites watch images by stacking transparent PNG layers:
 
 ## Image Requirements
 
-- **Format**: PNG with transparency
+- **Format**: PNG with transparency (for all layers except the base). Use PNG so the composite can stack layers correctly; JPEG has no transparency and will show a solid background.
 - **Dimensions**: All layers for a given watch style must have identical dimensions for proper alignment
 - **Base layer**: Can be opaque (full watch photo)
-- **Other layers**: Must have transparent background; only the component (case, dial, etc.) should be visible
+- **Other layers**: Must have transparent background; only the component (case, dial, etc.) should be visible. Export with alpha from your 3D or design tool when possible to avoid black-background and color issues.
 
 ## Naming Convention (Suggested)
 
@@ -35,7 +35,7 @@ strap-leather-black.png, strap-metal.png, ...
 
 1. Go to **Account > Admin > Configurator**
 2. Edit each option (Function, Case, Dial, Hands, Strap)
-3. Use the **Layer Image** upload field (separate from Thumbnail Image)
+3. Use the **Layer Image** upload field (separate from Thumbnail Image). When you crop a layer image in the admin, it is saved as **PNG** to preserve transparency and color; thumbnail and preview image crops are saved as JPEG.
 4. Set **Layer Z-Index** (defaults: Function=0, Case=10, Dial=20, Hands=30, Strap=40)
 
 ## Fallback Behavior
@@ -43,3 +43,4 @@ strap-leather-black.png, strap-metal.png, ...
 - If `layer_image_url` is empty, the configurator falls back to `image_url` (thumbnail)
 - Options without layer images are skipped in the composite
 - The base (Function) layer is required; other layers are optional
+- Layer images are shown as-is; the preview does not modify them. Export layer images with a real transparent background (alpha channel) from your 3D or design tool so the composite displays correctly and colors stay accurate.
