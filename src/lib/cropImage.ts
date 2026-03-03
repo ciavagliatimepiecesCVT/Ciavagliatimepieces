@@ -19,7 +19,8 @@ export async function getCroppedImageBlob(
   pixelCrop: Area,
   _rotation = 0,
   mimeType: string = "image/jpeg",
-  quality = 0.9
+  quality = 0.9,
+  backgroundColor?: string
 ): Promise<Blob> {
   const image = await loadImage(imageSrc);
   const canvas = document.createElement("canvas");
@@ -27,6 +28,10 @@ export async function getCroppedImageBlob(
   canvas.height = pixelCrop.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2d not available");
+  if (backgroundColor) {
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
   ctx.drawImage(
     image,
     pixelCrop.x,

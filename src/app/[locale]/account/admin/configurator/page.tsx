@@ -1454,37 +1454,6 @@ export default function AdminConfiguratorPage() {
                   </div>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-medium uppercase tracking-wider text-foreground">{isFr ? "Image aperçu" : "Preview image"}</label>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="block max-w-[180px] text-xs text-foreground file:mr-2 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) openCropModalFromFileWithPreview(file, (url) => setOptionForm((p) => ({ ...p, preview_image_url: url })), "preview");
-                        e.target.value = "";
-                      }}
-                    />
-                    <input
-                      value={optionForm.preview_image_url}
-                      onChange={(e) => setOptionForm((p) => ({ ...p, preview_image_url: e.target.value }))}
-                      placeholder={isFr ? "Ou URL" : "Or URL"}
-                      className="min-w-[200px] flex-1 rounded-lg border border-foreground/25 bg-white px-3 py-2 text-sm text-foreground placeholder:text-neutral-500"
-                    />
-                    {optionForm.preview_image_url && (
-                      <button
-                        type="button"
-                        disabled={cropModalCapturing}
-                        onClick={() => openCropModalFromUrlWithPreview(optionForm.preview_image_url, (url) => setOptionForm((p) => ({ ...p, preview_image_url: url })), "preview")}
-                        className="rounded-lg border border-foreground/25 px-3 py-1.5 text-xs text-foreground hover:bg-foreground/5"
-                      >
-                        {cropModalCapturing ? (isFr ? "Capture…" : "Capturing…") : isFr ? "Recadrer l'image" : "Crop image"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="sm:col-span-2">
                   <label className="text-xs font-medium uppercase tracking-wider text-foreground">{isFr ? "Image couche (aperçu composite)" : "Layer image (composite preview)"}</label>
                   <p className="mt-0.5 text-xs text-foreground/60">{isFr ? "PNG avec transparence réelle (canal alpha) pour superposition. 0=base, 10=cadran, 20=boîtier, 30=aiguilles, 40=bracelet. Exportez avec fond transparent depuis votre outil 3D." : "PNG with real transparency (alpha channel) for stacking. 0=base, 10=case, 20=dial, 30=hands, 40=strap. Export with transparent background from your 3D tool so the preview shows correctly."}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -1575,6 +1544,7 @@ export default function AdminConfiguratorPage() {
         minZoom={0.3}
         maxZoom={3}
         outputMimeType={cropModalForField === "layer" ? "image/png" : "image/jpeg"}
+        fillBackgroundColor={cropModalForField === "image" ? "#ffffff" : undefined}
       />
     </div>
   );

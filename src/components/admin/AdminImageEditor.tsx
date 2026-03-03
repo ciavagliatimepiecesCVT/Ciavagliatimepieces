@@ -23,6 +23,8 @@ type AdminImageEditorProps = {
   outputMimeType?: "image/jpeg" | "image/png";
   /** Quality for JPEG (0–1). Ignored when outputMimeType is image/png. */
   outputQuality?: number;
+  /** Fill color for crop canvas (e.g. "#ffffff"). Use for JPEG so transparent areas become this color instead of black. */
+  fillBackgroundColor?: string;
 };
 
 const DEFAULT_MIN_ZOOM = 0.3;
@@ -43,6 +45,7 @@ export default function AdminImageEditor({
   maxZoom = DEFAULT_MAX_ZOOM,
   outputMimeType = "image/jpeg",
   outputQuality = 0.9,
+  fillBackgroundColor,
 }: AdminImageEditorProps) {
   const isFr = locale === "fr";
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -74,7 +77,8 @@ export default function AdminImageEditor({
         croppedAreaPixels,
         0,
         mimeType,
-        quality ?? 0.9
+        quality ?? 0.9,
+        fillBackgroundColor
       );
       const ext = mimeType === "image/png" ? "png" : "jpg";
       const file = new File([blob], `cropped.${ext}`, { type: mimeType });
@@ -88,7 +92,7 @@ export default function AdminImageEditor({
     } finally {
       setSaving(false);
     }
-  }, [imageSource, croppedAreaPixels, onUpload, onSave, onClose, outputMimeType, outputQuality]);
+  }, [imageSource, croppedAreaPixels, onUpload, onSave, onClose, outputMimeType, outputQuality, fillBackgroundColor]);
 
   if (!open) return null;
 
@@ -103,7 +107,7 @@ export default function AdminImageEditor({
             {isFr ? "Ajustez le zoom et la position, puis enregistrez." : "Adjust zoom and position, then save."}
           </p>
         </div>
-        <div className="relative h-[50vh] min-h-[280px] shrink-0 overflow-hidden rounded-b-2xl bg-foreground/10">
+        <div className="relative h-[50vh] min-h-[280px] shrink-0 overflow-hidden rounded-b-2xl bg-white">
           {backgroundImageUrl && (
             <div
               className="absolute inset-0 z-0 flex items-center justify-center bg-[var(--background)]"
