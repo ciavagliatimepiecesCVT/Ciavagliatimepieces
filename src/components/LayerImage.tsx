@@ -5,9 +5,11 @@ import { useEffect, useState } from "react";
 /** Only pixels with r,g,b ALL below this are made transparent (black). */
 const PURE_BLACK_THRESHOLD = 4;
 /** Only pixels with r,g,b ALL above this are made transparent (white) when not using corner sample. */
-const PURE_WHITE_THRESHOLD = 238;
-/** Tolerance for matching corner white in auto mode (removes off-whites and dial cutout). */
-const WHITE_TOLERANCE = 28;
+const PURE_WHITE_THRESHOLD = 248;
+/** Tolerance for matching corner white in auto mode; keep small to avoid removing light highlights on metal. */
+const WHITE_TOLERANCE = 6;
+/** Max r/g/b spread for white removal: only remove neutral whites (r≈g≈b), not warm/cool highlights. */
+const WHITE_NEUTRAL_SPREAD = 5;
 /** Tolerance for "same grey" when removing grey background (max difference between r,g,b). */
 const GREY_TOLERANCE = 12;
 /** How many pixels from each corner to sample for auto-detect (per corner). */
@@ -218,14 +220,18 @@ export function LayerImage({
           if (effectiveMode === "black") {
             makeTransparent = r <= blackThreshold && g <= blackThreshold && b <= blackThreshold;
           } else if (effectiveMode === "white") {
-            // Auto-detected white: remove pixels matching corner (background + dial opening). Else use fixed threshold.
+            // Only remove neutral near‑white so we don't remove light spots/highlights on the watch.
+            const spread = Math.max(r, g, b) - Math.min(r, g, b);
+            const isNeutralWhite = spread <= WHITE_NEUTRAL_SPREAD;
             if (cornerR > 200) {
               makeTransparent =
+                isNeutralWhite &&
                 Math.abs(r - cornerR) <= WHITE_TOLERANCE &&
                 Math.abs(g - cornerG) <= WHITE_TOLERANCE &&
                 Math.abs(b - cornerB) <= WHITE_TOLERANCE;
             } else {
               makeTransparent =
+                isNeutralWhite &&
                 r >= PURE_WHITE_THRESHOLD &&
                 g >= PURE_WHITE_THRESHOLD &&
                 b >= PURE_WHITE_THRESHOLD;

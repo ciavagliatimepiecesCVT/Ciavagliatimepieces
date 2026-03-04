@@ -19,6 +19,7 @@ const DEFAULT_Z_INDEX: Record<string, number> = {
   function: 1,
   size: 6,
   case: 11,
+  bezel: 16,
   dial: 21,
   hands: 31,
   strap: 41,

@@ -10,9 +10,11 @@ The configurator composites watch images by stacking transparent PNG layers:
 |-------|------|---------|-------------|
 | Base | Function | 0 | Full watch image (Oak, Naut, Sub, etc.) |
 | Case | Case | 10 | Transparent PNG with case in selected color |
+| Bezel | Bezel | 15 | Transparent PNG with bezel (after case) |
 | Dial | Dial | 20 | Transparent PNG with dial pattern/color |
 | Hands | Hands | 30 | Transparent PNG with watch hands |
 | Strap | Strap | 40 | Transparent PNG with strap/bracelet |
+| Extra | Extra | 50 | Optional layer at the end (e.g. GMT/Sub) |
 
 ## Image Requirements
 
