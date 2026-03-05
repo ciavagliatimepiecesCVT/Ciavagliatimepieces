@@ -59,7 +59,10 @@ async function getCustomBuildPartsSummary(
   const stepsPayload = Array.isArray(config.steps) ? config.steps : [];
   const extras = Array.isArray(config.extras) ? config.extras : [];
   const addonIds = Array.isArray(config.addonIds) ? config.addonIds : [];
-  const dropdownSelections = config.dropdownSelections && typeof config.dropdownSelections === "object" ? config.dropdownSelections : {};
+  const dropdownSelections: Record<string, string> =
+    config.dropdownSelections && typeof config.dropdownSelections === "object" && !Array.isArray(config.dropdownSelections)
+      ? (config.dropdownSelections as Record<string, string>)
+      : {};
   const labelKey = locale === "fr" ? "label_fr" : "label_en";
 
   const functionOptionId = stepsPayload[0] && typeof stepsPayload[0] === "string" ? stepsPayload[0] : null;
@@ -99,7 +102,7 @@ async function getCustomBuildPartsSummary(
         const optLabel = (opt as Record<string, string> | null)?.[labelKey] ?? "";
         if (optLabel) parts.push(`${stepLabel}: ${optLabel}`);
       }
-    } else if (selectedOptionId) {
+    } else if (selectedOptionId && typeof selectedOptionId === "string") {
       const { data: opt } = await supabase.from("configurator_options").select("label_en, label_fr").eq("id", selectedOptionId).single();
       const optLabel = (opt as Record<string, string> | null)?.[labelKey] ?? "";
       const dropdownItemId = dropdownSelections[selectedOptionId];
@@ -137,7 +140,10 @@ async function calculateCustomBuildPrice(
   const stepsPayload = Array.isArray(config.steps) ? config.steps : [];
   const extras = Array.isArray(config.extras) ? config.extras : [];
   const addonIds = Array.isArray(config.addonIds) ? config.addonIds : [];
-  const dropdownSelections = config.dropdownSelections && typeof config.dropdownSelections === "object" ? config.dropdownSelections : {};
+  const dropdownSelections: Record<string, string> =
+    config.dropdownSelections && typeof config.dropdownSelections === "object" && !Array.isArray(config.dropdownSelections)
+      ? (config.dropdownSelections as Record<string, string>)
+      : {};
 
   const functionOptionId = stepsPayload[0] && typeof stepsPayload[0] === "string" ? stepsPayload[0] : null;
   if (!functionOptionId) return 0;
