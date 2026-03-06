@@ -1391,7 +1391,7 @@ export default function AdminConfiguratorPage() {
             {currentStepKey === "function" ? (
               <button
                 type="button"
-                onClick={() => { if (!functionStep) return; setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: functionStep.id, parent_option_id: null, label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "", layer_image_url: "", layer_z_index: 0, option_group_en: "", option_group_fr: "" }); }}
+                onClick={() => { if (!functionStep) return; setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: functionStep.id, parent_option_id: null, for_function_ids: [], label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "", layer_image_url: "", layer_z_index: 0, option_group_en: "", option_group_fr: "" }); }}
                 disabled={!functionStep}
                 className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-foreground/30 bg-white/60 p-4 text-foreground/60 transition hover:border-foreground/50 hover:bg-white/80 hover:text-foreground/80 disabled:opacity-50"
               >

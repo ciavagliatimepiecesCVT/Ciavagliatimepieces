@@ -171,7 +171,7 @@ async function calculateCustomBuildPrice(
       .from("configurator_options")
       .select("id, price, discount_percent, parent_option_id, for_function_ids")
       .eq("step_id", stepId);
-    if (!err1 && withForFunctionIds) optionsRaw = withForFunctionIds as typeof optionsRaw;
+    if (!err1 && withForFunctionIds) optionsRaw = withForFunctionIds as NonNullable<typeof optionsRaw>;
     if (optionsRaw == null) {
       const { data: fallback } = await supabase
         .from("configurator_options")
