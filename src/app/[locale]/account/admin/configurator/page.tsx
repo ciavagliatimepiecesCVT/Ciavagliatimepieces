@@ -41,6 +41,7 @@ import {
   deleteOptionGroup,
   setOptionsGroupId,
 } from "../actions";
+import { optionAppliesToFunction } from "../configurator-utils";
 import type {
   ConfiguratorStepRow,
   ConfiguratorOptionRow,
@@ -85,6 +86,7 @@ export default function AdminConfiguratorPage() {
   const [optionForm, setOptionForm] = useState({
     step_id: "",
     parent_option_id: "" as string | null,
+    for_function_ids: [] as string[],
     label_en: "",
     label_fr: "",
     letter: "A",
@@ -472,9 +474,7 @@ export default function AdminConfiguratorPage() {
   const optionsForCurrentStep = useMemo(() => {
     if (!currentStepId) return currentStepKey === "function" ? functionOptions : [];
     return options.filter(
-      (o) =>
-        o.step_id === currentStepId &&
-        (o.parent_option_id === null || o.parent_option_id === effectiveFunctionId)
+      (o) => o.step_id === currentStepId && optionAppliesToFunction(o, effectiveFunctionId ?? "")
     );
   }, [options, currentStepId, currentStepKey, effectiveFunctionId, functionOptions]);
 
@@ -712,7 +712,7 @@ export default function AdminConfiguratorPage() {
         letter: optionForm.letter,
         price: optionForm.price,
         discount_percent: optionForm.discount_percent ?? null,
-        parent_option_id: optionForm.parent_option_id || null,
+        for_function_ids: optionForm.for_function_ids.length > 0 ? optionForm.for_function_ids : null,
         image_url: optionForm.image_url.trim() || null,
         preview_image_url: optionForm.preview_image_url.trim() || null,
         layer_image_url: optionForm.layer_image_url.trim() || null,
@@ -733,7 +733,7 @@ export default function AdminConfiguratorPage() {
     try {
       await createConfiguratorOption({
         step_id: optionForm.step_id,
-        parent_option_id: optionForm.parent_option_id || null,
+        for_function_ids: optionForm.for_function_ids.length > 0 ? optionForm.for_function_ids : null,
         label_en: optionForm.label_en,
         label_fr: optionForm.label_fr,
         letter: optionForm.letter,
@@ -751,6 +751,7 @@ export default function AdminConfiguratorPage() {
       setOptionForm({
         step_id: optionForm.step_id,
         parent_option_id: null,
+        for_function_ids: [],
         label_en: "",
         label_fr: "",
         letter: "A",
@@ -1317,11 +1318,16 @@ export default function AdminConfiguratorPage() {
                       <span className="ml-1.5 text-xs text-foreground/50 line-through">C${Number(opt.price).toLocaleString()}</span>
                     )}
                   </span>
-                  {currentStepKey !== "function" && opt.parent_option_id && (
-                    <span className="mt-0.5 text-xs text-foreground/50">
-                      {isFr ? "Pour" : "For"}: {functionOptions.find((f) => f.id === opt.parent_option_id)?.label_en ?? ""}
-                    </span>
-                  )}
+                  {currentStepKey !== "function" && (() => {
+                    const ids = (opt as { for_function_ids?: string[] | null }).for_function_ids ?? (opt.parent_option_id ? [opt.parent_option_id] : []);
+                    if (ids.length === 0) return null;
+                    const labels = ids.map((id) => functionOptions.find((f) => f.id === id)?.label_en ?? id).join(", ");
+                    return (
+                      <span className="mt-0.5 text-xs text-foreground/50">
+                        {isFr ? "Pour" : "For"}: {labels}
+                      </span>
+                    );
+                  })()}
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
                     <button
                       type="button"
@@ -1332,6 +1338,7 @@ export default function AdminConfiguratorPage() {
                         setOptionForm({
                           step_id: opt.step_id,
                           parent_option_id: opt.parent_option_id,
+                          for_function_ids: (opt as { for_function_ids?: string[] | null }).for_function_ids ?? (opt.parent_option_id ? [opt.parent_option_id] : []),
                           label_en: opt.label_en,
                           label_fr: opt.label_fr,
                           letter: opt.letter,
@@ -1394,7 +1401,7 @@ export default function AdminConfiguratorPage() {
             ) : currentStepRow ? (
               <button
                 type="button"
-                onClick={() => { setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: currentStepRow.id, parent_option_id: effectiveFunctionId || null, label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "", layer_image_url: "", layer_z_index: 0, option_group_en: "", option_group_fr: "" }); }}
+                onClick={() => { setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: currentStepRow.id, parent_option_id: null, for_function_ids: effectiveFunctionId ? [effectiveFunctionId] : [], label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "", layer_image_url: "", layer_z_index: 0, option_group_en: "", option_group_fr: "" }); }}
                 className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-foreground/30 bg-white/60 p-4 text-foreground/60 transition hover:border-foreground/50 hover:bg-white/80 hover:text-foreground/80"
               >
                 <span className="text-2xl">+</span>
@@ -1855,18 +1862,29 @@ export default function AdminConfiguratorPage() {
                   />
                 </div>
                 {currentStepKey !== "function" && (
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="text-xs font-medium uppercase tracking-wider text-foreground">{isFr ? "Pour fonction (vide = toutes)" : "For function (empty = all)"}</label>
-                    <select
-                      value={optionForm.parent_option_id ?? ""}
-                      onChange={(e) => setOptionForm((p) => ({ ...p, parent_option_id: e.target.value || null }))}
-                      className="mt-1 w-full rounded-lg border border-foreground/25 bg-white px-3 py-2 text-foreground"
-                    >
-                      <option value="">— {isFr ? "Toutes" : "All"}</option>
+                    <p className="mt-0.5 text-xs text-foreground/60">{isFr ? "Cochez les types de montre pour lesquels cette option est disponible. Aucune case = toutes." : "Check which watch types this option is available for. None checked = all."}</p>
+                    <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2 rounded-lg border border-foreground/25 bg-white p-3">
                       {functionOptions.map((o) => (
-                        <option key={o.id} value={o.id}>{o.label_en}</option>
+                        <label key={o.id} className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={optionForm.for_function_ids.includes(o.id)}
+                            onChange={(e) => {
+                              setOptionForm((p) => ({
+                                ...p,
+                                for_function_ids: e.target.checked
+                                  ? [...p.for_function_ids, o.id]
+                                  : p.for_function_ids.filter((id) => id !== o.id),
+                              }));
+                            }}
+                            className="h-4 w-4 rounded border-foreground/30 text-foreground"
+                          />
+                          <span className="text-sm text-foreground">{o.label_en}</span>
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 )}
                 <div>

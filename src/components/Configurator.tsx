@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { WatchPreview } from "@/components/WatchPreview";
-import { CONFIGURATOR_PREVIEW_SIZE_PX } from "@/lib/configurator-constants";
+import { CONFIGURATOR_PREVIEW_SIZE_PX, optionAppliesToFunction } from "@/lib/configurator-constants";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCurrency } from "@/components/CurrencyContext";
@@ -186,11 +186,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
 
   const optionsForCurrentStep = useMemo(() => {
     if (!currentStepId) return [];
-    return options.filter(
-      (o) =>
-        o.step_id === currentStepId &&
-        (o.parent_option_id === null || o.parent_option_id === functionId)
-    );
+    return options.filter((o) => o.step_id === currentStepId && optionAppliesToFunction(o, functionId));
   }, [options, currentStepId, functionId]);
 
   /** Groups options by group_id (from optionGroups) for the dropdown; fallback to option_group_en/fr if no groups. */
@@ -275,11 +271,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
       if (!id) return;
       const stepId = stepKey === "function" ? functionStep?.id : stepIdsForFunction[stepsForFunction.indexOf(stepKey) - 1];
       if (!stepId) return;
-      const opts = options.filter(
-        (o) =>
-          o.step_id === stepId &&
-          (o.parent_option_id === null || o.parent_option_id === functionId)
-      );
+      const opts = options.filter((o) => o.step_id === stepId && optionAppliesToFunction(o, functionId));
       const o = opts.find((x) => x.id === id);
       if (o) {
         t += optionEffectivePrice(o);
@@ -474,11 +466,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
       if (!stepId) return;
       const meta = stepIdToMeta.get(stepId);
       const stepLabel = meta ? (isFr ? meta.label_fr : meta.label_en) : stepKey;
-      const opts = options.filter(
-        (o) =>
-          o.step_id === stepId &&
-          (o.parent_option_id === null || o.parent_option_id === functionId)
-      );
+      const opts = options.filter((o) => o.step_id === stepId && optionAppliesToFunction(o, functionId));
       const o = opts.find((x) => x.id === id);
       if (o) {
         const optionLabel = isFr ? o.label_fr : o.label_en;

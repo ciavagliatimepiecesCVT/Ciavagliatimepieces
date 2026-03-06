@@ -142,6 +142,7 @@ create table if not exists configurator_options (
   id uuid primary key default gen_random_uuid(),
   step_id uuid not null references configurator_steps(id) on delete cascade,
   parent_option_id uuid references configurator_options(id) on delete cascade,
+  for_function_ids uuid[] default null,
   group_id uuid references configurator_option_groups(id) on delete set null,
   label_en text not null,
   label_fr text not null,

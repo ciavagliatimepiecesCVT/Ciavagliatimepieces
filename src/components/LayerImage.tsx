@@ -41,6 +41,10 @@ type LayerImageProps = {
    * Optional: max r,g,b for black removal. Default 4. Only used when removing black.
    */
   blackToTransparentThreshold?: number;
+  /**
+   * When true, use crisp image rendering (e.g. for hands layer) to reduce fuzzy edges.
+   */
+  sharpen?: boolean;
 };
 
 function getMode(
@@ -140,6 +144,7 @@ export function LayerImage({
   removeSolidBackground,
   convertBlackToTransparent = false,
   blackToTransparentThreshold,
+  sharpen = false,
 }: LayerImageProps) {
   const [processedSrc, setProcessedSrc] = useState<string | null>(null);
   const [readySrc, setReadySrc] = useState<string | null>(null);
@@ -177,6 +182,7 @@ export function LayerImage({
           useAsIs();
           return;
         }
+        ctx.imageSmoothingEnabled = false;
         ctx.drawImage(img, 0, 0);
         const data = ctx.getImageData(0, 0, w, h);
         const d = data.data;
@@ -281,6 +287,12 @@ export function LayerImage({
         height: "100%",
         objectFit: "contain",
         objectPosition: "center",
+        ...(sharpen && {
+          imageRendering: "crisp-edges",
+          WebkitBackfaceVisibility: "hidden",
+          backfaceVisibility: "hidden",
+          transform: "translateZ(0)",
+        }),
         ...style,
         zIndex,
       }}

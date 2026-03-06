@@ -1,6 +1,3 @@
-/** Fixed pixel size for the watch preview in admin and main configurator so layer offsets line up. */
-export const CONFIGURATOR_PREVIEW_SIZE_PX = 420;
-
 /** True if this option applies to the given function (watch type). Uses for_function_ids; falls back to parent_option_id. */
 export function optionAppliesToFunction(
   opt: { parent_option_id?: string | null; for_function_ids?: string[] | null },

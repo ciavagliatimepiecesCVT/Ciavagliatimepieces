@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getUsdToCadRate } from "@/lib/currency";
+import { optionAppliesToFunction } from "@/lib/configurator-constants";
 import { getSiteUrl, getStripe } from "@/lib/stripe";
 
 /** Stripe line item name: include chosen variant so checkout clearly shows what they're buying. */
@@ -165,12 +166,20 @@ async function calculateCustomBuildPrice(
     const { data: stepRow } = await supabase.from("configurator_steps").select("id, step_key").eq("id", stepId).single();
     const stepKey = (stepRow as { step_key?: string } | null)?.step_key;
 
-    let q = supabase
+    let optionsRaw: { id: string; price: number; discount_percent?: number | null; parent_option_id?: string | null; for_function_ids?: string[] | null }[] | null = null;
+    const { data: withForFunctionIds, error: err1 } = await supabase
       .from("configurator_options")
-      .select("id, price, discount_percent")
-      .eq("step_id", stepId)
-      .or(`parent_option_id.is.null,parent_option_id.eq.${functionOptionId}`);
-    const { data: options } = await q;
+      .select("id, price, discount_percent, parent_option_id, for_function_ids")
+      .eq("step_id", stepId);
+    if (!err1 && withForFunctionIds) optionsRaw = withForFunctionIds as typeof optionsRaw;
+    if (optionsRaw == null) {
+      const { data: fallback } = await supabase
+        .from("configurator_options")
+        .select("id, price, discount_percent, parent_option_id")
+        .eq("step_id", stepId);
+      optionsRaw = (fallback ?? []).map((o) => ({ ...o, for_function_ids: null }));
+    }
+    const options = (optionsRaw ?? []).filter((o) => optionAppliesToFunction(o, functionOptionId));
 
     const effectivePrice = (opt: { price: number; discount_percent?: number | null }) => {
       const p = Number(opt.price ?? 0);

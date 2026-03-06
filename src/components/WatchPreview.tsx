@@ -1,6 +1,7 @@
 "use client";
 
 import { LayerImage } from "@/components/LayerImage";
+import { optionAppliesToFunction } from "@/lib/configurator-constants";
 import { useMemo, useRef, useState } from "react";
 
 type OptionWithLayers = {
@@ -85,11 +86,7 @@ export function WatchPreview({
       const stepId = stepKey === "function" ? functionStepId : stepIdsForFunction[idx - 1];
       if (!stepId) return;
 
-      const opts = options.filter(
-        (o) =>
-          o.step_id === stepId &&
-          (o.parent_option_id === null || o.parent_option_id === functionId)
-      );
+      const opts = options.filter((o) => o.step_id === stepId && optionAppliesToFunction(o, functionId));
       const opt = opts.find((o) => o.id === selectedId) as OptionWithLayers | undefined;
       if (!opt) return;
 
@@ -238,6 +235,7 @@ export function WatchPreview({
               style={{ position: "absolute" }}
               zIndex={0}
               removeSolidBackground="auto"
+              sharpen={layer.stepKey === "hands"}
             />
           </div>
         );
