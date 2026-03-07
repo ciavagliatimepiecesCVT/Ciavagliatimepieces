@@ -6,6 +6,7 @@ import { WatchPreview } from "@/components/WatchPreview";
 import { CONFIGURATOR_PREVIEW_SIZE_PX, optionAppliesToFunction } from "@/lib/configurator-constants";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import html2canvas from "html2canvas";
 import { useCurrency } from "@/components/CurrencyContext";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getPublicConfiguratorData } from "@/app/[locale]/account/admin/actions";
@@ -51,6 +52,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
   const [addToCartError, setAddToCartError] = useState<string | null>(null);
   /** For non-function steps: which group card is expanded (groupId or null). */
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchConfigData = useCallback(() => {
     getPublicConfiguratorData().then((data) => {
@@ -369,11 +371,34 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
   const canAddToCart = !!selections.function && total > 0;
   const isEditMode = !!editCartItemId;
 
+  /** Capture the watch preview as a data URL for cart thumbnail (smaller size to keep payload reasonable). */
+  const capturePreviewDataUrl = useCallback(async (): Promise<string | null> => {
+    const el = previewContainerRef.current;
+    if (!el) return null;
+    try {
+      const CART_PREVIEW_PX = 200;
+      const scale = CART_PREVIEW_PX / CONFIGURATOR_PREVIEW_SIZE_PX;
+      const canvas = await html2canvas(el, {
+        scale,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+      return canvas.toDataURL("image/png");
+    } catch {
+      return null;
+    }
+  }, []);
+
   const handleAddToCart = async () => {
     if (!canAddToCart) return;
     setAddToCartError(null);
     setAddToCartLoading(true);
     try {
+      const previewImageUrl = await capturePreviewDataUrl();
+      const imageUrl = previewImageUrl ?? "/images/configurator.svg";
+
       const supabase = createBrowserClient();
       const { data: { user } } = await supabase.auth.getUser();
       const title = isFr ? "Montre sur mesure" : "Custom Build";
@@ -386,18 +411,23 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
       };
 
       if (!user) {
-        addGuestCartItem({
+        const cart = addGuestCartItem({
           product_id: `custom-${crypto.randomUUID()}`,
           quantity: 1,
           price: total,
           title,
-          image_url: "/images/configurator.svg",
+          image_url: imageUrl,
           configuration,
         });
+        const newItem = cart[cart.length - 1];
         window.dispatchEvent(new CustomEvent("cart-updated"));
         window.dispatchEvent(
           new CustomEvent("cart-item-added", {
-            detail: { type: "custom", lineItems: totalLineItems },
+            detail: {
+              type: "custom",
+              cartItemId: newItem?.id,
+              lineItems: totalLineItems,
+            },
           })
         );
         setAddToCartLoading(false);
@@ -410,6 +440,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
           .update({
             price: total,
             title,
+            image_url: imageUrl,
             configuration,
           })
           .eq("id", editCartItemId)
@@ -431,7 +462,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
           quantity: 1,
           price: total,
           title,
-          image_url: "/images/configurator.svg",
+          image_url: imageUrl,
           configuration,
         })
         .select("id")
@@ -451,7 +482,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
         })
       );
     } catch {
-      setAddToCartError(isFr ? "Erreur lors de l’ajout au panier." : "Failed to add to cart.");
+      setAddToCartError(isFr ? "Erreur lors de l'ajout au panier." : "Failed to add to cart.");
     } finally {
       setAddToCartLoading(false);
     }
@@ -584,6 +615,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 lg:flex-row lg:gap-12">
         <div className="group flex flex-1 flex-col items-center gap-2">
           <div
+            ref={previewContainerRef}
             className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)] cursor-zoom-in transition-transform duration-300 ease-out group-hover:scale-[1.15] group-hover:shadow-[0_40px_120px_rgba(0,0,0,0.55)]"
             style={{
               width: CONFIGURATOR_PREVIEW_SIZE_PX,

@@ -29,6 +29,8 @@ export const dictionaries = {
       remove: "Remove",
       quantity: "Quantity",
       editBuild: "Edit build",
+      showMoreDetails: "Show more details",
+      showLessDetails: "Show less details",
     },
     contact: {
       title: "Contact",
@@ -88,6 +90,8 @@ export const dictionaries = {
       remove: "Retirer",
       quantity: "Quantité",
       editBuild: "Modifier le build",
+      showMoreDetails: "Voir le détail",
+      showLessDetails: "Masquer le détail",
     },
     contact: {
       title: "Contact",
