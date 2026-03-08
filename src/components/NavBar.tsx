@@ -152,7 +152,7 @@ export default function NavBar({
       <button
         type="button"
         onClick={() => setMobileNavRevealed(true)}
-        className={`fixed top-4 right-4 z-[60] flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-[var(--logo-green)] text-white shadow-lg transition hover:border-white hover:text-white md:hidden ${headerHidden ? "" : "hidden"}`}
+        className={`fixed top-4 right-4 z-[110] flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-[var(--logo-green)] text-white shadow-lg transition hover:border-white hover:text-white md:hidden ${headerHidden ? "" : "hidden"}`}
         aria-label="Open menu"
       >
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -160,7 +160,7 @@ export default function NavBar({
         </svg>
       </button>
     <header
-      className={`fixed left-0 right-0 top-0 z-50 w-full bg-[var(--logo-green)] transition-transform duration-300 ${headerHidden ? "-translate-y-full" : "translate-y-0"}`}
+      className={`fixed left-0 right-0 top-0 z-[100] w-full bg-[var(--logo-green)] transition-transform duration-300 ${headerHidden ? "-translate-y-full" : "translate-y-0"}`}
     >
       {/* Full-width top bar: left nav | center logo | right account + locale + cart */}
       <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-2.5">

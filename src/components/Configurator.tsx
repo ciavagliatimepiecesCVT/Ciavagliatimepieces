@@ -205,7 +205,11 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
     const result: { groupId: string; groupLabel: string; groupImageUrl: string | null; options: typeof opts }[] = [];
     groupsForStep.forEach((g: { id: string; label_en: string; label_fr: string; image_url: string | null; sort_order: number }) => {
       const items = byGroupId.get(g.id);
-      if (items?.length) result.push({ groupId: g.id, groupLabel: isFr ? g.label_fr : g.label_en, groupImageUrl: g.image_url, options: items });
+      if (items?.length) {
+        const firstOpt = items[0] as { image_url?: string | null; preview_image_url?: string | null };
+        const fallbackThumb = firstOpt?.image_url || firstOpt?.preview_image_url || null;
+        result.push({ groupId: g.id, groupLabel: isFr ? g.label_fr : g.label_en, groupImageUrl: g.image_url || fallbackThumb, options: items });
+      }
     });
     const ungrouped = byGroupId.get(ungroupedKey) ?? [];
     if (ungrouped.length) {
