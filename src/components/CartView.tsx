@@ -32,6 +32,8 @@ type CartLabels = {
   remove: string;
   quantity: string;
   editBuild?: string;
+  showMoreDetails?: string;
+  showLessDetails?: string;
 };
 
 export default function CartView({ locale, labels }: { locale: string; labels: CartLabels }) {
@@ -44,6 +46,7 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
+  const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
 
   const fetchCart = async () => {
     const supabase = createBrowserClient();
@@ -198,7 +201,7 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
                       fill
                       className="object-cover"
                       sizes="80px"
-                      unoptimized={item.image_url?.startsWith("http") ?? false}
+                      unoptimized={item.image_url?.startsWith("http") || item.image_url?.startsWith("data:") ?? false}
                     />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -212,15 +215,31 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
                       const isCustomBuild = item.product_id.startsWith("custom-");
                       const summaryLines = Array.isArray(cfg?.summaryLines) ? cfg.summaryLines : [];
                       if (isCustomBuild && summaryLines.length > 0) {
+                        const isExpanded = expandedDetails[item.id];
                         return (
-                          <ul className="mt-1 space-y-0.5 text-xs text-foreground/60">
-                            {summaryLines.map((line, i) => (
-                              <li key={i}>
-                                {line.label}
-                                {line.price > 0 ? ` (${formatPrice(line.price)})` : ""}
-                              </li>
-                            ))}
-                          </ul>
+                          <div className="mt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedDetails((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                              }
+                              className="text-xs font-medium text-[var(--accent)] underline hover:no-underline"
+                            >
+                              {isExpanded
+                                ? labels.showLessDetails ?? "Show less details"
+                                : labels.showMoreDetails ?? "Show more details"}
+                            </button>
+                            {isExpanded && (
+                              <ul className="mt-1.5 space-y-0.5 text-xs text-foreground/60">
+                                {summaryLines.map((line, i) => (
+                                  <li key={i}>
+                                    {line.label}
+                                    {line.price > 0 ? ` (${formatPrice(line.price)})` : ""}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
                         );
                       }
                       const variant = cfg?.bracelet_title;

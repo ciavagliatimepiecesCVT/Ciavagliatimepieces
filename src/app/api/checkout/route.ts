@@ -16,6 +16,99 @@ function getBuiltProductLineItemName(
   return `${baseName} · ${variant}`;
 }
 
+/** Stripe minimum unit amount (cents). */
+const STRIPE_MIN_UNIT_CENTS = 50;
+
+/** Build Stripe line items for a custom build from configuration.summaryLines so checkout and invoice show each part with its price. */
+function getCustomBuildStripeLineItems(
+  configuration: unknown,
+  totalPrice: number,
+  locale: "en" | "fr"
+): Array<{ quantity: number; price_data: { currency: string; product_data: { name: string; description?: string }; unit_amount: number } }> {
+  const cfg = configuration && typeof configuration === "object" ? (configuration as Record<string, unknown>) : null;
+  const summaryLines = Array.isArray(cfg?.summaryLines) ? cfg.summaryLines as Array<{ label: string; price: number }> : [];
+  if (summaryLines.length === 0) {
+    const name = locale === "fr" ? "Montre sur mesure" : "Custom Build";
+    return [
+      {
+        quantity: 1,
+        price_data: {
+          currency: "cad",
+          product_data: { name },
+          unit_amount: Math.round(totalPrice * 100),
+        },
+      },
+    ];
+  }
+  const items: Array<{ quantity: number; price_data: { currency: string; product_data: { name: string; description?: string }; unit_amount: number } }> = [];
+  const zeroPriceLabels: string[] = [];
+  let partsTotalCents = 0;
+
+  for (const line of summaryLines) {
+    const price = Number(line.price) || 0;
+    const label = typeof line.label === "string" ? line.label : String(line.label);
+    if (price < 0.5) {
+      if (price >= 0) zeroPriceLabels.push(label);
+      continue;
+    }
+    const unitCents = Math.round(price * 100);
+    items.push({
+      quantity: 1,
+      price_data: {
+        currency: "cad",
+        product_data: { name: label },
+        unit_amount: unitCents,
+      },
+    });
+    partsTotalCents += unitCents;
+  }
+
+  if (zeroPriceLabels.length > 0) {
+    items.push({
+      quantity: 1,
+      price_data: {
+        currency: "cad",
+        product_data: {
+          name: locale === "fr" ? "Options incluses" : "Included options",
+          description: zeroPriceLabels.join(", "),
+        },
+        unit_amount: STRIPE_MIN_UNIT_CENTS,
+      },
+    });
+    partsTotalCents += STRIPE_MIN_UNIT_CENTS;
+    items.push({
+      quantity: 1,
+      price_data: {
+        currency: "cad",
+        product_data: {
+          name: locale === "fr" ? "Réduction (options incluses)" : "Discount (included options)",
+        },
+        unit_amount: -STRIPE_MIN_UNIT_CENTS,
+      },
+    });
+    partsTotalCents -= STRIPE_MIN_UNIT_CENTS;
+  }
+
+  const desiredTotalCents = Math.round(totalPrice * 100);
+  const adjustment = desiredTotalCents - partsTotalCents;
+  if (adjustment !== 0) {
+    items.push({
+      quantity: 1,
+      price_data: {
+        currency: "cad",
+        product_data: {
+          name: adjustment < 0
+            ? (locale === "fr" ? "Réduction" : "Discount")
+            : (locale === "fr" ? "Ajustement" : "Adjustment"),
+        },
+        unit_amount: adjustment,
+      },
+    });
+  }
+
+  return items;
+}
+
 /** Build Stripe line-item description for a built product with bracelet/addons (so customers see what they're buying). */
 function getBuiltProductConfigDescription(
   configuration: unknown,
@@ -310,13 +403,6 @@ export async function POST(request: NextRequest) {
       }
       summary = "Custom build";
 
-      const partsDescription = await getCustomBuildPartsSummary(supabase, {
-        steps: Array.isArray(cfg.steps) ? cfg.steps : [],
-        extras: Array.isArray(cfg.extras) ? cfg.extras : [],
-        addonIds: Array.isArray(cfg.addonIds) ? cfg.addonIds : [],
-        dropdownSelections: cfg.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
-      }, localeSegment);
-
       const { data, error } = await supabase
         .from("configurations")
         .insert({
@@ -334,17 +420,10 @@ export async function POST(request: NextRequest) {
       }
 
       configurationId = data.id;
-      lineItems.push({
-        quantity: 1,
-        price_data: {
-          currency: "cad",
-          product_data: {
-            name: summary,
-            description: partsDescription,
-          },
-          unit_amount: Math.round(amount * 100),
-        },
-      });
+      const customLineItems = getCustomBuildStripeLineItems(body.configuration, amount, localeSegment);
+      for (const li of customLineItems) {
+        lineItems.push(li);
+      }
       const { data: freeShipRow } = await supabase
         .from("site_settings")
         .select("value")
@@ -429,14 +508,10 @@ export async function POST(request: NextRequest) {
         if (isCustom) {
           const unitPrice = Number(row.price) || 0;
           if (unitPrice < 0) continue;
-          lineItems.push({
-            quantity: qty,
-            price_data: {
-              currency: "cad",
-              product_data: { name: row.title ?? "Custom Build" },
-              unit_amount: Math.round(unitPrice * 100),
-            },
-          });
+          const customBuildItems = getCustomBuildStripeLineItems(row.configuration, unitPrice, localeSegment);
+          for (const li of customBuildItems) {
+            lineItems.push({ ...li, quantity: li.quantity * qty });
+          }
           cartProductQuantities.push({ product_id: row.product_id, quantity: qty });
           continue;
         }
@@ -507,7 +582,7 @@ export async function POST(request: NextRequest) {
 
         if (isCustom) {
           const cfg = row.configuration as Record<string, unknown> | undefined;
-          const unitPrice = Number(row.price) || 0;
+          let unitPrice = Number(row.price) || 0;
           if (unitPrice <= 0 && cfg && typeof (cfg as { price?: number }).price === "number") {
             const serverPrice = await calculateCustomBuildPrice(supabase, {
               steps: Array.isArray(cfg?.steps) ? cfg.steps : [],
@@ -515,25 +590,13 @@ export async function POST(request: NextRequest) {
               addonIds: Array.isArray(cfg?.addonIds) ? cfg.addonIds : [],
               dropdownSelections: cfg?.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
             });
-            if (serverPrice > 0) {
-              lineItems.push({
-                quantity: qty,
-                price_data: {
-                  currency: "cad",
-                  product_data: { name: row.title ?? "Custom Build" },
-                  unit_amount: Math.round(serverPrice * 100),
-                },
-              });
+            if (serverPrice > 0) unitPrice = serverPrice;
+          }
+          if (unitPrice > 0) {
+            const customBuildItems = getCustomBuildStripeLineItems(row.configuration, unitPrice, localeSegment);
+            for (const li of customBuildItems) {
+              lineItems.push({ ...li, quantity: li.quantity * qty });
             }
-          } else if (unitPrice > 0) {
-            lineItems.push({
-              quantity: qty,
-              price_data: {
-                currency: "cad",
-                product_data: { name: row.title ?? "Custom Build" },
-                unit_amount: Math.round(unitPrice * 100),
-              },
-            });
           }
           cartProductQuantities.push({ product_id: row.product_id, quantity: qty });
           continue;
