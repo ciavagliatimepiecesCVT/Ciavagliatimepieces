@@ -500,11 +500,30 @@ export default function Configurator({ locale, editCartItemId, productId, initia
   const canAddToCart = !!selections.function && total > 0;
   const isEditMode = !!editCartItemId;
 
+  /** First selected layer image URL (for cart thumbnail when html2canvas fails due to cross-origin). */
+  const fallbackThumbnailUrl = useMemo(() => {
+    const funcId = selections.function;
+    if (!funcId) return null;
+    for (let idx = 0; idx < stepsForFunction.length; idx++) {
+      const stepKey = stepsForFunction[idx];
+      const selectedId = selections[stepKey];
+      if (!selectedId) continue;
+      const stepId = stepKey === "function" ? functionStep?.id : stepIdsForFunction[idx - 1];
+      if (!stepId) continue;
+      const opts = options.filter((o) => o.step_id === stepId && optionAppliesToFunction(o, funcId));
+      const opt = opts.find((o) => o.id === selectedId) as { layer_image_url?: string | null; image_url?: string | null; preview_image_url?: string | null } | undefined;
+      if (!opt) continue;
+      const url = opt.layer_image_url || opt.image_url || opt.preview_image_url;
+      if (url) return url;
+    }
+    return null;
+  }, [selections, options, stepsForFunction, functionId, stepIdsForFunction, functionStep?.id]);
+
   /** Capture the watch preview as a data URL for cart thumbnail (smaller size to keep payload reasonable). */
   const capturePreviewDataUrl = useCallback(async (): Promise<string | null> => {
     const el = previewContainerRef.current;
     if (!el) return null;
-    try {
+    const doCapture = async (): Promise<string | null> => {
       const CART_PREVIEW_PX = 200;
       const scale = CART_PREVIEW_PX / CONFIGURATOR_PREVIEW_SIZE_PX;
       const canvas = await html2canvas(el, {
@@ -514,7 +533,16 @@ export default function Configurator({ locale, editCartItemId, productId, initia
         backgroundColor: "#ffffff",
         logging: false,
       });
-      return canvas.toDataURL("image/png");
+      return canvas.toDataURL("image/jpeg", 0.88);
+    };
+    try {
+      await new Promise((r) => requestAnimationFrame(r));
+      el.scrollIntoView({ block: "center" });
+      await new Promise((r) => setTimeout(r, 300));
+      const result = await doCapture();
+      if (result) return result;
+      await new Promise((r) => setTimeout(r, 200));
+      return await doCapture();
     } catch {
       return null;
     }
@@ -526,7 +554,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
     setAddToCartLoading(true);
     try {
       const previewImageUrl = await capturePreviewDataUrl();
-      const imageUrl = previewImageUrl ?? "/images/configurator.svg";
+      const imageUrl = previewImageUrl ?? fallbackThumbnailUrl ?? "/images/configurator.svg";
 
       const supabase = createBrowserClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -856,6 +884,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
                             height={56}
                             className="h-full w-full object-cover"
                             unoptimized={(opt as { image_url?: string }).image_url?.startsWith("http") ?? false}
+                            priority={false}
                           />
                           {selected && (
                             <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]">
@@ -921,7 +950,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
                             <div className="relative">
                               {imgUrl ? (
                                 <div className={`relative h-14 w-14 overflow-hidden rounded-full bg-white ${selected ? "ring-2 ring-[var(--accent)]" : ""}`}>
-                                  <Image src={imgUrl} alt="" width={56} height={56} className="h-full w-full object-cover" unoptimized={imgUrl.startsWith("http")} />
+                                  <Image src={imgUrl} alt="" width={56} height={56} className="h-full w-full object-cover" unoptimized={imgUrl.startsWith("http")} priority={false} />
                                   {selected && (
                                     <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]">
                                       <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -972,7 +1001,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
                       <div className="flex flex-1 items-center gap-3">
                         {groupImageUrl ? (
                           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white">
-                            <Image src={groupImageUrl} alt="" width={56} height={56} className="h-full w-full object-cover" unoptimized={groupImageUrl.startsWith("http")} />
+                            <Image src={groupImageUrl} alt="" width={56} height={56} className="h-full w-full object-cover" unoptimized={groupImageUrl.startsWith("http")} priority={false} />
                           </div>
                         ) : (
                           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-foreground/70">
@@ -1008,7 +1037,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
                               <div className="relative">
                                 {imgUrl ? (
                                   <div className={`relative h-14 w-14 overflow-hidden rounded-full bg-white ${selected ? "ring-2 ring-[var(--accent)]" : ""}`}>
-                                    <Image src={imgUrl} alt="" width={56} height={56} className="h-full w-full object-cover" unoptimized={imgUrl.startsWith("http")} />
+                                    <Image src={imgUrl} alt="" width={56} height={56} className="h-full w-full object-cover" unoptimized={imgUrl.startsWith("http")} priority={false} />
                                     {selected && (
                                       <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]">
                                         <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -1077,7 +1106,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
                       >
                         {imgUrl ? (
                           <div className={`relative h-12 w-12 overflow-hidden rounded-lg bg-white ${isSelected ? "ring-2 ring-[var(--accent)]" : ""}`}>
-                            <Image src={imgUrl} alt="" width={48} height={48} className="h-full w-full object-cover" unoptimized={imgUrl.startsWith("http")} />
+                            <Image src={imgUrl} alt="" width={48} height={48} className="h-full w-full object-cover" unoptimized={imgUrl.startsWith("http")} priority={false} />
                           </div>
                         ) : (
                           <div className={`flex h-12 w-12 items-center justify-center rounded-lg text-sm font-semibold ${isSelected ? "bg-[var(--accent)] text-white" : "bg-foreground/10 text-foreground/90"}`}>

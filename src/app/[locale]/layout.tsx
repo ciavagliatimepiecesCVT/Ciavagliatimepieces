@@ -69,16 +69,18 @@ export default async function LocaleLayout({
   }
 
   const dictionary = getDictionary(locale as Locale);
-  const supabase = await createAuthServerClient();
+  const [supabase, watchCategories, footer, cookieStore] = await Promise.all([
+    createAuthServerClient(),
+    getWatchCategories(),
+    getFooterSettings(),
+    cookies(),
+  ]);
   const { data: { user } } = await supabase.auth.getUser();
   const isAdminUser = isAdmin(user?.id);
-  const watchCategories = await getWatchCategories();
-  const cookieStore = await cookies();
   const currency = parseCurrency(cookieStore.get(CURRENCY_COOKIE_NAME)?.value);
 
   const orgJson = organizationJsonLd(locale);
   const webJson = websiteJsonLd(locale);
-  const footer = await getFooterSettings();
 
   return (
     <div className="min-h-screen bg-[var(--logo-green)]">

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { createAuthServerClient, createServerClient } from "@/lib/supabase/server";
 import { isAdmin } from "@/lib/admin";
 import { getWatchCategories as getWatchCategoriesLib } from "@/lib/watch-categories";
@@ -1238,8 +1238,7 @@ export async function applyAddonTemplateToProducts(templateId: string, productId
 }
 
 // ——— Footer (admin-editable, stored in site_settings) ———
-/** Public: get footer content. Returns default if not set. */
-export async function getFooterSettings(): Promise<FooterSettings> {
+async function getFooterSettingsUncached(): Promise<FooterSettings> {
   try {
     const supabase = createServerClient();
     const { data, error } = await supabase
@@ -1255,6 +1254,13 @@ export async function getFooterSettings(): Promise<FooterSettings> {
   }
 }
 
+/** Public: get footer content. Cached 60s; invalidated when footer is updated. */
+export const getFooterSettings = unstable_cache(
+  getFooterSettingsUncached,
+  ["footer-settings"],
+  { revalidate: 60, tags: ["footer"] }
+);
+
 export async function setFooterSettings(data: FooterSettings) {
   await requireAdmin();
   const supabase = createServerClient();
@@ -1262,6 +1268,7 @@ export async function setFooterSettings(data: FooterSettings) {
     { key: "footer", value: JSON.stringify(data), updated_at: new Date().toISOString() },
     { onConflict: "key" }
   );
+  revalidateTag("footer", "max");
   revalidatePath("/[locale]", "layout");
   revalidatePath("/[locale]/account/admin/footer", "page");
 }
@@ -2607,7 +2614,7 @@ export type PublicConfiguratorData = {
   checkboxSectionEnabledMap: PublicCheckboxSectionEnabledMap;
 };
 
-export async function getPublicConfiguratorData(): Promise<PublicConfiguratorData | null> {
+async function getPublicConfiguratorDataUncached(): Promise<PublicConfiguratorData | null> {
   try {
     const supabase = createServerClient();
 
@@ -2837,6 +2844,13 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
     return null;
   }
 }
+
+/** Public: full configurator data. Cached 2 min to speed up configurator and cart. */
+export const getPublicConfiguratorData = unstable_cache(
+  getPublicConfiguratorDataUncached,
+  ["configurator-data"],
+  { revalidate: 120, tags: ["configurator-data"] }
+);
 
 /** Public: get configurator preset for a product (for "Edit now" → configurator at final step). Returns null if product not found or no preset. */
 export async function getProductConfiguratorConfig(productId: string): Promise<{

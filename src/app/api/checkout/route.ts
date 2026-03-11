@@ -27,7 +27,13 @@ function getCustomBuildStripeLineItems(
   locale: "en" | "fr"
 ): Array<{ quantity: number; price_data: { currency: string; product_data: { name: string; description?: string }; unit_amount: number } }> {
   const cfg = configuration && typeof configuration === "object" ? (configuration as Record<string, unknown>) : null;
-  const summaryLines = Array.isArray(cfg?.summaryLines) ? cfg.summaryLines as Array<{ label: string; price: number }> : [];
+  const rawSummary = Array.isArray(cfg?.summaryLines) ? cfg.summaryLines : [];
+  const summaryLines = rawSummary
+    .filter((line): line is { label: string; price: number } => line != null && typeof line === "object")
+    .map((line) => ({
+      label: typeof (line as { label?: unknown }).label === "string" ? (line as { label: string }).label : String((line as { label?: unknown }).label ?? ""),
+      price: Number((line as { price?: unknown }).price) || 0,
+    }));
   if (summaryLines.length === 0) {
     const name = locale === "fr" ? "Montre sur mesure" : "Custom Build";
     return [
@@ -36,7 +42,7 @@ function getCustomBuildStripeLineItems(
         price_data: {
           currency: "cad",
           product_data: { name },
-          unit_amount: Math.round(totalPrice * 100),
+          unit_amount: Math.max(0, Math.round(totalPrice * 100)),
         },
       },
     ];
@@ -52,7 +58,7 @@ function getCustomBuildStripeLineItems(
       if (price >= 0) zeroPriceLabels.push(label);
       continue;
     }
-    const unitCents = Math.round(price * 100);
+    const unitCents = Math.max(0, Math.round(price * 100));
     items.push({
       quantity: 1,
       price_data: {
@@ -73,38 +79,38 @@ function getCustomBuildStripeLineItems(
           name: locale === "fr" ? "Options incluses" : "Included options",
           description: zeroPriceLabels.join(", "),
         },
-        unit_amount: STRIPE_MIN_UNIT_CENTS,
+        unit_amount: 0,
       },
     });
-    partsTotalCents += STRIPE_MIN_UNIT_CENTS;
-    items.push({
-      quantity: 1,
-      price_data: {
-        currency: "cad",
-        product_data: {
-          name: locale === "fr" ? "Réduction (options incluses)" : "Discount (included options)",
-        },
-        unit_amount: -STRIPE_MIN_UNIT_CENTS,
-      },
-    });
-    partsTotalCents -= STRIPE_MIN_UNIT_CENTS;
   }
 
   const desiredTotalCents = Math.round(totalPrice * 100);
-  const adjustment = desiredTotalCents - partsTotalCents;
+  let adjustment = desiredTotalCents - partsTotalCents;
   if (adjustment !== 0) {
-    items.push({
-      quantity: 1,
-      price_data: {
-        currency: "cad",
-        product_data: {
-          name: adjustment < 0
-            ? (locale === "fr" ? "Réduction" : "Discount")
-            : (locale === "fr" ? "Ajustement" : "Adjustment"),
+    if (adjustment < 0) {
+      let discountCents = Math.round(-adjustment);
+      for (let i = items.length - 1; i >= 0 && discountCents > 0; i--) {
+        const amt = items[i].price_data.unit_amount;
+        if (amt > 0) {
+          const take = Math.min(amt, discountCents);
+          items[i].price_data.unit_amount = Math.max(0, Math.round(amt - take));
+          adjustment += take;
+          discountCents -= take;
+        }
+      }
+    }
+    if (adjustment > 0) {
+      items.push({
+        quantity: 1,
+        price_data: {
+          currency: "cad",
+          product_data: {
+            name: locale === "fr" ? "Ajustement" : "Adjustment",
+          },
+          unit_amount: Math.round(adjustment),
         },
-        unit_amount: adjustment,
-      },
-    });
+      });
+    }
   }
 
   return items;
@@ -295,7 +301,7 @@ async function calculateCustomBuildPrice(
         .eq("step_id", stepId);
       optionsRaw = (fallback ?? []).map((o) => ({ ...o, for_function_ids: null }));
     }
-    const options = (optionsRaw ?? []).filter((o) => optionAppliesToFunction(o, functionOptionId));
+    const options = (optionsRaw ?? []).filter((o): o is NonNullable<typeof o> => o != null && optionAppliesToFunction(o, functionOptionId));
 
     const effectivePrice = (opt: { price: number; discount_percent?: number | null }) => {
       const p = Number(opt.price ?? 0);
@@ -425,6 +431,7 @@ export async function POST(request: NextRequest) {
         extras: Array.isArray(cfg.extras) ? cfg.extras : [],
         addonIds: Array.isArray(cfg.addonIds) ? cfg.addonIds : [],
         dropdownSelections: cfg.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
+        sizeOptionId: typeof cfg.sizeOptionId === "string" && cfg.sizeOptionId ? cfg.sizeOptionId : undefined,
       });
       if (amount === 0 && typeof cfg.price === "number" && cfg.price > 0) {
         amount = cfg.price;
@@ -539,7 +546,7 @@ export async function POST(request: NextRequest) {
       const cartProductQuantities: { product_id: string; quantity: number }[] = [];
 
       for (const row of cartRows) {
-        const qty = Math.max(1, Number(row.quantity) || 1);
+        const qty = Math.max(1, Math.floor(Number(row.quantity) || 1));
         const isCustom = isConfiguratorCustom(row);
 
         if (isCustom) {
@@ -547,7 +554,7 @@ export async function POST(request: NextRequest) {
           if (unitPrice < 0) continue;
           const customBuildItems = getCustomBuildStripeLineItems(row.configuration, unitPrice, localeSegment);
           for (const li of customBuildItems) {
-            lineItems.push({ ...li, quantity: li.quantity * qty });
+            lineItems.push({ ...li, quantity: Math.max(1, Math.floor(li.quantity * qty)) });
           }
           cartProductQuantities.push({ product_id: row.product_id, quantity: qty });
           continue;
@@ -614,7 +621,7 @@ export async function POST(request: NextRequest) {
       const cartProductQuantities: { product_id: string; quantity: number }[] = [];
 
       for (const row of guestCart) {
-        const qty = Math.max(1, Number(row.quantity) || 1);
+        const qty = Math.max(1, Math.floor(Number(row.quantity) || 1));
         const isCustom = isConfiguratorCustom(row);
 
         if (isCustom) {
@@ -626,13 +633,14 @@ export async function POST(request: NextRequest) {
               extras: Array.isArray(cfg?.extras) ? cfg.extras : [],
               addonIds: Array.isArray(cfg?.addonIds) ? cfg.addonIds : [],
               dropdownSelections: cfg?.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
+              sizeOptionId: typeof cfg.sizeOptionId === "string" && cfg.sizeOptionId ? cfg.sizeOptionId : undefined,
             });
             if (serverPrice > 0) unitPrice = serverPrice;
           }
           if (unitPrice > 0) {
             const customBuildItems = getCustomBuildStripeLineItems(row.configuration, unitPrice, localeSegment);
             for (const li of customBuildItems) {
-              lineItems.push({ ...li, quantity: li.quantity * qty });
+              lineItems.push({ ...li, quantity: Math.max(1, Math.floor(li.quantity * qty)) });
             }
           }
           cartProductQuantities.push({ product_id: row.product_id, quantity: qty });
@@ -793,6 +801,9 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : "Unknown error";
     const stack = error instanceof Error ? error.stack : undefined;
     console.error("Checkout error:", message, stack ?? "");
+    if (process.env.NODE_ENV === "development" && error instanceof Error) {
+      console.error("Checkout error name:", error.name, "cause:", (error as { cause?: unknown }).cause);
+    }
     if (message.includes("stock") || message.includes("product")) {
       return NextResponse.json({ error: "Product unavailable. Please refresh and try again." }, { status: 400 });
     }

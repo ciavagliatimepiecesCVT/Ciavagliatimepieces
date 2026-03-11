@@ -6,11 +6,13 @@ import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION_EN, fullUrl } from "@/lib/seo"
 const displayFont = Playfair_Display({
   variable: "--font-display",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const bodyFont = Manrope({
   variable: "--font-body",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const ogImage = `${SITE_URL}/images/logo.png`;

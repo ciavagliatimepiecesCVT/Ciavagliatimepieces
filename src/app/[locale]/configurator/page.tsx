@@ -1,7 +1,16 @@
 import type { Metadata } from "next";
-import Configurator from "@/components/Configurator";
+import dynamic from "next/dynamic";
 import { getPublicConfiguratorData, getProductConfiguratorConfig } from "@/app/[locale]/account/admin/actions";
 import { Locale } from "@/lib/i18n";
+
+const Configurator = dynamic(() => import("@/components/Configurator"), {
+  ssr: true,
+  loading: () => (
+    <div className="flex min-h-[60vh] items-center justify-center bg-[var(--logo-green)]">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden />
+    </div>
+  ),
+});
 
 export async function generateMetadata({
   params,

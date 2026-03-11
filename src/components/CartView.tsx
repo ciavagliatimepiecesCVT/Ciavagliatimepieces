@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getPublicConfiguratorData } from "@/app/[locale]/account/admin/actions";
+import { CartItemPreview } from "@/components/CartItemPreview";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useCurrency } from "@/components/CurrencyContext";
 import {
@@ -47,6 +49,16 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
   const [error, setError] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
+  const [configuratorData, setConfiguratorData] = useState<Awaited<ReturnType<typeof getPublicConfiguratorData>>>(null);
+
+  useEffect(() => {
+    const hasCustom = items.some((i) => i.product_id.startsWith("custom-"));
+    if (hasCustom) {
+      getPublicConfiguratorData().then(setConfiguratorData);
+    } else {
+      setConfiguratorData(null);
+    }
+  }, [items]);
 
   const fetchCart = async () => {
     const supabase = createBrowserClient();
@@ -151,7 +163,6 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data?.url) {
-        if (isGuest) setGuestCart([]);
         window.location.href = data.url;
         return;
       }
@@ -195,23 +206,40 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
                   className="flex flex-wrap items-center gap-4 rounded-[22px] border border-foreground/15 bg-white p-4 text-foreground shadow-sm"
                 >
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-foreground/5">
-                    <Image
-                      src={
-                        item.image_url?.includes("supabase")
-                          ? "/images/hero-1.svg"
-                          : (item.image_url ?? "/images/hero-1.svg")
-                      }
-                      alt={item.title ?? ""}
-                      fill
-                      className="object-cover"
-                      sizes="80px"
-                      unoptimized={
-                        (item.image_url?.startsWith("http") || item.image_url?.startsWith("data:")) &&
-                        !item.image_url?.includes("supabase")
-                          ? true
-                          : false
-                      }
-                    />
+                    {item.product_id.startsWith("custom-") ? (
+                      configuratorData ? (
+                        <CartItemPreview
+                          configuration={item.configuration as { steps?: unknown[]; extras?: unknown[] } | undefined}
+                          configData={configuratorData}
+                          locale={activeLocale}
+                        />
+                      ) : (
+                        <img
+                          src={item.image_url ?? "/images/configurator.svg"}
+                          alt={item.title ?? ""}
+                          className="h-full w-full object-cover"
+                          width={80}
+                          height={80}
+                          referrerPolicy="no-referrer"
+                        />
+                      )
+                    ) : (
+                      <Image
+                        src={
+                          item.image_url?.includes("supabase")
+                            ? "/images/hero-1.svg"
+                            : (item.image_url ?? "/images/hero-1.svg")
+                        }
+                        alt={item.title ?? ""}
+                        fill
+                        className="object-cover"
+                        sizes="80px"
+                        unoptimized={
+                          (item.image_url?.startsWith("http") || item.image_url?.startsWith("data:")) &&
+                          !item.image_url?.includes("supabase")
+                        }
+                      />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-foreground">{item.title}</p>

@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createServerClient } from "@/lib/supabase/server";
 import { shopCategories } from "@/data/categories";
 
@@ -38,8 +39,7 @@ function ensureWomensInNav(categories: WatchCategory[]): WatchCategory[] {
   return [WOMENS_NAV_CATEGORY, ...categories];
 }
 
-/** Server-only: fetch watch categories for nav and shop. Uses static list if DB empty or error. */
-export async function getWatchCategories(): Promise<WatchCategory[]> {
+async function getWatchCategoriesUncached(): Promise<WatchCategory[]> {
   try {
     const supabase = createServerClient();
     const { data, error } = await supabase
@@ -52,3 +52,10 @@ export async function getWatchCategories(): Promise<WatchCategory[]> {
     return ensureWomensInNav(FALLBACK_CATEGORIES);
   }
 }
+
+/** Server-only: fetch watch categories for nav and shop. Cached 60s to speed up layout. */
+export const getWatchCategories = unstable_cache(
+  getWatchCategoriesUncached,
+  ["watch-categories"],
+  { revalidate: 60, tags: ["watch-categories"] }
+);
