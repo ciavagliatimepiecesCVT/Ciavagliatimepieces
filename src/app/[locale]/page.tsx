@@ -82,8 +82,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
 
       <StorySection
         id="watch-collections"
-        minHeight="100vh"
-        className="bg-[var(--background)] text-foreground"
+        minHeight="auto"
+        className="-mt-24 bg-[var(--background)] text-foreground md:-mt-32"
         contentCenter={false}
       >
         <HomeStyleCardsSection
@@ -101,7 +101,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
         contentCenter={true}
       >
         <ScrollReveal>
-          <h2 className="text-3xl font-medium md:text-4xl lg:text-5xl">{home.buildYourOwn}</h2>
+          <h2 className="text-3xl font-medium md:text-4xl lg:text-5xl">{home.finalCtaTitle}</h2>
           <p className="mx-auto mt-6 max-w-xl text-lg text-white/85">{home.buildYourOwnSub}</p>
           <Link
             href={`/${locale}/configurator`}
@@ -109,25 +109,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
           >
             {hero.ctaPrimary}
           </Link>
-        </ScrollReveal>
-      </StorySection>
-
-      <StorySection
-        minHeight="90vh"
-        className="bg-gradient-to-br from-[#f6efe6] via-[#f2e7d6] to-[#efe0cb] text-foreground"
-        contentCenter={true}
-      >
-        <ScrollReveal>
-          <h2 className="text-3xl font-medium md:text-4xl lg:text-5xl">{home.finalCtaTitle}</h2>
-          <p className="mx-auto mt-6 max-w-xl text-foreground/75">{home.finalCtaSub}</p>
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link
-              href={`/${locale}/configurator`}
-              className="btn-hover rounded-full bg-foreground px-10 py-4 text-xs uppercase tracking-[0.35em] text-white transition hover:bg-foreground/90"
-            >
-              {home.startConfiguring}
-            </Link>
-          </div>
         </ScrollReveal>
       </StorySection>
     </div>

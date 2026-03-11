@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import { useCurrency } from "@/components/CurrencyContext";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { getPublicConfiguratorData } from "@/app/[locale]/account/admin/actions";
+import { getPublicConfiguratorData, setProductConfiguratorConfig } from "@/app/[locale]/account/admin/actions";
 import { addGuestCartItem } from "@/lib/guest-cart";
 
 // Use site theme from globals.css: --accent, --foreground, --background
@@ -22,34 +22,52 @@ type ConfigShape = {
   addonIds?: string[];
   /** Option id -> selected dropdown item id (for options that have dropdown menus). */
   dropdownSelections?: Record<string, string>;
+  /** Section id -> selected checkbox item ids (for admin-defined checkbox sections per step). */
+  customCheckboxSelections?: Record<string, string[]>;
   /** Human-readable lines for cart/checkout display (label + price). */
   summaryLines?: { label: string; price: number }[];
+};
+
+type ProductConfigShape = {
+  steps?: string[];
+  addonIds?: string[];
+  dropdownSelections?: Record<string, string>;
+  customCheckboxSelections?: Record<string, string[]>;
 };
 
 type ConfiguratorProps = {
   locale: string;
   editCartItemId?: string;
+  productId?: string;
+  initialProductConfig?: ProductConfigShape | null;
   initialData?: Awaited<ReturnType<typeof getPublicConfiguratorData>> | null;
+  /** When set, show admin bar to save current build as preset for this product. */
+  adminPresetProduct?: { id: string; name: string };
 };
 
-export default function Configurator({ locale, editCartItemId, initialData }: ConfiguratorProps) {
+export default function Configurator({ locale, editCartItemId, productId, initialProductConfig, initialData, adminPresetProduct }: ConfiguratorProps) {
   const isFr = locale === "fr";
   const router = useRouter();
   const { currency, formatPrice } = useCurrency();
   const [configData, setConfigData] = useState<Awaited<ReturnType<typeof getPublicConfiguratorData>> | null>(initialData ?? null);
   const [dataLoading, setDataLoading] = useState(!initialData);
   const [editLoadDone, setEditLoadDone] = useState(false);
+  const [productPresetLoadDone, setProductPresetLoadDone] = useState(false);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [selections, setSelections] = useState<Partial<Record<string, string>>>({});
   /** For options that have dropdown items: optionId -> selected dropdown item id. */
   const [dropdownSelections, setDropdownSelections] = useState<Record<string, string>>({});
+  /** Section id -> selected checkbox item ids (for admin-defined checkbox sections). */
+  const [customCheckboxSelections, setCustomCheckboxSelections] = useState<Record<string, string[]>>({});
   const [addonChecked, setAddonChecked] = useState<Record<string, boolean>>({});
   const [totalExpanded, setTotalExpanded] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [addToCartLoading, setAddToCartLoading] = useState(false);
   const [addToCartError, setAddToCartError] = useState<string | null>(null);
+  const [adminPresetSaving, setAdminPresetSaving] = useState(false);
+  const [adminPresetError, setAdminPresetError] = useState<string | null>(null);
   /** For non-function steps: which group card is expanded (groupId or null). */
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -85,6 +103,10 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
   useEffect(() => {
     if (editCartItemId) setEditLoadDone(false);
   }, [editCartItemId]);
+
+  useEffect(() => {
+    if (productId || initialProductConfig) setProductPresetLoadDone(false);
+  }, [productId, initialProductConfig]);
 
   useEffect(() => {
     if (!editCartItemId || !configData || editLoadDone) return;
@@ -128,9 +150,13 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
         if (typeof id === "string") nextAddons[id] = true;
       });
       const nextDropdowns = (config.dropdownSelections && typeof config.dropdownSelections === "object") ? config.dropdownSelections as Record<string, string> : {};
+      const nextCheckbox = (config.customCheckboxSelections && typeof config.customCheckboxSelections === "object" && !Array.isArray(config.customCheckboxSelections))
+        ? (config.customCheckboxSelections as Record<string, string[]>)
+        : {};
       setSelections(nextSelections);
       setAddonChecked(nextAddons);
       setDropdownSelections(nextDropdowns);
+      setCustomCheckboxSelections(nextCheckbox);
       setStepIndex(0);
       setEditLoadDone(true);
     })();
@@ -138,6 +164,48 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
       cancelled = true;
     };
   }, [editCartItemId, configData, editLoadDone]);
+
+  useEffect(() => {
+    if (editCartItemId || !configData || !initialProductConfig?.steps?.length || productPresetLoadDone) return;
+    const steps = initialProductConfig.steps;
+    const funcId = steps[0] && typeof steps[0] === "string" ? steps[0] : "";
+    if (!funcId) {
+      setProductPresetLoadDone(true);
+      return;
+    }
+    const stepsMeta = configData.stepsMeta ?? [];
+    const functionStepsMap = configData.functionStepsMap ?? {};
+    const stepIdToMeta = new Map(stepsMeta.map((s) => [s.id, s]));
+    const stepIds = functionStepsMap[funcId] ?? [];
+    const stepKeys = stepIds
+      .map((sid) => stepIdToMeta.get(sid)?.step_key)
+      .filter((k): k is string => !!k);
+    const stepsForPreset = ["function", ...stepKeys];
+    const nextSelections: Partial<Record<string, string>> = { function: funcId };
+    stepsForPreset.forEach((key, i) => {
+      const val = steps[i] && typeof steps[i] === "string" ? steps[i] : "";
+      if (val && key !== "function") nextSelections[key] = val;
+    });
+    const addonIds = Array.isArray(initialProductConfig.addonIds) ? initialProductConfig.addonIds : [];
+    const nextAddons: Record<string, boolean> = {};
+    addonIds.forEach((id) => {
+      if (typeof id === "string") nextAddons[id] = true;
+    });
+    const nextDropdowns =
+      initialProductConfig.dropdownSelections && typeof initialProductConfig.dropdownSelections === "object"
+        ? initialProductConfig.dropdownSelections
+        : {};
+    const nextCheckbox =
+      initialProductConfig.customCheckboxSelections && typeof initialProductConfig.customCheckboxSelections === "object" && !Array.isArray(initialProductConfig.customCheckboxSelections)
+        ? initialProductConfig.customCheckboxSelections
+        : {};
+    setSelections(nextSelections);
+    setAddonChecked(nextAddons);
+    setDropdownSelections(nextDropdowns);
+    setCustomCheckboxSelections(nextCheckbox);
+    setStepIndex(Math.max(0, stepsForPreset.length - 1));
+    setProductPresetLoadDone(true);
+  }, [editCartItemId, configData, initialProductConfig, productPresetLoadDone]);
 
   const stepsMeta = configData?.stepsMeta ?? [];
   const functionOptions = configData?.functionOptions ?? [];
@@ -224,6 +292,29 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
   const isLastStep = stepIndex === stepsForFunction.length - 1;
   const isOptionalStep = currentStepMeta?.optional ?? false;
 
+  /** Checkbox sections for current step that are enabled for this watch type. */
+  const checkboxSectionsForCurrentStep = useMemo(() => {
+    const sections = configData?.checkboxSections ?? [];
+    const enabledMap = configData?.checkboxSectionEnabledMap ?? {};
+    if (!currentStepId || !functionId) return [];
+    return sections.filter(
+      (s) => s.step_id === currentStepId && (enabledMap[s.id]?.includes(functionId) ?? false)
+    );
+  }, [configData?.checkboxSections, configData?.checkboxSectionEnabledMap, currentStepId, functionId]);
+
+  const toggleCustomCheckbox = useCallback((sectionId: string, itemId: string) => {
+    setCustomCheckboxSelections((prev) => {
+      const arr = prev[sectionId] ?? [];
+      const next = arr.includes(itemId) ? arr.filter((id) => id !== itemId) : [...arr, itemId];
+      if (next.length === 0) {
+        const rest = { ...prev };
+        delete rest[sectionId];
+        return rest;
+      }
+      return { ...prev, [sectionId]: next };
+    });
+  }, []);
+
   const setSelection = useCallback(
     (optionId: string | null) => {
       if (optionId === null) {
@@ -298,10 +389,19 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
   const discountPercent = configData?.configuratorDiscountPercent ?? 0;
   const displayTotal = discountPercent > 0 ? total * (1 - discountPercent / 100) : total;
 
-  const canContinue = useCallback(
-    () => isOptionalStep || !!selectedId,
-    [isOptionalStep, selectedId]
-  );
+  const canContinue = useCallback(() => {
+    if (isOptionalStep && !selectedId) {
+      const mandatorySatisfied = checkboxSectionsForCurrentStep
+        .filter((s) => s.mandatory)
+        .every((s) => (customCheckboxSelections[s.id]?.length ?? 0) >= 1);
+      return mandatorySatisfied;
+    }
+    if (!selectedId) return false;
+    const mandatorySatisfied = checkboxSectionsForCurrentStep
+      .filter((s) => s.mandatory)
+      .every((s) => (customCheckboxSelections[s.id]?.length ?? 0) >= 1);
+    return mandatorySatisfied;
+  }, [isOptionalStep, selectedId, checkboxSectionsForCurrentStep, customCheckboxSelections]);
 
   const handleContinue = () => {
     if (stepIndex < stepsForFunction.length - 1) setStepIndex((s) => s + 1);
@@ -321,6 +421,29 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
     () => addons.filter((a) => addonChecked[a.id]).map((a) => a.id),
     [addons, addonChecked]
   );
+
+  const handleSaveAsPreset = useCallback(async () => {
+    if (!adminPresetProduct || !stepsPayload.length || !stepsPayload[0]) return;
+    setAdminPresetError(null);
+    setAdminPresetSaving(true);
+    try {
+      await setProductConfiguratorConfig(adminPresetProduct.id, {
+        steps: stepsPayload,
+        addonIds: addonIdsPayload.length ? addonIdsPayload : undefined,
+        dropdownSelections: Object.keys(dropdownSelections).length ? dropdownSelections : undefined,
+        customCheckboxSelections: Object.keys(customCheckboxSelections).length ? customCheckboxSelections : undefined,
+      });
+      router.push(`/${locale}/account/admin/products`);
+    } catch (e) {
+      setAdminPresetError(e instanceof Error ? e.message : "Failed to save preset");
+    } finally {
+      setAdminPresetSaving(false);
+    }
+  }, [adminPresetProduct, stepsPayload, addonIdsPayload, dropdownSelections, customCheckboxSelections, locale, router]);
+
+  const handleCancelAdminPreset = useCallback(() => {
+    router.push(`/${locale}/account/admin/products`);
+  }, [locale, router]);
 
   const handleReviewOrder = async () => {
     setCheckoutError(null);
@@ -342,6 +465,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
             extras,
             addonIds: addonIdsPayload,
             dropdownSelections: Object.keys(dropdownSelections).length ? dropdownSelections : undefined,
+            customCheckboxSelections: Object.keys(customCheckboxSelections).length ? customCheckboxSelections : undefined,
             summaryLines: totalLineItems.length ? totalLineItems : undefined,
             price: total,
           },
@@ -369,6 +493,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
     setStepIndex(0);
     setSelections({});
     setDropdownSelections({});
+    setCustomCheckboxSelections({});
     setAddonChecked({});
   };
 
@@ -411,6 +536,7 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
         extras: stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [],
         addonIds: addonIdsPayload,
         dropdownSelections: Object.keys(dropdownSelections).length ? dropdownSelections : undefined,
+        customCheckboxSelections: Object.keys(customCheckboxSelections).length ? customCheckboxSelections : undefined,
         summaryLines: totalLineItems.length ? totalLineItems : undefined,
       };
 
@@ -568,6 +694,35 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
 
   return (
     <div className="min-h-screen bg-[var(--logo-green)] text-white">
+      {adminPresetProduct && (
+        <div className="border-b border-amber-400/50 bg-amber-500/20 px-6 py-3">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
+            <p className="text-sm font-medium text-amber-100">
+              {isFr ? "Préréglage configurateur pour" : "Configurator preset for"}: <span className="font-semibold text-white">{adminPresetProduct.name || adminPresetProduct.id}</span>
+            </p>
+            <div className="flex items-center gap-3">
+              {adminPresetError && (
+                <span className="text-sm text-red-200">{adminPresetError}</span>
+              )}
+              <button
+                type="button"
+                onClick={handleCancelAdminPreset}
+                className="rounded-full border border-white/40 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+              >
+                {isFr ? "Annuler" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAsPreset}
+                disabled={adminPresetSaving || !stepsPayload[0]}
+                className="rounded-full bg-[var(--logo-gold)] px-5 py-2 text-sm font-semibold uppercase tracking-wider text-[var(--logo-green)] transition hover:opacity-90 disabled:opacity-50"
+              >
+                {adminPresetSaving ? (isFr ? "Enregistrement…" : "Saving…") : isFr ? "Enregistrer comme préréglage" : "Save as preset"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/20 bg-[var(--logo-green)] px-6 py-4">
         <div className="flex flex-1 flex-wrap items-center justify-center gap-2 md:gap-4">
           {stepsForFunction.map((stepKey, i) => {
@@ -643,6 +798,20 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
               layerScales={publicLayerScales}
             />
           </div>
+          {selectedId && (() => {
+            const opt = optionsForCurrentStep.find((o) => o.id === selectedId);
+            if (!opt) return null;
+            const partLabel = isFr ? opt.label_fr : opt.label_en;
+            const dropdownItems = (opt as { dropdownItems?: { id: string; label_en: string; label_fr: string }[] }).dropdownItems;
+            const dropdownId = dropdownSelections[opt.id];
+            const dropdownItem = dropdownItems?.find((d) => d.id === dropdownId);
+            const fullName = dropdownItem ? `${partLabel} → ${isFr ? dropdownItem.label_fr : dropdownItem.label_en}` : partLabel;
+            return (
+              <p className="mt-3 text-center text-sm font-medium text-white" aria-live="polite">
+                {fullName}
+              </p>
+            );
+          })()}
           {functionId && stepsForFunction.length > 1 && (layerTransformsByFunction[functionId]?.length ?? 0) === 0 && (
             <p className="text-center text-sm text-white/80">
               {isFr
@@ -926,6 +1095,51 @@ export default function Configurator({ locale, editCartItemId, initialData }: Co
               </div>
             );
           })()}
+
+          {checkboxSectionsForCurrentStep.length > 0 && (
+            <div className="mt-6 space-y-4">
+              {checkboxSectionsForCurrentStep.map((section) => {
+                const selectedIds = customCheckboxSelections[section.id] ?? [];
+                const sectionLabel = isFr ? section.label_fr : section.label_en;
+                return (
+                  <div key={section.id} className="rounded-xl border border-foreground/15 bg-white/90 p-4 shadow-[0_24px_90px_rgba(15,20,23,0.06)]">
+                    <p className="mb-3 text-sm font-medium text-foreground">
+                      {sectionLabel}
+                      {section.mandatory && (
+                        <span className="ml-2 text-xs text-amber-600">
+                          {isFr ? "(obligatoire)" : "(required)"}
+                        </span>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {section.items.map((item) => {
+                        const checked = selectedIds.includes(item.id);
+                        const itemLabel = isFr ? item.label_fr : item.label_en;
+                        return (
+                          <label
+                            key={item.id}
+                            className={`flex cursor-pointer items-center gap-2 rounded-xl border-2 px-4 py-3 transition ${
+                              checked
+                                ? "border-[var(--accent)] bg-[var(--accent)]/10"
+                                : "border-foreground/20 bg-white hover:border-foreground/35"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleCustomCheckbox(section.id, item.id)}
+                              className="h-4 w-4 rounded border-foreground/30 text-[var(--accent)]"
+                            />
+                            <span className="text-sm font-medium text-foreground">{itemLabel}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {currentStepKey === "case" && showFrostedForSelectedCase.length > 0 && (
             <div className="mt-8 space-y-4">

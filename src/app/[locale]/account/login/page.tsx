@@ -134,12 +134,6 @@ export default function LoginPage() {
               </ul>
             </div>
           </ScrollReveal>
-          <ScrollReveal>
-            <div className="rounded-[32px] border border-white/70 bg-white/80 p-8 text-foreground">
-              <p className="text-xs uppercase tracking-[0.3em] text-foreground/60">{isFr ? "Assistance" : "Need help?"}</p>
-              <p className="mt-4 text-foreground/70">concierge@civagliatimepieces.com</p>
-            </div>
-          </ScrollReveal>
         </div>
       </div>
     </section>

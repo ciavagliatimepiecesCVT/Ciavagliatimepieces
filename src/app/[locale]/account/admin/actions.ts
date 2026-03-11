@@ -1737,8 +1737,31 @@ export async function getFunctionSteps(functionOptionId: string): Promise<string
   return (data ?? []).map((r: { step_id: string }) => r.step_id);
 }
 
-/** Set which steps (and order) follow for a function option. stepIds = array of configurator_steps.id. */
-export async function setFunctionSteps(functionOptionId: string, stepIds: string[]): Promise<void> {
+/** Get step_id + size checkbox flags for a function (for admin STEPS modal). */
+export async function getFunctionStepSizeCheckboxState(functionOptionId: string): Promise<
+  { step_id: string; has_size_checkbox: boolean; size_checkbox_mandatory: boolean }[]
+> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("configurator_function_steps")
+    .select("step_id, has_size_checkbox, size_checkbox_mandatory")
+    .eq("function_option_id", functionOptionId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r: { step_id: string; has_size_checkbox?: boolean; size_checkbox_mandatory?: boolean }) => ({
+    step_id: r.step_id,
+    has_size_checkbox: r.has_size_checkbox ?? false,
+    size_checkbox_mandatory: r.size_checkbox_mandatory ?? false,
+  }));
+}
+
+/** Set which steps (and order) follow for a function option. stepIds = array of configurator_steps.id. Optional sizeCfg: stepId -> { hasSizeCheckbox, mandatory }. */
+export async function setFunctionSteps(
+  functionOptionId: string,
+  stepIds: string[],
+  sizeCfg?: Record<string, { hasSizeCheckbox: boolean; mandatory: boolean }>
+): Promise<void> {
   await requireAdmin();
   if (!functionOptionId) throw new Error("Function option id required");
   const supabase = createServerClient();
@@ -1748,16 +1771,209 @@ export async function setFunctionSteps(functionOptionId: string, stepIds: string
     .eq("function_option_id", functionOptionId);
   if (delError) throw delError;
   if (stepIds.length > 0) {
-    const rows = stepIds.map((step_id, i) => ({
-      function_option_id: functionOptionId,
-      step_id,
-      sort_order: i,
-    }));
+    const rows = stepIds.map((step_id, i) => {
+      const cfg = sizeCfg?.[step_id];
+      return {
+        function_option_id: functionOptionId,
+        step_id,
+        sort_order: i,
+        has_size_checkbox: cfg?.hasSizeCheckbox ?? false,
+        size_checkbox_mandatory: cfg?.mandatory ?? false,
+      };
+    });
     const { error: insError } = await supabase.from("configurator_function_steps").insert(rows);
     if (insError) throw insError;
   }
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
+}
+
+// --- Configurator step checkbox sections (admin-defined custom checkboxes per step) ---
+export type ConfiguratorStepCheckboxSectionRow = {
+  id: string;
+  step_id: string;
+  label_en: string;
+  label_fr: string;
+  mandatory: boolean;
+  sort_order: number;
+};
+export type ConfiguratorStepCheckboxItemRow = {
+  id: string;
+  section_id: string;
+  label_en: string;
+  label_fr: string;
+  sort_order: number;
+};
+
+export async function getCheckboxSectionsForStep(stepId: string): Promise<ConfiguratorStepCheckboxSectionRow[]> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("configurator_step_checkbox_sections")
+    .select("id, step_id, label_en, label_fr, mandatory, sort_order")
+    .eq("step_id", stepId)
+    .order("sort_order", { ascending: true });
+  if (error) return [];
+  return (data ?? []) as ConfiguratorStepCheckboxSectionRow[];
+}
+
+export async function getCheckboxSectionItems(sectionId: string): Promise<ConfiguratorStepCheckboxItemRow[]> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("configurator_step_checkbox_items")
+    .select("id, section_id, label_en, label_fr, sort_order")
+    .eq("section_id", sectionId)
+    .order("sort_order", { ascending: true });
+  if (error) return [];
+  return (data ?? []) as ConfiguratorStepCheckboxItemRow[];
+}
+
+export async function createCheckboxSection(
+  stepId: string,
+  input: { label_en: string; label_fr: string; mandatory: boolean },
+  items: { label_en: string; label_fr: string }[]
+): Promise<string> {
+  await requireAdmin();
+  if (!stepId || !input.label_en?.trim()) throw new Error("Step and section name required");
+  const supabase = createServerClient();
+  const { data: sectionRow, error: sectionErr } = await supabase
+    .from("configurator_step_checkbox_sections")
+    .insert({
+      step_id: stepId,
+      label_en: input.label_en.trim(),
+      label_fr: input.label_fr?.trim() || input.label_en.trim(),
+      mandatory: !!input.mandatory,
+      sort_order: 0,
+    })
+    .select("id")
+    .single();
+  if (sectionErr || !sectionRow) throw new Error(sectionErr?.message ?? "Failed to create section");
+  const sectionId = (sectionRow as { id: string }).id;
+  if (items.length > 0) {
+    const itemRows = items.map((it, i) => ({
+      section_id: sectionId,
+      label_en: it.label_en?.trim() || `Item ${i + 1}`,
+      label_fr: it.label_fr?.trim() || it.label_en?.trim() || `Item ${i + 1}`,
+      sort_order: i,
+    }));
+    await supabase.from("configurator_step_checkbox_items").insert(itemRows);
+  }
+  revalidatePath("/[locale]/configurator", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+  return sectionId;
+}
+
+export async function updateCheckboxSection(
+  sectionId: string,
+  input: { label_en?: string; label_fr?: string; mandatory?: boolean }
+): Promise<void> {
+  await requireAdmin();
+  if (!sectionId) throw new Error("Section id required");
+  const supabase = createServerClient();
+  const updates: Record<string, unknown> = {};
+  if (input.label_en !== undefined) updates.label_en = input.label_en?.trim() || "";
+  if (input.label_fr !== undefined) updates.label_fr = input.label_fr?.trim() || (input.label_en ?? "");
+  if (input.mandatory !== undefined) updates.mandatory = !!input.mandatory;
+  updates.updated_at = new Date().toISOString();
+  if (Object.keys(updates).length <= 1) return;
+  const { error } = await supabase.from("configurator_step_checkbox_sections").update(updates).eq("id", sectionId);
+  if (error) throw error;
+  revalidatePath("/[locale]/configurator", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+export async function deleteCheckboxSection(sectionId: string): Promise<void> {
+  await requireAdmin();
+  if (!sectionId) throw new Error("Section id required");
+  const supabase = createServerClient();
+  const { error } = await supabase.from("configurator_step_checkbox_sections").delete().eq("id", sectionId);
+  if (error) throw error;
+  revalidatePath("/[locale]/configurator", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+export async function createCheckboxItem(sectionId: string, label_en: string, label_fr: string): Promise<string> {
+  await requireAdmin();
+  if (!sectionId || !label_en?.trim()) throw new Error("Section and label required");
+  const supabase = createServerClient();
+  const { data: item, error } = await supabase
+    .from("configurator_step_checkbox_items")
+    .insert({
+      section_id: sectionId,
+      label_en: label_en.trim(),
+      label_fr: label_fr?.trim() || label_en.trim(),
+      sort_order: 999,
+    })
+    .select("id")
+    .single();
+  if (error || !item) throw new Error(error?.message ?? "Failed to create item");
+  revalidatePath("/[locale]/configurator", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+  return (item as { id: string }).id;
+}
+
+export async function updateCheckboxItem(itemId: string, input: { label_en?: string; label_fr?: string }): Promise<void> {
+  await requireAdmin();
+  if (!itemId) throw new Error("Item id required");
+  const supabase = createServerClient();
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.label_en !== undefined) updates.label_en = input.label_en?.trim() ?? "";
+  if (input.label_fr !== undefined) updates.label_fr = input.label_fr?.trim() ?? input.label_en ?? "";
+  if (Object.keys(updates).length <= 1) return;
+  const { error } = await supabase.from("configurator_step_checkbox_items").update(updates).eq("id", itemId);
+  if (error) throw error;
+  revalidatePath("/[locale]/configurator", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+export async function deleteCheckboxItem(itemId: string): Promise<void> {
+  await requireAdmin();
+  if (!itemId) throw new Error("Item id required");
+  const supabase = createServerClient();
+  const { error } = await supabase.from("configurator_step_checkbox_items").delete().eq("id", itemId);
+  if (error) throw error;
+  revalidatePath("/[locale]/configurator", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+/** Which function_option_ids have this section enabled (for this step). */
+export async function getSectionEnabledFunctionIds(sectionId: string): Promise<string[]> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("configurator_function_step_sections")
+    .select("function_option_id")
+    .eq("section_id", sectionId);
+  if (error) return [];
+  return (data ?? []).map((r: { function_option_id: string }) => r.function_option_id);
+}
+
+/** Enable this checkbox section for the given function options (e.g. "apply to all watches" = all functions that have this step). */
+export async function setSectionEnabledForFunctions(sectionId: string, functionOptionIds: string[]): Promise<void> {
+  await requireAdmin();
+  if (!sectionId) throw new Error("Section id required");
+  const supabase = createServerClient();
+  await supabase.from("configurator_function_step_sections").delete().eq("section_id", sectionId);
+  if (functionOptionIds.length > 0) {
+    const rows = functionOptionIds.map((function_option_id) => ({ function_option_id, section_id: sectionId }));
+    const { error } = await supabase.from("configurator_function_step_sections").insert(rows);
+    if (error) throw error;
+  }
+  revalidatePath("/[locale]/configurator", "page");
+  revalidatePath("/[locale]/account/admin", "page");
+}
+
+/** Get all function_option_ids that have a given step_id in their configurator flow (for "Apply to all watches"). */
+export async function getFunctionIdsForStep(stepId: string): Promise<string[]> {
+  await requireAdmin();
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("configurator_function_steps")
+    .select("function_option_id")
+    .eq("step_id", stepId);
+  if (error) return [];
+  return (data ?? []).map((r: { function_option_id: string }) => r.function_option_id);
 }
 
 export async function getAdminConfiguratorOptions(stepId?: string | null, parentOptionId?: string | null): Promise<ConfiguratorOptionRow[]> {
@@ -2361,6 +2577,19 @@ export type PublicDropdownItem = { id: string; label_en: string; label_fr: strin
 /** Public: one option group for customer dropdown (name + image). */
 export type PublicOptionGroup = { id: string; step_id: string; label_en: string; label_fr: string; image_url: string | null; sort_order: number };
 
+/** Public: one checkbox section (admin-defined per step) with items. */
+export type PublicCheckboxSection = {
+  id: string;
+  step_id: string;
+  label_en: string;
+  label_fr: string;
+  mandatory: boolean;
+  sort_order: number;
+  items: { id: string; label_en: string; label_fr: string }[];
+};
+/** Public: which function_option_ids have each section enabled. Key = section_id. */
+export type PublicCheckboxSectionEnabledMap = Record<string, string[]>;
+
 /** Public: full configurator data for customer (no auth). Used by Configurator component. */
 export type PublicConfiguratorData = {
   stepsMeta: { id: string; step_key: string | null; label_en: string; label_fr: string; optional: boolean; sort_order: number; image_url: string | null }[];
@@ -2372,6 +2601,10 @@ export type PublicConfiguratorData = {
   configuratorDiscountPercent: number;
   /** Layer position/scale per function (watch type). Key = function_option_id, value = per step_key. */
   layerTransformsByFunction: Record<string, LayerTransformRow[]>;
+  /** Checkbox sections per step (custom admin-defined). */
+  checkboxSections: PublicCheckboxSection[];
+  /** Which function_option_ids have each section enabled. Key = section_id. */
+  checkboxSectionEnabledMap: PublicCheckboxSectionEnabledMap;
 };
 
 export async function getPublicConfiguratorData(): Promise<PublicConfiguratorData | null> {
@@ -2451,7 +2684,7 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
       .from("configurator_function_steps")
       .select("function_option_id, step_id, sort_order")
       .order("sort_order", { ascending: true });
-    if (fsErr) return { stepsMeta, functionOptions, functionStepsMap: {}, options: mapToPublicOptions(allOptions), optionGroups: [], addons: [], configuratorDiscountPercent: 0, layerTransformsByFunction: {} };
+    if (fsErr) return { stepsMeta, functionOptions, functionStepsMap: {}, options: mapToPublicOptions(allOptions), optionGroups: [], addons: [], configuratorDiscountPercent: 0, layerTransformsByFunction: {}, checkboxSections: [], checkboxSectionEnabledMap: {} };
 
     const functionStepsMap: Record<string, string[]> = {};
     (fsRows ?? []).forEach((r: { function_option_id: string; step_id: string }) => {
@@ -2462,7 +2695,7 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
     const { data: addonsRows, error: addonsErr } = await supabase
       .from("configurator_addons")
       .select("id, step_id, label_en, label_fr, price");
-    if (addonsErr) return { stepsMeta, functionOptions, functionStepsMap, options: mapToPublicOptions(allOptions), optionGroups: [], addons: [], configuratorDiscountPercent: 0, layerTransformsByFunction: {} };
+    if (addonsErr) return { stepsMeta, functionOptions, functionStepsMap, options: mapToPublicOptions(allOptions), optionGroups: [], addons: [], configuratorDiscountPercent: 0, layerTransformsByFunction: {}, checkboxSections: [], checkboxSectionEnabledMap: {} };
 
     const { data: addonOptRows } = await supabase.from("configurator_addon_options").select("addon_id, option_id");
     const optionIdsByAddon: Record<string, string[]> = {};
@@ -2563,10 +2796,131 @@ export async function getPublicConfiguratorData(): Promise<PublicConfiguratorDat
       });
     }
 
-    return { stepsMeta, functionOptions, functionStepsMap, options, optionGroups, addons, configuratorDiscountPercent, layerTransformsByFunction };
+    let checkboxSections: PublicCheckboxSection[] = [];
+    let checkboxSectionEnabledMap: PublicCheckboxSectionEnabledMap = {};
+    try {
+      const { data: sectionRows } = await supabase
+        .from("configurator_step_checkbox_sections")
+        .select("id, step_id, label_en, label_fr, mandatory, sort_order")
+        .order("sort_order", { ascending: true });
+      const { data: itemRows } = await supabase
+        .from("configurator_step_checkbox_items")
+        .select("id, section_id, label_en, label_fr, sort_order")
+        .order("sort_order", { ascending: true });
+      const { data: enabledRows } = await supabase
+        .from("configurator_function_step_sections")
+        .select("section_id, function_option_id");
+      const itemsBySection: Record<string, { id: string; label_en: string; label_fr: string }[]> = {};
+      (itemRows ?? []).forEach((it: { id: string; section_id: string; label_en: string; label_fr: string }) => {
+        if (!itemsBySection[it.section_id]) itemsBySection[it.section_id] = [];
+        itemsBySection[it.section_id].push({ id: it.id, label_en: it.label_en, label_fr: it.label_fr });
+      });
+      checkboxSections = (sectionRows ?? []).map((s: { id: string; step_id: string; label_en: string; label_fr: string; mandatory: boolean; sort_order: number }) => ({
+        id: s.id,
+        step_id: s.step_id,
+        label_en: s.label_en,
+        label_fr: s.label_fr,
+        mandatory: !!s.mandatory,
+        sort_order: Number(s.sort_order ?? 0),
+        items: itemsBySection[s.id] ?? [],
+      }));
+      (enabledRows ?? []).forEach((r: { section_id: string; function_option_id: string }) => {
+        if (!checkboxSectionEnabledMap[r.section_id]) checkboxSectionEnabledMap[r.section_id] = [];
+        checkboxSectionEnabledMap[r.section_id].push(r.function_option_id);
+      });
+    } catch {
+      // configurator_step_checkbox_* tables may not exist before migration
+    }
+
+    return { stepsMeta, functionOptions, functionStepsMap, options, optionGroups, addons, configuratorDiscountPercent, layerTransformsByFunction, checkboxSections, checkboxSectionEnabledMap };
   } catch {
     return null;
   }
+}
+
+/** Public: get configurator preset for a product (for "Edit now" → configurator at final step). Returns null if product not found or no preset. */
+export async function getProductConfiguratorConfig(productId: string): Promise<{
+  steps?: string[];
+  addonIds?: string[];
+  dropdownSelections?: Record<string, string>;
+} | null> {
+  if (!productId?.trim()) return null;
+  try {
+    const supabase = createServerClient();
+    const { data, error } = await supabase
+      .from("products")
+      .select("configurator_config")
+      .eq("id", productId.trim())
+      .eq("active", true)
+      .single();
+    if (error || !data) return null;
+    const raw = (data as { configurator_config?: unknown }).configurator_config;
+    if (raw == null || typeof raw !== "object") return null;
+    const config = raw as Record<string, unknown>;
+    const steps = Array.isArray(config.steps) ? (config.steps as string[]) : undefined;
+    const addonIds = Array.isArray(config.addonIds) ? (config.addonIds as string[]) : undefined;
+    const dropdownSelections =
+      config.dropdownSelections && typeof config.dropdownSelections === "object" && !Array.isArray(config.dropdownSelections)
+        ? (config.dropdownSelections as Record<string, string>)
+        : undefined;
+    if (!steps?.length) return null;
+    return { steps, addonIds, dropdownSelections };
+  } catch {
+    return null;
+  }
+}
+
+/** Admin: get configurator preset for any product (for editing in admin). */
+export async function getAdminProductConfiguratorConfig(productId: string): Promise<{
+  steps?: string[];
+  addonIds?: string[];
+  dropdownSelections?: Record<string, string>;
+  customCheckboxSelections?: Record<string, string[]>;
+} | null> {
+  await requireAdmin();
+  if (!productId?.trim()) return null;
+  try {
+    const supabase = createServerClient();
+    const { data, error } = await supabase
+      .from("products")
+      .select("configurator_config")
+      .eq("id", productId.trim())
+      .single();
+    if (error || !data) return null;
+    const raw = (data as { configurator_config?: unknown }).configurator_config;
+    if (raw == null || typeof raw !== "object") return null;
+    const config = raw as Record<string, unknown>;
+    const steps = Array.isArray(config.steps) ? (config.steps as string[]) : undefined;
+    const addonIds = Array.isArray(config.addonIds) ? (config.addonIds as string[]) : undefined;
+    const dropdownSelections =
+      config.dropdownSelections && typeof config.dropdownSelections === "object" && !Array.isArray(config.dropdownSelections)
+        ? (config.dropdownSelections as Record<string, string>)
+        : undefined;
+    const customCheckboxSelections =
+      config.customCheckboxSelections && typeof config.customCheckboxSelections === "object" && !Array.isArray(config.customCheckboxSelections)
+        ? (config.customCheckboxSelections as Record<string, string[]>)
+        : undefined;
+    return { steps, addonIds, dropdownSelections, customCheckboxSelections };
+  } catch {
+    return null;
+  }
+}
+
+/** Admin: set or clear configurator preset for a product. */
+export async function setProductConfiguratorConfig(
+  productId: string,
+  config: { steps: string[]; addonIds?: string[]; dropdownSelections?: Record<string, string>; customCheckboxSelections?: Record<string, string[]> } | null
+): Promise<void> {
+  await requireAdmin();
+  if (!productId?.trim()) throw new Error("Invalid product ID");
+  const supabase = createServerClient();
+  const { error } = await supabase
+    .from("products")
+    .update({ configurator_config: config, updated_at: new Date().toISOString() })
+    .eq("id", productId.trim());
+  if (error) throw error;
+  revalidatePath("/[locale]/shop/product/[id]", "page");
+  revalidatePath("/[locale]/configurator", "page");
 }
 
 // ——— Orders (admin: view orders + shipping addresses for labels) ———

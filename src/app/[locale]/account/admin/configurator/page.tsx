@@ -12,6 +12,7 @@ import {
   getAdminConfiguratorOptions,
   getFunctionOptions,
   getFunctionSteps,
+  getFunctionStepSizeCheckboxState,
   setFunctionSteps,
   createConfiguratorStep,
   updateConfiguratorStep,
@@ -40,6 +41,17 @@ import {
   updateOptionGroup,
   deleteOptionGroup,
   setOptionsGroupId,
+  getCheckboxSectionsForStep,
+  getCheckboxSectionItems,
+  createCheckboxSection,
+  updateCheckboxSection,
+  deleteCheckboxSection,
+  createCheckboxItem,
+  updateCheckboxItem,
+  deleteCheckboxItem,
+  getSectionEnabledFunctionIds,
+  setSectionEnabledForFunctions,
+  getFunctionIdsForStep,
 } from "../actions";
 import { optionAppliesToFunction } from "../configurator-utils";
 import type {
@@ -48,6 +60,8 @@ import type {
   ConfiguratorAddonRow,
   ConfiguratorDropdownItemRow,
   ConfiguratorOptionGroupRow,
+  ConfiguratorStepCheckboxSectionRow,
+  ConfiguratorStepCheckboxItemRow,
 } from "../actions";
 
 const STEP_KEYS: { key: string; labelEn: string; labelFr: string }[] = [
@@ -103,6 +117,8 @@ export default function AdminConfiguratorPage() {
 
   const [editingFunctionStepsFor, setEditingFunctionStepsFor] = useState<string | null>(null);
   const [functionStepIds, setFunctionStepIds] = useState<string[]>([]);
+  /** When editing function steps: for each step_id, whether to show size on that step and if mandatory. */
+  const [sizeCheckboxByStepId, setSizeCheckboxByStepId] = useState<Record<string, { on: boolean; mandatory: boolean }>>({});
 
   const [editingAddonId, setEditingAddonId] = useState<string | null>(null);
   const [addonForm, setAddonForm] = useState({ label_en: "", label_fr: "", price: 0 });
@@ -155,6 +171,22 @@ export default function AdminConfiguratorPage() {
   const [addToGroupId, setAddToGroupId] = useState<string | null>(null);
   const [addToGroupSelectedIds, setAddToGroupSelectedIds] = useState<string[]>([]);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+
+  /** Checkbox sections for the current step (admin-defined custom checkboxes). */
+  const [checkboxSectionsForStep, setCheckboxSectionsForStep] = useState<ConfiguratorStepCheckboxSectionRow[]>([]);
+  const [checkboxItemsBySectionId, setCheckboxItemsBySectionId] = useState<Record<string, ConfiguratorStepCheckboxItemRow[]>>({});
+  const [showAddCheckboxSection, setShowAddCheckboxSection] = useState(false);
+  const [checkboxSectionForm, setCheckboxSectionForm] = useState({
+    label_en: "",
+    label_fr: "",
+    mandatory: false,
+    items: [] as { label_en: string; label_fr: string }[],
+  });
+  const [editingCheckboxSectionId, setEditingCheckboxSectionId] = useState<string | null>(null);
+  const [checkboxSectionFormLoading, setCheckboxSectionFormLoading] = useState(false);
+  const [editingCheckboxItemId, setEditingCheckboxItemId] = useState<string | null>(null);
+  const [checkboxItemForm, setCheckboxItemForm] = useState({ label_en: "", label_fr: "" });
+  const [applyToAllLoading, setApplyToAllLoading] = useState<string | null>(null);
 
   const openCropModalFromFile = useCallback((file: File, onSave: (url: string) => void) => {
     setCropModalBackgroundUrl(null);
@@ -254,8 +286,8 @@ export default function AdminConfiguratorPage() {
       const map: Record<string, string[]> = {};
       await Promise.all(
         (funcOpts ?? []).map(async (f) => {
-          const ids = await getFunctionSteps(f.id);
-          map[f.id] = ids;
+          const stepIds = await getFunctionSteps(f.id);
+          map[f.id] = stepIds;
         })
       );
       setFunctionStepsMap(map);
@@ -292,14 +324,19 @@ export default function AdminConfiguratorPage() {
   const functionStep = steps.find((s) => (s as { step_key?: string }).step_key === "function");
   const caseStep = steps.find((s) => (s as { step_key?: string }).step_key === "case");
   const stepsAfterFunction = steps.filter((s) => (s as { step_key?: string }).step_key !== "function");
-  /** When editing "which steps follow", show selected steps in their current order so ↑↓ move visually */
+  /** Steps that can be added to a function (exclude Size — size is shown as checkbox on another step). */
+  const stepsAfterFunctionNoSize = useMemo(
+    () => stepsAfterFunction.filter((s) => (s as { step_key?: string }).step_key !== "size"),
+    [stepsAfterFunction]
+  );
+  /** When editing "which steps follow", show selected steps in their current order so ↑↓ move visually. Excludes Size step. */
   const orderedStepsForFunctionEdit = useMemo(() => {
     const selected = functionStepIds
-      .map((id) => stepsAfterFunction.find((s) => s.id === id))
+      .map((id) => stepsAfterFunctionNoSize.find((s) => s.id === id))
       .filter((s): s is ConfiguratorStepRow => !!s);
-    const unselected = stepsAfterFunction.filter((s) => !functionStepIds.includes(s.id));
+    const unselected = stepsAfterFunctionNoSize.filter((s) => !functionStepIds.includes(s.id));
     return [...selected, ...unselected];
-  }, [stepsAfterFunction, functionStepIds]);
+  }, [stepsAfterFunctionNoSize, functionStepIds]);
 
   const stepIdToMeta = useMemo(
     () => new Map(steps.map((s) => [s.id, s as ConfiguratorStepRow & { step_key?: string }])),
@@ -493,6 +530,32 @@ export default function AdminConfiguratorPage() {
     };
   }, [currentStepKey, currentStepRow?.id]);
 
+  /** Load checkbox sections and items when on a non-function step */
+  useEffect(() => {
+    if (currentStepKey === "function" || !currentStepRow?.id) {
+      setCheckboxSectionsForStep([]);
+      setCheckboxItemsBySectionId({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const sections = await getCheckboxSectionsForStep(currentStepRow!.id);
+      if (cancelled) return;
+      setCheckboxSectionsForStep(sections);
+      const itemsBySection: Record<string, ConfiguratorStepCheckboxItemRow[]> = {};
+      await Promise.all(
+        sections.map(async (sec) => {
+          const items = await getCheckboxSectionItems(sec.id);
+          if (!cancelled) itemsBySection[sec.id] = items;
+        })
+      );
+      if (!cancelled) setCheckboxItemsBySectionId(itemsBySection);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStepKey, currentStepRow?.id]);
+
   const caseAddons = caseStep ? addons.filter((a) => a.step_id === caseStep.id) : [];
   const caseOptions = caseStep ? options.filter((o) => o.step_id === caseStep.id && (o.parent_option_id === null || o.parent_option_id === effectiveFunctionId)) : [];
 
@@ -668,15 +731,30 @@ export default function AdminConfiguratorPage() {
 
   const openEditFunctionSteps = async (functionOptionId: string) => {
     setEditingFunctionStepsFor(functionOptionId);
-    const ids = await getFunctionSteps(functionOptionId);
-    setFunctionStepIds(ids);
+    const stepIds = await getFunctionSteps(functionOptionId);
+    const noSizeStepIds = new Set(steps.filter((s) => (s as { step_key?: string }).step_key !== "size").map((s) => s.id));
+    setFunctionStepIds(stepIds.filter((id) => noSizeStepIds.has(id)));
+    const sizeRows = await getFunctionStepSizeCheckboxState(functionOptionId);
+    setSizeCheckboxByStepId(
+      sizeRows.reduce<Record<string, { on: boolean; mandatory: boolean }>>((acc, r) => {
+        if (noSizeStepIds.has(r.step_id)) acc[r.step_id] = { on: r.has_size_checkbox, mandatory: r.size_checkbox_mandatory };
+        return acc;
+      }, {})
+    );
   };
 
   const handleSaveFunctionSteps = async () => {
     if (!editingFunctionStepsFor) return;
     setError(null);
     try {
-      await setFunctionSteps(editingFunctionStepsFor, functionStepIds);
+      const sizeCfg: Record<string, { hasSizeCheckbox: boolean; mandatory: boolean }> = {};
+      functionStepIds.forEach((sid) => {
+        sizeCfg[sid] = {
+          hasSizeCheckbox: sizeCheckboxByStepId[sid]?.on ?? false,
+          mandatory: sizeCheckboxByStepId[sid]?.mandatory ?? false,
+        };
+      });
+      await setFunctionSteps(editingFunctionStepsFor, functionStepIds, sizeCfg);
       await load();
       setEditingFunctionStepsFor(null);
     } catch (e) {
@@ -700,6 +778,155 @@ export default function AdminConfiguratorPage() {
       [next[i], next[j]] = [next[j], next[i]];
       return next;
     });
+  };
+
+  const setSizeCheckboxForStep = (stepId: string, field: "on" | "mandatory", value: boolean) => {
+    setSizeCheckboxByStepId((prev) => {
+      const cur = prev[stepId] ?? { on: false, mandatory: false };
+      if (field === "on") return { ...prev, [stepId]: { ...cur, on: value, mandatory: value ? cur.mandatory : false } };
+      return { ...prev, [stepId]: { ...cur, mandatory: value } };
+    });
+  };
+
+  const handleCreateCheckboxSection = async () => {
+    if (!currentStepRow?.id || !checkboxSectionForm.label_en.trim()) return;
+    setError(null);
+    setCheckboxSectionFormLoading(true);
+    try {
+      await createCheckboxSection(
+        currentStepRow.id,
+        {
+          label_en: checkboxSectionForm.label_en.trim(),
+          label_fr: checkboxSectionForm.label_fr.trim() || checkboxSectionForm.label_en.trim(),
+          mandatory: checkboxSectionForm.mandatory,
+        },
+        checkboxSectionForm.items.filter((i) => i.label_en.trim())
+      );
+      const sections = await getCheckboxSectionsForStep(currentStepRow.id);
+      setCheckboxSectionsForStep(sections);
+      const itemsBySection: Record<string, ConfiguratorStepCheckboxItemRow[]> = {};
+      await Promise.all(
+        sections.map(async (sec) => {
+          itemsBySection[sec.id] = await getCheckboxSectionItems(sec.id);
+        })
+      );
+      setCheckboxItemsBySectionId(itemsBySection);
+      setShowAddCheckboxSection(false);
+      setCheckboxSectionForm({ label_en: "", label_fr: "", mandatory: false, items: [] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create section");
+    } finally {
+      setCheckboxSectionFormLoading(false);
+    }
+  };
+
+  const handleUpdateCheckboxSection = async () => {
+    if (!editingCheckboxSectionId) return;
+    setError(null);
+    setCheckboxSectionFormLoading(true);
+    try {
+      await updateCheckboxSection(editingCheckboxSectionId, {
+        label_en: checkboxSectionForm.label_en.trim() || undefined,
+        label_fr: checkboxSectionForm.label_fr.trim() || undefined,
+        mandatory: checkboxSectionForm.mandatory,
+      });
+      if (currentStepRow?.id) {
+        const sections = await getCheckboxSectionsForStep(currentStepRow.id);
+        setCheckboxSectionsForStep(sections);
+      }
+      setEditingCheckboxSectionId(null);
+      setCheckboxSectionForm({ label_en: "", label_fr: "", mandatory: false, items: [] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update section");
+    } finally {
+      setCheckboxSectionFormLoading(false);
+    }
+  };
+
+  const handleDeleteCheckboxSection = async (sectionId: string) => {
+    if (!confirm(isFr ? "Supprimer cette section de cases à cocher ?" : "Delete this checkbox section?")) return;
+    setError(null);
+    try {
+      await deleteCheckboxSection(sectionId);
+      if (currentStepRow?.id) {
+        const sections = await getCheckboxSectionsForStep(currentStepRow.id);
+        setCheckboxSectionsForStep(sections);
+        setCheckboxItemsBySectionId((prev) => {
+          const next = { ...prev };
+          delete next[sectionId];
+          return next;
+        });
+      }
+      if (editingCheckboxSectionId === sectionId) {
+        setEditingCheckboxSectionId(null);
+        setCheckboxSectionForm({ label_en: "", label_fr: "", mandatory: false, items: [] });
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete section");
+    }
+  };
+
+  const handleApplyToAllWatches = async (sectionId: string) => {
+    if (!currentStepRow?.id) return;
+    setError(null);
+    setApplyToAllLoading(sectionId);
+    try {
+      const functionIds = await getFunctionIdsForStep(currentStepRow.id);
+      await setSectionEnabledForFunctions(sectionId, functionIds);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to apply to all watches");
+    } finally {
+      setApplyToAllLoading(null);
+    }
+  };
+
+  const handleAddCheckboxItem = async (sectionId: string) => {
+    if (!checkboxItemForm.label_en.trim()) return;
+    setError(null);
+    try {
+      await createCheckboxItem(sectionId, checkboxItemForm.label_en.trim(), checkboxItemForm.label_fr.trim() || checkboxItemForm.label_en.trim());
+      const items = await getCheckboxSectionItems(sectionId);
+      setCheckboxItemsBySectionId((prev) => ({ ...prev, [sectionId]: items }));
+      setCheckboxItemForm({ label_en: "", label_fr: "" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to add item");
+    }
+  };
+
+  const handleSaveCheckboxItem = async () => {
+    if (!editingCheckboxItemId) return;
+    const sectionId = checkboxSectionsForStep.find((s) => checkboxItemsBySectionId[s.id]?.some((it) => it.id === editingCheckboxItemId))?.id;
+    if (!sectionId) return;
+    setError(null);
+    try {
+      await updateCheckboxItem(editingCheckboxItemId, {
+        label_en: checkboxItemForm.label_en.trim() || undefined,
+        label_fr: checkboxItemForm.label_fr.trim() || undefined,
+      });
+      const items = await getCheckboxSectionItems(sectionId);
+      setCheckboxItemsBySectionId((prev) => ({ ...prev, [sectionId]: items }));
+      setEditingCheckboxItemId(null);
+      setCheckboxItemForm({ label_en: "", label_fr: "" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update item");
+    }
+  };
+
+  const handleDeleteCheckboxItem = async (itemId: string) => {
+    const sectionId = checkboxSectionsForStep.find((s) => checkboxItemsBySectionId[s.id]?.some((it) => it.id === itemId))?.id;
+    if (!sectionId || !confirm(isFr ? "Supprimer cette option ?" : "Delete this option?")) return;
+    setError(null);
+    try {
+      await deleteCheckboxItem(itemId);
+      const items = await getCheckboxSectionItems(sectionId);
+      setCheckboxItemsBySectionId((prev) => ({ ...prev, [sectionId]: items }));
+      if (editingCheckboxItemId === itemId) {
+        setEditingCheckboxItemId(null);
+        setCheckboxItemForm({ label_en: "", label_fr: "" });
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete item");
+    }
   };
 
   const handleSaveOption = async () => {
@@ -1254,6 +1481,235 @@ export default function AdminConfiguratorPage() {
             </div>
           )}
 
+          {/* Checkbox sections: custom checkbox block per step; optional mandatory; "Apply to all watches" */}
+          {currentStepKey !== "function" && currentStepRow && (
+            <div className="mt-6 rounded-xl border border-white/20 bg-white/5 p-4">
+              <h3 className="text-lg font-semibold text-white">
+                {isFr ? "Sections de cases à cocher" : "Checkbox sections"}
+              </h3>
+              <p className="mt-1 text-sm text-white/70">
+                {isFr ? "Ajoutez un bloc de cases à cocher sur cette étape. Nommez la section et les options. Cochez « Obligatoire » si le client doit en sélectionner au moins une. « Appliquer à toutes les montres » affiche ce bloc pour tous les types de montre qui ont cette étape." : "Add a checkbox block to this step. Name the section and the options. Check « Mandatory » if the customer must select at least one. « Apply to all watches » shows this block for all watch types that have this step."}
+              </p>
+              <div className="mt-4 space-y-4">
+                {checkboxSectionsForStep.map((sec) => (
+                  <div key={sec.id} className="rounded-lg border border-white/15 bg-white/5 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-white">{sec.label_en}</span>
+                      {sec.mandatory && (
+                        <span className="rounded bg-amber-500/30 px-2 py-0.5 text-xs text-amber-200">
+                          {isFr ? "Obligatoire" : "Mandatory"}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCheckboxSectionId(sec.id);
+                          setCheckboxSectionForm({
+                            label_en: sec.label_en,
+                            label_fr: sec.label_fr,
+                            mandatory: sec.mandatory,
+                            items: [],
+                          });
+                          setShowAddCheckboxSection(false);
+                        }}
+                        className="rounded border border-white/30 px-2 py-1 text-xs text-white hover:bg-white/10"
+                      >
+                        {isFr ? "Modifier" : "Edit"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCheckboxSection(sec.id)}
+                        className="rounded border border-red-300/50 px-2 py-1 text-xs text-red-300 hover:bg-red-500/20"
+                      >
+                        {isFr ? "Supprimer" : "Delete"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyToAllWatches(sec.id)}
+                        disabled={applyToAllLoading === sec.id}
+                        className="rounded border border-[var(--accent)]/60 bg-[var(--accent)]/20 px-2 py-1 text-xs text-white hover:bg-[var(--accent)]/30 disabled:opacity-50"
+                      >
+                        {applyToAllLoading === sec.id ? "…" : isFr ? "Appliquer à toutes les montres" : "Apply to all watches"}
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(checkboxItemsBySectionId[sec.id] ?? []).map((item) => (
+                        <span key={item.id} className="inline-flex items-center gap-1 rounded bg-white/10 px-2 py-1 text-sm text-white/90">
+                          {editingCheckboxItemId === item.id ? (
+                            <>
+                              <input
+                                value={checkboxItemForm.label_en}
+                                onChange={(e) => setCheckboxItemForm((p) => ({ ...p, label_en: e.target.value }))}
+                                className="w-24 rounded border border-white/30 bg-white/10 px-1.5 py-0.5 text-sm text-white"
+                                placeholder="EN"
+                              />
+                              <input
+                                value={checkboxItemForm.label_fr}
+                                onChange={(e) => setCheckboxItemForm((p) => ({ ...p, label_fr: e.target.value }))}
+                                className="w-24 rounded border border-white/30 bg-white/10 px-1.5 py-0.5 text-sm text-white"
+                                placeholder="FR"
+                              />
+                              <button type="button" onClick={handleSaveCheckboxItem} className="rounded bg-white/20 px-1.5 py-0.5 text-xs text-white">✓</button>
+                              <button type="button" onClick={() => { setEditingCheckboxItemId(null); setCheckboxItemForm({ label_en: "", label_fr: "" }); }} className="rounded bg-white/20 px-1.5 py-0.5 text-xs text-white">✕</button>
+                            </>
+                          ) : (
+                            <>
+                              <span>{item.label_en}</span>
+                              <button type="button" onClick={() => { setEditingCheckboxItemId(item.id); setCheckboxItemForm({ label_en: item.label_en, label_fr: item.label_fr }); }} className="text-white/60 hover:text-white">✎</button>
+                              <button type="button" onClick={() => handleDeleteCheckboxItem(item.id)} className="text-red-300/80 hover:text-red-300">×</button>
+                            </>
+                          )}
+                        </span>
+                      ))}
+                      <span className="inline-flex gap-1 rounded bg-white/10 px-2 py-1 text-sm text-white/70">
+                        <input
+                          value={editingCheckboxItemId ? "" : checkboxItemForm.label_en}
+                          onChange={(e) => setCheckboxItemForm((p) => ({ ...p, label_en: e.target.value }))}
+                          onKeyDown={(e) => e.key === "Enter" && (editingCheckboxItemId ? null : handleAddCheckboxItem(sec.id))}
+                          className="w-20 rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-sm text-white placeholder:text-white/40"
+                          placeholder={isFr ? "Nom (EN)" : "Name (EN)"}
+                          disabled={!!editingCheckboxItemId}
+                        />
+                        <input
+                          value={editingCheckboxItemId ? "" : checkboxItemForm.label_fr}
+                          onChange={(e) => setCheckboxItemForm((p) => ({ ...p, label_fr: e.target.value }))}
+                          onKeyDown={(e) => e.key === "Enter" && (editingCheckboxItemId ? null : handleAddCheckboxItem(sec.id))}
+                          className="w-20 rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-sm text-white placeholder:text-white/40"
+                          placeholder={isFr ? "Nom (FR)" : "Name (FR)"}
+                          disabled={!!editingCheckboxItemId}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddCheckboxItem(sec.id)}
+                          disabled={!!editingCheckboxItemId || !checkboxItemForm.label_en.trim()}
+                          className="rounded bg-white/20 px-1.5 py-0.5 text-xs text-white disabled:opacity-50"
+                        >
+                          {isFr ? "Ajouter" : "Add"}
+                        </button>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {(showAddCheckboxSection || editingCheckboxSectionId) && (
+                  <div className="rounded-lg border-2 border-[var(--accent)]/40 bg-white/5 p-4">
+                    <h4 className="text-sm font-medium text-white">
+                      {editingCheckboxSectionId ? (isFr ? "Modifier la section" : "Edit section") : (isFr ? "Nouvelle section de cases à cocher" : "New checkbox section")}
+                    </h4>
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <label className="text-xs text-white/70">{isFr ? "Nom de la section (EN)" : "Section name (EN)"}</label>
+                        <input
+                          value={checkboxSectionForm.label_en}
+                          onChange={(e) => setCheckboxSectionForm((p) => ({ ...p, label_en: e.target.value }))}
+                          className="mt-1 w-full max-w-xs rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-white/70">{isFr ? "Nom de la section (FR)" : "Section name (FR)"}</label>
+                        <input
+                          value={checkboxSectionForm.label_fr}
+                          onChange={(e) => setCheckboxSectionForm((p) => ({ ...p, label_fr: e.target.value }))}
+                          className="mt-1 w-full max-w-xs rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-white"
+                        />
+                      </div>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-white">
+                        <input
+                          type="checkbox"
+                          checked={checkboxSectionForm.mandatory}
+                          onChange={(e) => setCheckboxSectionForm((p) => ({ ...p, mandatory: e.target.checked }))}
+                          className="rounded border-white/30"
+                        />
+                        {isFr ? "Obligatoire (le client doit cocher au moins une option)" : "Mandatory (customer must select at least one)"}
+                      </label>
+                      {!editingCheckboxSectionId && (
+                        <div>
+                          <label className="text-xs text-white/70">{isFr ? "Noms des cases à cocher (EN / FR)" : "Checkbox names (EN / FR)"}</label>
+                          <div className="mt-2 space-y-2">
+                            {checkboxSectionForm.items.map((it, idx) => (
+                              <div key={idx} className="flex flex-wrap gap-2">
+                                <input
+                                  value={it.label_en}
+                                  onChange={(e) =>
+                                    setCheckboxSectionForm((p) => ({
+                                      ...p,
+                                      items: p.items.map((item, i) => (i === idx ? { ...item, label_en: e.target.value } : item)),
+                                    }))
+                                  }
+                                  placeholder="EN"
+                                  className="w-32 rounded border border-white/30 bg-white/10 px-2 py-1 text-sm text-white"
+                                />
+                                <input
+                                  value={it.label_fr}
+                                  onChange={(e) =>
+                                    setCheckboxSectionForm((p) => ({
+                                      ...p,
+                                      items: p.items.map((item, i) => (i === idx ? { ...item, label_fr: e.target.value } : item)),
+                                    }))
+                                  }
+                                  placeholder="FR"
+                                  className="w-32 rounded border border-white/30 bg-white/10 px-2 py-1 text-sm text-white"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCheckboxSectionForm((p) => ({
+                                      ...p,
+                                      items: p.items.filter((_, i) => i !== idx),
+                                    }))
+                                  }
+                                  className="rounded bg-red-500/30 px-2 py-1 text-xs text-red-200"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => setCheckboxSectionForm((p) => ({ ...p, items: [...p.items, { label_en: "", label_fr: "" }] }))}
+                              className="rounded border border-white/30 px-2 py-1 text-xs text-white hover:bg-white/10"
+                            >
+                              {isFr ? "+ Ajouter une option" : "+ Add option"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={editingCheckboxSectionId ? handleUpdateCheckboxSection : handleCreateCheckboxSection}
+                        disabled={checkboxSectionFormLoading || !checkboxSectionForm.label_en.trim()}
+                        className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                      >
+                        {checkboxSectionFormLoading ? "…" : isFr ? "Enregistrer" : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddCheckboxSection(false);
+                          setEditingCheckboxSectionId(null);
+                          setCheckboxSectionForm({ label_en: "", label_fr: "", mandatory: false, items: [] });
+                        }}
+                        className="rounded-lg border border-white/30 px-4 py-2 text-sm text-white hover:bg-white/10"
+                      >
+                        {isFr ? "Annuler" : "Cancel"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {!showAddCheckboxSection && !editingCheckboxSectionId && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddCheckboxSection(true); setCheckboxSectionForm({ label_en: "", label_fr: "", mandatory: false, items: [] }); }}
+                    className="rounded-lg border-2 border-dashed border-white/30 bg-white/5 px-4 py-2 text-sm text-white/90 hover:bg-white/10"
+                  >
+                    {isFr ? "+ Ajouter une section de cases à cocher" : "+ Add checkbox section"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Option cards – same layout as customer; Edit / Steps (function only) / Delete on each */}
           <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {optionsForCurrentStep.map((opt) => {
@@ -1699,13 +2155,14 @@ export default function AdminConfiguratorPage() {
                 {isFr ? "Quelles étapes après la fonction ?" : "Which steps follow for this watch type?"}
               </h3>
               <p className="mt-1 text-sm text-foreground/60">
-                {isFr ? "Cochez et réordonnez (↑↓)." : "Check and reorder (↑↓)."}
+                {isFr ? "Cochez et réordonnez (↑↓). Optionnel : afficher la taille sur une étape." : "Check and reorder (↑↓). Optionally show Size on a step."}
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 {orderedStepsForFunctionEdit.map((s) => {
                   const checked = functionStepIds.includes(s.id);
+                  const sizeCfg = sizeCheckboxByStepId[s.id] ?? { on: false, mandatory: false };
                   return (
-                    <div key={s.id} className="flex items-center gap-2">
+                    <div key={s.id} className="flex flex-wrap items-center gap-2">
                       <label className="flex cursor-pointer items-center gap-2 rounded-full border border-foreground/20 bg-white px-4 py-2 text-foreground">
                         <input type="checkbox" checked={checked} onChange={() => toggleFunctionStep(s.id)} className="rounded border-foreground/30" />
                         <span className="text-sm text-foreground">{s.label_en}</span>
@@ -1714,6 +2171,16 @@ export default function AdminConfiguratorPage() {
                         <>
                           <button type="button" onClick={() => moveFunctionStep(s.id, "up")} className="text-foreground/60 hover:text-foreground" title={isFr ? "Monter" : "Move up"}>↑</button>
                           <button type="button" onClick={() => moveFunctionStep(s.id, "down")} className="text-foreground/60 hover:text-foreground" title={isFr ? "Descendre" : "Move down"}>↓</button>
+                          <label className="ml-2 flex cursor-pointer items-center gap-1.5 rounded border border-foreground/15 bg-white/80 px-3 py-1.5 text-xs text-foreground">
+                            <input type="checkbox" checked={sizeCfg.on} onChange={(e) => setSizeCheckboxForStep(s.id, "on", e.target.checked)} className="rounded border-foreground/30" />
+                            <span>{isFr ? "Taille sur cette étape" : "Size on this step"}</span>
+                          </label>
+                          {sizeCfg.on && (
+                            <label className="flex cursor-pointer items-center gap-1.5 rounded border border-foreground/15 bg-white/80 px-3 py-1.5 text-xs text-foreground">
+                              <input type="checkbox" checked={sizeCfg.mandatory} onChange={(e) => setSizeCheckboxForStep(s.id, "mandatory", e.target.checked)} className="rounded border-foreground/30" />
+                              <span>{isFr ? "Taille obligatoire" : "Size mandatory"}</span>
+                            </label>
+                          )}
                         </>
                       )}
                     </div>

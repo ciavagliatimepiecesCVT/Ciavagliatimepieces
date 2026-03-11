@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type Stripe from "stripe";
 import { createServerClient } from "@/lib/supabase/server";
 import { getUsdToCadRate } from "@/lib/currency";
 import { optionAppliesToFunction } from "@/lib/configurator-constants";
@@ -147,7 +148,7 @@ function getBuiltProductConfigDescription(
  */
 async function getCustomBuildPartsSummary(
   supabase: ReturnType<typeof createServerClient>,
-  config: { steps?: unknown[]; extras?: unknown[]; addonIds?: unknown[]; dropdownSelections?: Record<string, string> },
+  config: { steps?: unknown[]; extras?: unknown[]; addonIds?: unknown[]; dropdownSelections?: Record<string, string>; sizeOptionId?: string },
   locale: "en" | "fr"
 ): Promise<string> {
   const stepsPayload = Array.isArray(config.steps) ? config.steps : [];
@@ -172,13 +173,22 @@ async function getCustomBuildPartsSummary(
 
   const parts: string[] = [];
 
-    const { data: functionOpt } = await supabase
-      .from("configurator_options")
-      .select("label_en, label_fr")
-      .eq("id", functionOptionId)
-      .single();
+  const { data: functionOpt } = await supabase
+    .from("configurator_options")
+    .select("label_en, label_fr")
+    .eq("id", functionOptionId)
+    .single();
   const functionLabel = (functionOpt as Record<string, string> | null)?.[labelKey] ?? "Function";
   parts.push(`${locale === "fr" ? "Fonction" : "Function"}: ${functionLabel}`);
+
+  const sizeOptionId = typeof config.sizeOptionId === "string" && config.sizeOptionId ? config.sizeOptionId : null;
+  if (sizeOptionId) {
+    const { data: sizeStep } = await supabase.from("configurator_steps").select("label_en, label_fr").eq("step_key", "size").maybeSingle();
+    const { data: sizeOpt } = await supabase.from("configurator_options").select("label_en, label_fr").eq("id", sizeOptionId).single();
+    const sizeStepLabel = (sizeStep as Record<string, string> | null)?.[labelKey] ?? "Size";
+    const sizeOptLabel = (sizeOpt as Record<string, string> | null)?.[labelKey] ?? "";
+    if (sizeOptLabel) parts.push(`${sizeStepLabel}: ${sizeOptLabel}`);
+  }
 
   for (let i = 0; i < stepIdsOrdered.length; i++) {
     const stepId = stepIdsOrdered[i];
@@ -229,7 +239,7 @@ async function getCustomBuildPartsSummary(
  */
 async function calculateCustomBuildPrice(
   supabase: ReturnType<typeof createServerClient>,
-  config: { steps?: unknown[]; extras?: unknown[]; addonIds?: unknown[]; dropdownSelections?: Record<string, string> }
+  config: { steps?: unknown[]; extras?: unknown[]; addonIds?: unknown[]; dropdownSelections?: Record<string, string>; sizeOptionId?: string }
 ): Promise<number> {
   const stepsPayload = Array.isArray(config.steps) ? config.steps : [];
   const extras = Array.isArray(config.extras) ? config.extras : [];
@@ -242,15 +252,28 @@ async function calculateCustomBuildPrice(
   const functionOptionId = stepsPayload[0] && typeof stepsPayload[0] === "string" ? stepsPayload[0] : null;
   if (!functionOptionId) return 0;
 
+  let total = 0;
+  const sizeOptionId = typeof config.sizeOptionId === "string" && config.sizeOptionId ? config.sizeOptionId : null;
+  if (sizeOptionId) {
+    const { data: sizeOpt } = await supabase
+      .from("configurator_options")
+      .select("price, discount_percent")
+      .eq("id", sizeOptionId)
+      .single();
+    if (sizeOpt) {
+      const p = Number((sizeOpt as { price?: number }).price ?? 0);
+      const d = Math.min(100, Math.max(0, Number((sizeOpt as { discount_percent?: number }).discount_percent ?? 0)));
+      total += d > 0 ? p * (1 - d / 100) : p;
+    }
+  }
+
   const { data: functionStepRows } = await supabase
     .from("configurator_function_steps")
     .select("step_id, sort_order")
     .eq("function_option_id", functionOptionId)
     .order("sort_order", { ascending: true });
   const stepIdsOrdered = (functionStepRows ?? []).map((r: { step_id: string }) => r.step_id);
-  if (!stepIdsOrdered.length) return 0;
-
-  let total = 0;
+  if (!stepIdsOrdered.length) return total;
 
   for (let i = 0; i < stepIdsOrdered.length; i++) {
     const stepId = stepIdsOrdered[i];
@@ -365,6 +388,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = createServerClient();
+
+    let stripe: ReturnType<typeof getStripe>;
+    let siteUrl: string;
+    try {
+      stripe = getStripe();
+      siteUrl = getSiteUrl();
+    } catch (configError) {
+      const msg = configError instanceof Error ? configError.message : "Configuration error";
+      console.error("Checkout config error:", msg);
+      return NextResponse.json(
+        { error: "Checkout is temporarily unavailable. Please try again later." },
+        { status: 503 }
+      );
+    }
 
     let summary = "Ciavaglia timepiece";
     let amount = 0;
@@ -697,8 +734,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const siteUrl = getSiteUrl();
-    const stripe = getStripe();
     const metadata: Record<string, string> = {
       configuration_id: configurationId ?? "",
       summary,
@@ -720,24 +755,44 @@ export async function POST(request: NextRequest) {
       metadata.cart_product_quantities = guestCartProductQuantitiesJson;
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
+    const sessionParams = {
+      mode: "payment" as const,
       line_items: finalLineItems,
       success_url: `${siteUrl}/${localeSegment}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/${localeSegment}/checkout/cancel`,
       metadata,
-      locale: localeSegment === "fr" ? "fr" : "en",
-      billing_address_collection: "required",
-      shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "FR", "DE", "IT", "ES", "CH", "AU", "JP"] },
+      locale: (localeSegment === "fr" ? "fr" : "en") as "fr" | "en",
+      billing_address_collection: "required" as const,
+      shipping_address_collection: {
+        allowed_countries: ["US", "CA", "GB", "FR", "DE", "IT", "ES", "CH", "AU", "JP"] as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection["allowed_countries"],
+      },
       allow_promotion_codes: true,
       automatic_tax: { enabled: true },
       invoice_creation: { enabled: true },
-    });
+    };
+
+    let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>;
+    try {
+      session = await stripe.checkout.sessions.create(sessionParams);
+    } catch (stripeErr) {
+      const stripeMsg = stripeErr instanceof Error ? stripeErr.message : String(stripeErr);
+      const isTaxOrInvoiceError =
+        /tax|invoice|settings|configuration/i.test(stripeMsg) ||
+        (stripeErr as { code?: string }).code === "account_invalid";
+      if (isTaxOrInvoiceError) {
+        console.warn("Checkout: Stripe tax/invoice error, retrying without automatic_tax and invoice_creation:", stripeMsg);
+        const { automatic_tax, invoice_creation, ...paramsWithoutTax } = sessionParams;
+        session = await stripe.checkout.sessions.create(paramsWithoutTax);
+      } else {
+        throw stripeErr;
+      }
+    }
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Checkout error:", error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error("Checkout error:", message, stack ?? "");
     if (message.includes("stock") || message.includes("product")) {
       return NextResponse.json({ error: "Product unavailable. Please refresh and try again." }, { status: 400 });
     }
@@ -747,8 +802,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    const isDev = process.env.NODE_ENV === "development";
     return NextResponse.json(
-      { error: "Failed to create checkout session. Please try again." },
+      {
+        error: "Failed to create checkout session. Please try again.",
+        ...(isDev ? { debug: message } : {}),
+      },
       { status: 500 }
     );
   }

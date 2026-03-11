@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import ScrollReveal from "@/components/ScrollReveal";
 import AdminImageEditor from "@/components/admin/AdminImageEditor";
@@ -66,6 +66,7 @@ export default function AdminProductsPage() {
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [cropModalImageSource, setCropModalImageSource] = useState<string | null>(null);
   const [cropModalOnSave, setCropModalOnSave] = useState<((url: string) => void) | null>(null);
+  const router = useRouter();
 
   const openCropModal = useCallback((file: File, onSave: (url: string) => void) => {
     setCropModalImageSource(URL.createObjectURL(file));
@@ -716,6 +717,21 @@ export default function AdminProductsPage() {
                       <div className="flex items-center gap-2 pt-2">
                         <input type="checkbox" id={`free-shipping-${p.id}`} checked={formData.free_shipping ?? false} onChange={(e) => setFormData((prev) => ({ ...prev, free_shipping: e.target.checked }))} className="h-4 w-4 rounded" />
                         <label htmlFor={`free-shipping-${p.id}`} className="text-sm">{isFr ? "Livraison gratuite" : "Free shipping"}</label>
+                      </div>
+                      <div className="sm:col-span-2 pt-2">
+                        <p className="text-xs uppercase tracking-[0.2em] text-foreground/60">{isFr ? "Bouton « Modifier » (configurateur)" : "« Edit now » button (configurator)"}</p>
+                        <p className="mt-1 text-xs text-foreground/50">{isFr ? "Préréglage des options affichées quand le client clique sur « Modifier » sur la page produit." : "Preset options shown when the customer clicks « Edit now » on the product page."}</p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            router.push(
+                              `/${locale}/configurator?adminPreset=${encodeURIComponent(editingId)}&product=${encodeURIComponent(editingId)}&productName=${encodeURIComponent(formData.name ?? p.name ?? "")}`
+                            )
+                          }
+                          className="mt-2 rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] text-foreground hover:bg-foreground/5"
+                        >
+                          {isFr ? "Définir le préréglage configurateur" : "Set configurator preset"}
+                        </button>
                       </div>
                     </div>
                     <div className="flex gap-2">

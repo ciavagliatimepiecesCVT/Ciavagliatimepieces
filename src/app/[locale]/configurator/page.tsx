@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Configurator from "@/components/Configurator";
-import { getPublicConfiguratorData } from "@/app/[locale]/account/admin/actions";
+import { getPublicConfiguratorData, getProductConfiguratorConfig } from "@/app/[locale]/account/admin/actions";
 import { Locale } from "@/lib/i18n";
 
 export async function generateMetadata({
@@ -26,15 +26,38 @@ export default async function ConfiguratorPage({
   searchParams,
 }: {
   params: Promise<{ locale: Locale }>;
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; product?: string; adminPreset?: string; productName?: string }>;
 }) {
   const { locale } = await params;
-  const { edit: editCartItemId } = await searchParams;
-  const initialConfigData = await getPublicConfiguratorData();
+  const { edit: editCartItemId, product: productId, adminPreset, productName } = await searchParams;
+  const [initialConfigData, initialProductConfig] = await Promise.all([
+    getPublicConfiguratorData(),
+    productId ? getProductConfiguratorConfig(productId) : Promise.resolve(null),
+  ]);
+
+  const decodedProductName =
+    typeof productName === "string"
+      ? (() => {
+          try {
+            return decodeURIComponent(productName);
+          } catch {
+            return "";
+          }
+        })()
+      : "";
+  const adminPresetProduct =
+    adminPreset && productId ? { id: productId, name: decodedProductName } : undefined;
 
   return (
     <section className="min-h-screen bg-[var(--logo-green)]">
-      <Configurator locale={locale} editCartItemId={editCartItemId ?? undefined} initialData={initialConfigData} />
+      <Configurator
+        locale={locale}
+        editCartItemId={editCartItemId ?? undefined}
+        productId={productId ?? undefined}
+        initialProductConfig={initialProductConfig ?? undefined}
+        initialData={initialConfigData}
+        adminPresetProduct={adminPresetProduct}
+      />
     </section>
   );
 }

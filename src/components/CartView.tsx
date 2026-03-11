@@ -196,12 +196,21 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
                 >
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-foreground/5">
                     <Image
-                      src={item.image_url ?? "/images/hero-1.svg"}
+                      src={
+                        item.image_url?.includes("supabase")
+                          ? "/images/hero-1.svg"
+                          : (item.image_url ?? "/images/hero-1.svg")
+                      }
                       alt={item.title ?? ""}
                       fill
                       className="object-cover"
                       sizes="80px"
-                      unoptimized={(item.image_url?.startsWith("http") || item.image_url?.startsWith("data:")) ?? false}
+                      unoptimized={
+                        (item.image_url?.startsWith("http") || item.image_url?.startsWith("data:")) &&
+                        !item.image_url?.includes("supabase")
+                          ? true
+                          : false
+                      }
                     />
                   </div>
                   <div className="min-w-0 flex-1">

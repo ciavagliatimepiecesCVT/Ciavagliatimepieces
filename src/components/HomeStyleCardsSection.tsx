@@ -155,7 +155,7 @@ export default function HomeStyleCardsSection({
 
   return (
     <>
-      <div className="mx-auto w-full max-w-6xl px-6 py-20">
+      <div className="mx-auto w-full max-w-6xl px-6 pt-0 pb-20">
         <ScrollReveal>
           <h2 className="text-center text-2xl uppercase tracking-[0.25em] text-foreground/80 md:text-3xl">
             {sectionHeading}
