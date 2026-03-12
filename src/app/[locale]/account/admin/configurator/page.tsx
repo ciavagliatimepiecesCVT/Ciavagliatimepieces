@@ -1,8 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  rectSortingStrategy,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import html2canvas from "html2canvas";
 import AdminImageEditor from "@/components/admin/AdminImageEditor";
 import { WatchPreview } from "@/components/WatchPreview";
@@ -74,6 +90,59 @@ const STEP_KEYS: { key: string; labelEn: string; labelFr: string }[] = [
   { key: "strap", labelEn: "Strap", labelFr: "Bracelet" },
   { key: "extra", labelEn: "Extra", labelFr: "Extra" },
 ];
+
+function DragHandle({ className }: { className?: string }) {
+  return (
+    <span
+      className={`${className ?? ""} inline-flex items-center justify-center rounded-full bg-white text-foreground shadow-sm border border-foreground/20`}
+      aria-hidden
+      style={{ touchAction: "none", cursor: "grab" }}
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" className="opacity-80">
+        <circle cx="4" cy="4" r="1.3" />
+        <circle cx="10" cy="4" r="1.3" />
+        <circle cx="4" cy="10" r="1.3" />
+        <circle cx="10" cy="10" r="1.3" />
+      </svg>
+    </span>
+  );
+}
+
+function SortableWrapper({
+  id,
+  children,
+  handlePosition = "right",
+}: {
+  id: string;
+  children: ReactNode;
+  handlePosition?: "right" | "left" | "inline";
+}) {
+  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
+  const handleClass =
+    handlePosition === "inline"
+      ? "inline-flex cursor-grab active:cursor-grabbing rounded p-0.5 hover:bg-foreground/10 self-center"
+      : handlePosition === "left"
+        ? "absolute left-2 top-2 z-10 flex cursor-grab active:cursor-grabbing rounded p-1 hover:bg-foreground/10"
+        : "absolute right-2 top-2 z-10 flex cursor-grab active:cursor-grabbing rounded p-1 hover:bg-foreground/10";
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`relative ${isDragging ? "opacity-60 z-10" : ""}`}
+    >
+      <span
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        className={handleClass}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <DragHandle />
+      </span>
+      {children}
+    </div>
+  );
+}
 
 export default function AdminConfiguratorPage() {
   const params = useParams<{ locale?: string | string[] }>();
@@ -187,6 +256,7 @@ export default function AdminConfiguratorPage() {
   const [editingCheckboxItemId, setEditingCheckboxItemId] = useState<string | null>(null);
   const [checkboxItemForm, setCheckboxItemForm] = useState({ label_en: "", label_fr: "" });
   const [applyToAllLoading, setApplyToAllLoading] = useState<string | null>(null);
+  const [applyToCurrentLoading, setApplyToCurrentLoading] = useState<string | null>(null);
 
   const openCropModalFromFile = useCallback((file: File, onSave: (url: string) => void) => {
     setCropModalBackgroundUrl(null);
@@ -507,12 +577,13 @@ export default function AdminConfiguratorPage() {
   const currentStepId =
     currentStepKey === "function" ? functionStep?.id : stepIdsForFunction[stepsForFunction.indexOf(currentStepKey) - 1];
 
-  /** Options for current step filtered for effective function (same as customer) */
+  /** Options for current step filtered for effective function (same as customer), sorted by sort_order */
   const optionsForCurrentStep = useMemo(() => {
     if (!currentStepId) return currentStepKey === "function" ? functionOptions : [];
-    return options.filter(
+    const filtered = options.filter(
       (o) => o.step_id === currentStepId && optionAppliesToFunction(o, effectiveFunctionId ?? "")
     );
+    return filtered.slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   }, [options, currentStepId, currentStepKey, effectiveFunctionId, functionOptions]);
 
   /** Load option groups when on a non-function step */
@@ -880,6 +951,19 @@ export default function AdminConfiguratorPage() {
     }
   };
 
+  const handleApplyToCurrentWatch = async (sectionId: string) => {
+    if (!currentStepRow?.id || !effectiveFunctionId) return;
+    setError(null);
+    setApplyToCurrentLoading(sectionId);
+    try {
+      await setSectionEnabledForFunctions(sectionId, [effectiveFunctionId]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : isFr ? "Impossible d’appliquer à cette montre uniquement" : "Failed to apply to this watch only");
+    } finally {
+      setApplyToCurrentLoading(null);
+    }
+  };
+
   const handleAddCheckboxItem = async (sectionId: string) => {
     if (!checkboxItemForm.label_en.trim()) return;
     setError(null);
@@ -1007,6 +1091,137 @@ export default function AdminConfiguratorPage() {
       setError(e instanceof Error ? e.message : "Failed to delete");
     }
   };
+
+  const moveOptionSort = async (optionId: string, dir: "up" | "down") => {
+    const idx = optionsForCurrentStep.findIndex((o) => o.id === optionId);
+    if (idx === -1) return;
+    const targetIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= optionsForCurrentStep.length) return;
+    const current = optionsForCurrentStep[idx] as ConfiguratorOptionRow;
+    const other = optionsForCurrentStep[targetIdx] as ConfiguratorOptionRow;
+    setError(null);
+    try {
+      await Promise.all([
+        updateConfiguratorOption(current.id, { sort_order: other.sort_order }),
+        updateConfiguratorOption(other.id, { sort_order: current.sort_order }),
+      ]);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : isFr ? "Impossible de réordonner les options" : "Failed to reorder options");
+    }
+  };
+
+  const moveOptionSortWithinGroup = async (groupId: string, optionId: string, dir: "left" | "right") => {
+    const inGroup = optionsForCurrentStep
+      .filter((o) => (o as { group_id?: string | null }).group_id === groupId)
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)) as ConfiguratorOptionRow[];
+    if (inGroup.length === 0) return;
+    const idx = inGroup.findIndex((o) => o.id === optionId);
+    if (idx === -1) return;
+    const targetIdx = dir === "left" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= inGroup.length) return;
+    const current = inGroup[idx];
+    const other = inGroup[targetIdx];
+    setError(null);
+    try {
+      await Promise.all([
+        updateConfiguratorOption(current.id, { sort_order: other.sort_order }),
+        updateConfiguratorOption(other.id, { sort_order: current.sort_order }),
+      ]);
+      await load();
+      if (currentStepRow?.id) {
+        const groups = await getOptionGroupsForStep(currentStepRow.id);
+        setOptionGroupsForStep(groups);
+      }
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : isFr
+            ? "Impossible de réordonner les options dans le groupe"
+            : "Failed to reorder options within group"
+      );
+    }
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      setError(null);
+      const activeId = String(active.id);
+      try {
+        if (activeId.startsWith("main-opt-")) {
+          const optionIds = optionsForCurrentStep.map((o) => "main-opt-" + o.id);
+          const oldIndex = optionIds.indexOf(activeId);
+          const newIndex = optionIds.indexOf(String(over.id));
+          if (oldIndex === -1 || newIndex === -1) return;
+          const newOrder = arrayMove(optionIds, oldIndex, newIndex);
+          const optionIdsInOrder = newOrder.map((id) => id.replace("main-opt-", ""));
+          await Promise.all(
+            optionIdsInOrder.map((id, i) => updateConfiguratorOption(id, { sort_order: i }))
+          );
+          await load();
+          return;
+        }
+        if (activeId.startsWith("grp:") && activeId.includes(":opt:")) {
+          const parts = activeId.split(":");
+          const groupId = parts[1];
+          const inGroup = optionsForCurrentStep
+            .filter((o) => (o as { group_id?: string }).group_id === groupId)
+            .slice()
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)) as ConfiguratorOptionRow[];
+          const sortableIds = inGroup.map((o) => `grp:${groupId}:opt:${o.id}`);
+          const overId = String(over.id);
+          if (!overId.startsWith("grp:") || !overId.includes(":opt:") || overId.split(":")[1] !== groupId) return;
+          const oldIndex = sortableIds.indexOf(activeId);
+          const newIndex = sortableIds.indexOf(overId);
+          if (oldIndex === -1 || newIndex === -1) return;
+          const newOrder = arrayMove(sortableIds, oldIndex, newIndex);
+          const optionIdsInOrder = newOrder.map((id) => id.split(":")[3]);
+          const sortOrders = inGroup.map((o) => o.sort_order ?? 0).slice().sort((a, b) => a - b);
+          await Promise.all(
+            optionIdsInOrder.map((id, i) => updateConfiguratorOption(id, { sort_order: sortOrders[i] }))
+          );
+          await load();
+          if (currentStepRow?.id) {
+            const groups = await getOptionGroupsForStep(currentStepRow.id);
+            setOptionGroupsForStep(groups);
+          }
+          return;
+        }
+        if (activeId.startsWith("grp:")) {
+          const groupId = activeId.replace("grp:", "");
+          const groupIds = optionGroupsForStep.map((g) => "grp:" + g.id);
+          const oldIndex = groupIds.indexOf(activeId);
+          const newIndex = groupIds.indexOf(String(over.id));
+          if (oldIndex === -1 || newIndex === -1) return;
+          const newOrder = arrayMove(groupIds, oldIndex, newIndex);
+          const idsInOrder = newOrder.map((id) => id.replace("grp:", ""));
+          await Promise.all(
+            idsInOrder.map((id, i) => updateOptionGroup(id, { sort_order: i }))
+          );
+          if (currentStepRow?.id) {
+            const groups = await getOptionGroupsForStep(currentStepRow.id);
+            setOptionGroupsForStep(groups);
+          }
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : isFr ? "Erreur lors du réordonnement" : "Failed to reorder");
+      }
+    },
+    [
+      optionsForCurrentStep,
+      optionGroupsForStep,
+      currentStepRow?.id,
+      isFr,
+    ]
+  );
 
   const handleSaveAddon = async () => {
     if (!editingAddonId) return;
@@ -1525,6 +1740,14 @@ export default function AdminConfiguratorPage() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => handleApplyToCurrentWatch(sec.id)}
+                        disabled={applyToCurrentLoading === sec.id}
+                        className="rounded border border-[var(--accent)]/60 bg-[var(--accent)]/10 px-2 py-1 text-xs text-white hover:bg-[var(--accent)]/20 disabled:opacity-50"
+                      >
+                        {applyToCurrentLoading === sec.id ? "…" : isFr ? "Appliquer à cette montre uniquement" : "Apply to this watch only"}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleApplyToAllWatches(sec.id)}
                         disabled={applyToAllLoading === sec.id}
                         className="rounded border border-[var(--accent)]/60 bg-[var(--accent)]/20 px-2 py-1 text-xs text-white hover:bg-[var(--accent)]/30 disabled:opacity-50"
@@ -1710,16 +1933,23 @@ export default function AdminConfiguratorPage() {
             </div>
           )}
 
-          {/* Option cards – same layout as customer; Edit / Steps (function only) / Delete on each */}
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {optionsForCurrentStep.map((opt) => {
-              const isEditing = editingOptionId === opt.id;
-              const label = isFr ? (opt.label_fr || opt.label_en) : opt.label_en;
-              const isSelectedForGroup = currentStepKey !== "function" && selectedOptionIdsForGroup.includes(opt.id);
-              return (
-                <div
-                  key={opt.id}
-                  onClick={() => {
+          {/* Option cards – drag to reorder; Edit / Steps (function only) / Delete */}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={optionsForCurrentStep.map((o) => "main-opt-" + o.id)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {optionsForCurrentStep.map((opt, index) => {
+                  const isEditing = editingOptionId === opt.id;
+                  const label = isFr ? (opt.label_fr || opt.label_en) : opt.label_en;
+                  const isSelectedForGroup = currentStepKey !== "function" && selectedOptionIdsForGroup.includes(opt.id);
+                  const isFirst = index === 0;
+                  const isLast = index === optionsForCurrentStep.length - 1;
+                  return (
+                    <SortableWrapper key={opt.id} id={"main-opt-" + opt.id}>
+                      <div
+                        onClick={() => {
                     setPreviewSelections((prev) => ({
                       ...prev,
                       [currentStepKey]: opt.id,
@@ -1785,6 +2015,32 @@ export default function AdminConfiguratorPage() {
                     );
                   })()}
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    <div className="flex flex-col gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void moveOptionSort(opt.id, "up");
+                        }}
+                        disabled={isFirst}
+                        className="flex h-6 w-6 items-center justify-center rounded-full border border-foreground/20 bg-white text-[10px] text-foreground hover:bg-foreground/5 disabled:opacity-40"
+                        aria-label={isFr ? "Monter l’option" : "Move option up"}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void moveOptionSort(opt.id, "down");
+                        }}
+                        disabled={isLast}
+                        className="flex h-6 w-6 items-center justify-center rounded-full border border-foreground/20 bg-white text-[10px] text-foreground hover:bg-foreground/5 disabled:opacity-40"
+                        aria-label={isFr ? "Descendre l’option" : "Move option down"}
+                      >
+                        ↓
+                      </button>
+                    </div>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1837,8 +2093,9 @@ export default function AdminConfiguratorPage() {
                     </button>
                   </div>
                 </div>
-              );
-            })}
+                    </SortableWrapper>
+                  );
+                })}
               {!functionStep && (
                 <p className="mt-4 text-sm text-amber-700">
                   {isFr ? "Créez d’abord l’étape « Function » (step_key = function) dans la base de données." : "Create the Function step (step_key = function) in the database first."}
@@ -1864,17 +2121,28 @@ export default function AdminConfiguratorPage() {
                 <span className="mt-1 text-sm font-medium">{isFr ? "Option" : "Option"}</span>
               </button>
             ) : null}
-          </div>
+              </div>
+            </SortableContext>
 
           {currentStepKey !== "function" && optionGroupsForStep.length > 0 && (
             <div className="mt-8 rounded-xl border border-white/20 bg-white/5 p-4">
               <h3 className="text-lg font-semibold text-white">{isFr ? "Groupes" : "Groups"}</h3>
               <p className="mt-0.5 text-sm text-white/70">{isFr ? "Retirez ou ajoutez des options, modifiez le nom ou l’image du groupe." : "Remove or add options, edit group name or image."}</p>
+              <SortableContext
+                items={optionGroupsForStep.map((g) => "grp:" + g.id)}
+                strategy={verticalListSortingStrategy}
+              >
               <div className="mt-4 space-y-4">
-                {optionGroupsForStep.map((grp) => {
-                  const optionsInGroup = optionsForCurrentStep.filter((o) => (o as { group_id?: string }).group_id === grp.id);
+                {optionGroupsForStep.map((grp, index) => {
+                  const optionsInGroup = optionsForCurrentStep
+                    .filter((o) => (o as { group_id?: string }).group_id === grp.id)
+                    .slice()
+                    .sort((a, b) => ((a as ConfiguratorOptionRow).sort_order ?? 0) - ((b as ConfiguratorOptionRow).sort_order ?? 0));
+                  const isFirstGroup = index === 0;
+                  const isLastGroup = index === optionGroupsForStep.length - 1;
                   return (
-                    <div key={grp.id} className="flex flex-wrap gap-4 rounded-xl border border-foreground/10 bg-white p-4">
+                    <SortableWrapper key={grp.id} id={"grp:" + grp.id} handlePosition="left">
+                    <div className="flex flex-wrap gap-4 rounded-xl border border-foreground/10 bg-white p-4">
                       <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-foreground/15 bg-foreground/5">
                         {grp.image_url ? (
                           <img src={grp.image_url} alt="" className="h-full w-full object-cover" />
@@ -1883,26 +2151,81 @@ export default function AdminConfiguratorPage() {
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground">{isFr ? grp.label_fr : grp.label_en}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-foreground">{isFr ? grp.label_fr : grp.label_en}</p>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (isFirstGroup || !currentStepRow?.id) return;
+                                try {
+                                  const above = optionGroupsForStep[index - 1];
+                                  await Promise.all([
+                                    updateOptionGroup(grp.id, { sort_order: above.sort_order }),
+                                    updateOptionGroup(above.id, { sort_order: grp.sort_order }),
+                                  ]);
+                                  const groups = await getOptionGroupsForStep(currentStepRow.id);
+                                  setOptionGroupsForStep(groups);
+                                } catch (e) {
+                                  setError(e instanceof Error ? e.message : isFr ? "Impossible de réordonner les groupes" : "Failed to reorder groups");
+                                }
+                              }}
+                              disabled={isFirstGroup}
+                              className="flex h-6 w-6 items-center justify-center rounded-full border border-foreground/30 bg-white text-[10px] text-foreground hover:bg-foreground/5 disabled:opacity-40"
+                              aria-label={isFr ? "Monter le groupe" : "Move group up"}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (isLastGroup || !currentStepRow?.id) return;
+                                try {
+                                  const below = optionGroupsForStep[index + 1];
+                                  await Promise.all([
+                                    updateOptionGroup(grp.id, { sort_order: below.sort_order }),
+                                    updateOptionGroup(below.id, { sort_order: grp.sort_order }),
+                                  ]);
+                                  const groups = await getOptionGroupsForStep(currentStepRow.id);
+                                  setOptionGroupsForStep(groups);
+                                } catch (e) {
+                                  setError(e instanceof Error ? e.message : isFr ? "Impossible de réordonner les groupes" : "Failed to reorder groups");
+                                }
+                              }}
+                              disabled={isLastGroup}
+                              className="flex h-6 w-6 items-center justify-center rounded-full border border-foreground/30 bg-white text-[10px] text-foreground hover:bg-foreground/5 disabled:opacity-40"
+                              aria-label={isFr ? "Descendre le groupe" : "Move group down"}
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <SortableContext
+                            items={optionsInGroup.map((o) => `grp:${grp.id}:opt:${o.id}`)}
+                            strategy={rectSortingStrategy}
+                          >
                           {optionsInGroup.map((o) => (
-                            <span key={o.id} className="inline-flex items-center gap-1 rounded-full bg-foreground/10 px-2 py-0.5 text-xs text-foreground">
-                              {isFr ? o.label_fr : o.label_en}
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  await setOptionsGroupId([o.id], null);
-                                  await load();
-                                  setOptionGroupsForStep((prev) => prev);
-                                  getOptionGroupsForStep(currentStepRow!.id).then(setOptionGroupsForStep);
-                                }}
-                                className="rounded-full p-0.5 hover:bg-red-100 hover:text-red-600"
-                                aria-label={isFr ? "Retirer du groupe" : "Remove from group"}
-                              >
-                                ×
-                              </button>
-                            </span>
+                            <SortableWrapper key={o.id} id={`grp:${grp.id}:opt:${o.id}`} handlePosition="inline">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-foreground/10 px-2 py-0.5 text-xs text-foreground">
+                                <span>{isFr ? o.label_fr : o.label_en}</span>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await setOptionsGroupId([o.id], null);
+                                    await load();
+                                    setOptionGroupsForStep((prev) => prev);
+                                    getOptionGroupsForStep(currentStepRow!.id).then(setOptionGroupsForStep);
+                                  }}
+                                  className="rounded-full p-0.5 hover:bg-red-100 hover:text-red-600"
+                                  aria-label={isFr ? "Retirer du groupe" : "Remove from group"}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            </SortableWrapper>
                           ))}
+                          </SortableContext>
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <button
@@ -1940,11 +2263,15 @@ export default function AdminConfiguratorPage() {
                         </div>
                       </div>
                     </div>
+                    </SortableWrapper>
                   );
                 })}
               </div>
+              </SortableContext>
             </div>
           )}
+
+          </DndContext>
 
           {addToGroupId && currentStepRow && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

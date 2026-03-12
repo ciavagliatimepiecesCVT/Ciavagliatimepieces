@@ -304,8 +304,9 @@ export default function Configurator({ locale, editCartItemId, productId, initia
 
   const toggleCustomCheckbox = useCallback((sectionId: string, itemId: string) => {
     setCustomCheckboxSelections((prev) => {
-      const arr = prev[sectionId] ?? [];
-      const next = arr.includes(itemId) ? arr.filter((id) => id !== itemId) : [...arr, itemId];
+      const current = prev[sectionId] ?? [];
+      const isSelected = current[0] === itemId;
+      const next = isSelected ? [] : [itemId];
       if (next.length === 0) {
         const rest = { ...prev };
         delete rest[sectionId];

@@ -2217,7 +2217,7 @@ export async function createOptionGroup(input: {
 
 export async function updateOptionGroup(
   id: string,
-  input: { label_en?: string; label_fr?: string; image_url?: string | null }
+  input: { label_en?: string; label_fr?: string; image_url?: string | null; sort_order?: number }
 ) {
   await requireAdmin();
   if (!id) throw new Error("Invalid id");
@@ -2226,6 +2226,7 @@ export async function updateOptionGroup(
   if (input.label_en !== undefined) updates.label_en = input.label_en.trim();
   if (input.label_fr !== undefined) updates.label_fr = input.label_fr?.trim() ?? (input.label_en ?? "").trim();
   if (input.image_url !== undefined) updates.image_url = input.image_url?.trim() || null;
+  if (input.sort_order !== undefined) updates.sort_order = input.sort_order;
   if (Object.keys(updates).length === 0) return;
   const { error } = await supabase.from("configurator_option_groups").update(updates).eq("id", id);
   if (error) throw error;
