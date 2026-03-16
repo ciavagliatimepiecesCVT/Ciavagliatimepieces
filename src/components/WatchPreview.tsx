@@ -249,9 +249,7 @@ export function WatchPreview({
               style={{ position: "absolute" }}
               zIndex={0}
               removeSolidBackground={
-                layer.stepKey === "case" || layer.stepKey === "bezel"
-                  ? "off"
-                  : "auto"
+                layer.stepKey === "bezel" ? "off" : "auto"
               }
               sharpen={layer.stepKey === "hands"}
             />
