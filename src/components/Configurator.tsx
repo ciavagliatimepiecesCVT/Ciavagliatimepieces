@@ -833,6 +833,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
               locale={locale}
               layerOffsets={publicLayerOffsets}
               layerScales={publicLayerScales}
+              hideFunctionLayerWhenCaseSelected
             />
           </div>
           {selectedId && (() => {

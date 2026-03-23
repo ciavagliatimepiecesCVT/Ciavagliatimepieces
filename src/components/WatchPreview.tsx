@@ -46,6 +46,8 @@ type WatchPreviewProps = {
   onLayerScaleChange?: (key: string, scale: number) => void;
   /** When set (e.g. in admin), only the layer for this step key is draggable; others get pointer-events: none so the correct layer receives drag. */
   editableStepKey?: string | null;
+  /** In the client configurator, hide the full-watch base "function" layer once a case has been chosen. */
+  hideFunctionLayerWhenCaseSelected?: boolean;
 };
 
 export function WatchPreview({
@@ -63,6 +65,7 @@ export function WatchPreview({
   layerScales,
   onLayerScaleChange,
   editableStepKey,
+  hideFunctionLayerWhenCaseSelected,
 }: WatchPreviewProps) {
   const isFr = locale === "fr";
 
@@ -82,6 +85,17 @@ export function WatchPreview({
     stepsForFunction.forEach((stepKey, idx) => {
       const selectedId = selections[stepKey];
       if (!selectedId) return;
+
+      // In the client-facing configurator we want the composed layers (case, bezel, dial, etc.)
+      // to fully replace the generic full-watch "function" base once a case has been chosen.
+      if (
+        hideFunctionLayerWhenCaseSelected &&
+        stepKey === "function" &&
+        typeof selections.case === "string" &&
+        selections.case
+      ) {
+        return;
+      }
 
       const stepId = stepKey === "function" ? functionStepId : stepIdsForFunction[idx - 1];
       if (!stepId) return;
@@ -234,7 +248,9 @@ export function WatchPreview({
               sizes="(max-width: 1024px) 100vw, 50vw"
               style={{ position: "absolute" }}
               zIndex={0}
-              removeSolidBackground="auto"
+              removeSolidBackground={
+                layer.stepKey === "bezel" ? "off" : "auto"
+              }
               sharpen={layer.stepKey === "hands"}
             />
           </div>
