@@ -35,10 +35,10 @@ export default async function ConfiguratorPage({
   searchParams,
 }: {
   params: Promise<{ locale: Locale }>;
-  searchParams: Promise<{ edit?: string; product?: string; adminPreset?: string; productName?: string }>;
+  searchParams: Promise<{ edit?: string; product?: string; adminPreset?: string; productName?: string; saved?: string }>;
 }) {
   const { locale } = await params;
-  const { edit: editCartItemId, product: productId, adminPreset, productName } = await searchParams;
+  const { edit: editCartItemId, product: productId, adminPreset, productName, saved: savedConfigurationId } = await searchParams;
   const [initialConfigData, initialProductConfig] = await Promise.all([
     getPublicConfiguratorData(),
     productId ? getProductConfiguratorConfig(productId) : Promise.resolve(null),
@@ -63,6 +63,7 @@ export default async function ConfiguratorPage({
         locale={locale}
         editCartItemId={editCartItemId ?? undefined}
         productId={productId ?? undefined}
+        savedConfigurationId={savedConfigurationId ?? undefined}
         initialProductConfig={initialProductConfig ?? undefined}
         initialData={initialConfigData}
         adminPresetProduct={adminPresetProduct}

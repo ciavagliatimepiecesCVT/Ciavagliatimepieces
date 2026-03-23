@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 export default function SignUpPage() {
   const params = useParams<{ locale?: string | string[] }>();
+  const searchParams = useSearchParams();
   const locale = Array.isArray(params.locale) ? params.locale[0] : params.locale ?? "en";
   const router = useRouter();
+  const redirectTo = searchParams.get("redirect");
   const isFr = locale === "fr";
   const [form, setForm] = useState({
     fullName: "",
@@ -71,6 +73,10 @@ export default function SignUpPage() {
 
       // Session is set by signUp when email confirmation is disabled; refresh so the app sees it
       router.refresh();
+      if (redirectTo && redirectTo.startsWith("/")) {
+        router.push(redirectTo);
+        return;
+      }
       router.push(`/${locale}/account/manage`);
     } finally {
       setLoading(false);
@@ -202,7 +208,10 @@ export default function SignUpPage() {
             </form>
             <p className="mt-6 text-sm text-foreground/70">
               {isFr ? "Deja un compte ?" : "Already have an account?"}{" "}
-              <Link href={`/${locale}/account/login`} className="text-foreground underline">
+              <Link
+                href={redirectTo ? `/${locale}/account/login?redirect=${encodeURIComponent(redirectTo)}` : `/${locale}/account/login`}
+                className="text-foreground underline"
+              >
                 {isFr ? "Connexion" : "Sign in"}
               </Link>
               .

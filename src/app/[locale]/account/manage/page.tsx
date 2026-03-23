@@ -25,6 +25,17 @@ type Order = {
   tracking_url: string | null;
 };
 
+type SavedWatchConfiguration = {
+  id: string;
+  name: string;
+  image_url: string | null;
+  total_price: number | null;
+  created_at: string;
+  configuration: {
+    summaryLines?: { label: string; price: number }[];
+  } | null;
+};
+
 function emptyProfile(): Profile {
   return {
     full_name: null,
@@ -48,6 +59,8 @@ export default function ManageAccountPage() {
   const [editForm, setEditForm] = useState<Profile>(emptyProfile());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedConfigurations, setSavedConfigurations] = useState<SavedWatchConfiguration[]>([]);
+  const [savedConfigurationsLoading, setSavedConfigurationsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -104,6 +117,13 @@ export default function ManageAccountPage() {
       );
       setOrders(orderData ?? []);
       setLoading(false);
+      const { data: savedBuilds } = await supabase
+        .from("saved_watch_configurations")
+        .select("id, name, image_url, total_price, created_at, configuration")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      setSavedConfigurations((savedBuilds ?? []) as SavedWatchConfiguration[]);
+      setSavedConfigurationsLoading(false);
     };
 
     load();
@@ -152,6 +172,18 @@ export default function ManageAccountPage() {
     setProfile({ ...editForm });
     setEditing(false);
     setSaving(false);
+  };
+
+  const handleDeleteSavedConfiguration = async (savedConfigId: string) => {
+    if (!userId) return;
+    const supabase = createBrowserClient();
+    const { error } = await supabase
+      .from("saved_watch_configurations")
+      .delete()
+      .eq("id", savedConfigId)
+      .eq("user_id", userId);
+    if (error) return;
+    setSavedConfigurations((prev) => prev.filter((item) => item.id !== savedConfigId));
   };
 
   return (
@@ -311,6 +343,57 @@ export default function ManageAccountPage() {
                       ? "Vos configurations apparaissent ici après création."
                       : "Your configurations appear here after you build them in the configurator."}
                   </p>
+                  <div className="mt-4 space-y-3">
+                    {savedConfigurationsLoading ? (
+                      <p className="text-foreground/70">{isFr ? "Chargement..." : "Loading saved configurations..."}</p>
+                    ) : savedConfigurations.length === 0 ? (
+                      <p className="text-foreground/70">
+                        {isFr ? "Aucune configuration enregistrée pour le moment." : "No saved builds yet."}
+                      </p>
+                    ) : (
+                      savedConfigurations.map((savedConfig) => (
+                        <div key={savedConfig.id} className="rounded-[20px] border border-foreground/10 bg-white px-4 py-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">{savedConfig.name}</p>
+                              <p className="mt-1 text-xs uppercase tracking-[0.2em] text-foreground/50">
+                                {new Date(savedConfig.created_at).toLocaleDateString(locale === "fr" ? "fr-CA" : "en-CA")}
+                              </p>
+                            </div>
+                            {savedConfig.total_price != null && (
+                              <p className="text-sm font-semibold text-foreground">
+                                {new Intl.NumberFormat(locale === "fr" ? "fr-CA" : "en-CA", {
+                                  style: "currency",
+                                  currency: "CAD",
+                                  maximumFractionDigits: 0,
+                                }).format(Number(savedConfig.total_price))}
+                              </p>
+                            )}
+                          </div>
+                          {savedConfig.configuration?.summaryLines?.length ? (
+                            <p className="mt-2 text-sm text-foreground/70">
+                              {savedConfig.configuration.summaryLines.slice(0, 2).map((line) => line.label).join(" • ")}
+                            </p>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <a
+                              href={`/${locale}/configurator?saved=${savedConfig.id}`}
+                              className="rounded-full border border-foreground/20 px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-foreground/80 transition hover:border-foreground hover:text-foreground"
+                            >
+                              {isFr ? "Modifier" : "Edit build"}
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSavedConfiguration(savedConfig.id)}
+                              className="rounded-full border border-red-200 px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-red-700 transition hover:bg-red-50"
+                            >
+                              {isFr ? "Supprimer" : "Delete"}
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </ScrollReveal>
             </div>

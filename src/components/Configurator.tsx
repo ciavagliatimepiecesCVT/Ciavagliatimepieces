@@ -39,13 +39,23 @@ type ConfiguratorProps = {
   locale: string;
   editCartItemId?: string;
   productId?: string;
+  savedConfigurationId?: string;
   initialProductConfig?: ProductConfigShape | null;
   initialData?: Awaited<ReturnType<typeof getPublicConfiguratorData>> | null;
   /** When set, show admin bar to save current build as preset for this product. */
   adminPresetProduct?: { id: string; name: string };
 };
 
-export default function Configurator({ locale, editCartItemId, productId, initialProductConfig, initialData, adminPresetProduct }: ConfiguratorProps) {
+type SavedConfigurationPayload = {
+  steps: string[];
+  extras?: string[];
+  addonIds?: string[];
+  dropdownSelections?: Record<string, string>;
+  customCheckboxSelections?: Record<string, string[]>;
+  summaryLines?: { label: string; price: number }[];
+};
+
+export default function Configurator({ locale, editCartItemId, productId, savedConfigurationId, initialProductConfig, initialData, adminPresetProduct }: ConfiguratorProps) {
   const isFr = locale === "fr";
   const router = useRouter();
   const { currency, formatPrice } = useCurrency();
@@ -53,6 +63,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
   const [dataLoading, setDataLoading] = useState(!initialData);
   const [editLoadDone, setEditLoadDone] = useState(false);
   const [productPresetLoadDone, setProductPresetLoadDone] = useState(false);
+  const [savedConfigurationLoadDone, setSavedConfigurationLoadDone] = useState(false);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [selections, setSelections] = useState<Partial<Record<string, string>>>({});
@@ -67,6 +78,9 @@ export default function Configurator({ locale, editCartItemId, productId, initia
   const [loading, setLoading] = useState(false);
   const [addToCartLoading, setAddToCartLoading] = useState(false);
   const [addToCartError, setAddToCartError] = useState<string | null>(null);
+  const [saveBuildLoading, setSaveBuildLoading] = useState(false);
+  const [saveBuildError, setSaveBuildError] = useState<string | null>(null);
+  const [saveBuildMessage, setSaveBuildMessage] = useState<string | null>(null);
   const [adminPresetSaving, setAdminPresetSaving] = useState(false);
   const [adminPresetError, setAdminPresetError] = useState<string | null>(null);
   /** For non-function steps: which group card is expanded (groupId or null). */
@@ -108,6 +122,10 @@ export default function Configurator({ locale, editCartItemId, productId, initia
   useEffect(() => {
     if (productId || initialProductConfig) setProductPresetLoadDone(false);
   }, [productId, initialProductConfig]);
+
+  useEffect(() => {
+    if (savedConfigurationId) setSavedConfigurationLoadDone(false);
+  }, [savedConfigurationId]);
 
   useEffect(() => {
     if (!editCartItemId || !configData || editLoadDone) return;
@@ -165,6 +183,65 @@ export default function Configurator({ locale, editCartItemId, productId, initia
       cancelled = true;
     };
   }, [editCartItemId, configData, editLoadDone]);
+
+  useEffect(() => {
+    if (editCartItemId || !savedConfigurationId || !configData || savedConfigurationLoadDone) return;
+    const supabase = createBrowserClient();
+    const stepsMeta = configData.stepsMeta ?? [];
+    const functionStepsMap = configData.functionStepsMap ?? {};
+    const stepIdToMeta = new Map(stepsMeta.map((s) => [s.id, s]));
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) {
+        if (!user) setSavedConfigurationLoadDone(true);
+        return;
+      }
+      const { data: row, error } = await supabase
+        .from("saved_watch_configurations")
+        .select("configuration")
+        .eq("id", savedConfigurationId)
+        .eq("user_id", user.id)
+        .single();
+      if (cancelled || error || !row) {
+        setSavedConfigurationLoadDone(true);
+        return;
+      }
+      const config = (row.configuration ?? {}) as ConfigShape;
+      const steps = Array.isArray(config.steps) ? config.steps : [];
+      const funcId = steps[0] && typeof steps[0] === "string" ? steps[0] : "";
+      const stepIds = functionStepsMap[funcId] ?? [];
+      const stepKeys = stepIds
+        .map((sid) => stepIdToMeta.get(sid)?.step_key)
+        .filter((k): k is string => !!k);
+      const stepsForSavedConfig = ["function", ...stepKeys];
+      const nextSelections: Partial<Record<string, string>> = { function: funcId };
+      stepsForSavedConfig.forEach((key, i) => {
+        const val = steps[i] && typeof steps[i] === "string" ? steps[i] : "";
+        if (val && key !== "function") nextSelections[key] = val;
+      });
+      const addonIds = Array.isArray(config.addonIds) ? config.addonIds : [];
+      const nextAddons: Record<string, boolean> = {};
+      addonIds.forEach((id) => {
+        if (typeof id === "string") nextAddons[id] = true;
+      });
+      const nextDropdowns = (config.dropdownSelections && typeof config.dropdownSelections === "object")
+        ? config.dropdownSelections as Record<string, string>
+        : {};
+      const nextCheckbox = (config.customCheckboxSelections && typeof config.customCheckboxSelections === "object" && !Array.isArray(config.customCheckboxSelections))
+        ? (config.customCheckboxSelections as Record<string, string[]>)
+        : {};
+      setSelections(nextSelections);
+      setAddonChecked(nextAddons);
+      setDropdownSelections(nextDropdowns);
+      setCustomCheckboxSelections(nextCheckbox);
+      setStepIndex(Math.max(0, stepsForSavedConfig.length - 1));
+      setSavedConfigurationLoadDone(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editCartItemId, savedConfigurationId, configData, savedConfigurationLoadDone]);
 
   useEffect(() => {
     if (editCartItemId || !configData || !initialProductConfig?.steps?.length || productPresetLoadDone) return;
@@ -648,6 +725,56 @@ export default function Configurator({ locale, editCartItemId, productId, initia
     }
   };
 
+  const handleSaveBuildToAccount = async () => {
+    if (!canAddToCart) return;
+    setSaveBuildError(null);
+    setSaveBuildMessage(null);
+    setSaveBuildLoading(true);
+    try {
+      const supabase = createBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push(`/${locale}/account/sign-up?redirect=${encodeURIComponent(`/${locale}/configurator`)}`);
+        return;
+      }
+
+      const previewImageUrl = await capturePreviewDataUrl();
+      const imageUrl = previewImageUrl ?? fallbackThumbnailUrl ?? "/images/configurator.svg";
+      const savedConfiguration: SavedConfigurationPayload = {
+        steps: stepsPayload,
+        extras: stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [],
+        addonIds: addonIdsPayload,
+        dropdownSelections: Object.keys(dropdownSelections).length ? dropdownSelections : undefined,
+        customCheckboxSelections: Object.keys(customCheckboxSelections).length ? customCheckboxSelections : undefined,
+        summaryLines: totalLineItems.length ? totalLineItems : undefined,
+      };
+
+      const defaultName =
+        (isFr ? "Montre personnalisée" : "Custom watch") +
+        ` • ${new Date().toLocaleDateString(locale === "fr" ? "fr-CA" : "en-CA")}`;
+
+      const { error } = await supabase.from("saved_watch_configurations").insert({
+        user_id: user.id,
+        name: defaultName,
+        configuration: savedConfiguration,
+        image_url: imageUrl,
+        total_price: total,
+      });
+
+      if (error) {
+        setSaveBuildError(error.message);
+        return;
+      }
+
+      setSaveBuildMessage(isFr ? "Configuration enregistrée dans votre compte." : "Build saved to your account.");
+      window.dispatchEvent(new CustomEvent("saved-configurations-updated"));
+    } catch {
+      setSaveBuildError(isFr ? "Impossible d'enregistrer la configuration." : "Failed to save this build.");
+    } finally {
+      setSaveBuildLoading(false);
+    }
+  };
+
   const totalLineItems = useMemo(() => {
     const lines: { label: string; price: number }[] = [];
     stepsForFunction.forEach((stepKey) => {
@@ -812,7 +939,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
         <div className="group flex flex-1 flex-col items-center gap-2">
           <div
             ref={previewContainerRef}
-            className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)] cursor-zoom-in transition-transform duration-300 ease-out group-hover:scale-[1.15] group-hover:shadow-[0_40px_120px_rgba(0,0,0,0.55)]"
+            className="relative z-0 isolate flex shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)] cursor-zoom-in transition-transform duration-300 ease-out group-hover:scale-[1.15] group-hover:shadow-[0_40px_120px_rgba(0,0,0,0.55)]"
             style={{
               width: CONFIGURATOR_PREVIEW_SIZE_PX,
               height: CONFIGURATOR_PREVIEW_SIZE_PX,
@@ -1210,9 +1337,15 @@ export default function Configurator({ locale, editCartItemId, productId, initia
             </div>
           )}
 
-          {(checkoutError || addToCartError) && (
-            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {checkoutError ?? addToCartError}
+          {(checkoutError || addToCartError || saveBuildError || saveBuildMessage) && (
+            <div
+              className={`mt-6 rounded-xl px-4 py-3 text-sm ${
+                saveBuildMessage && !checkoutError && !addToCartError && !saveBuildError
+                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border border-red-200 bg-red-50 text-red-700"
+              }`}
+            >
+              {checkoutError ?? addToCartError ?? saveBuildError ?? saveBuildMessage}
             </div>
           )}
 
@@ -1233,6 +1366,14 @@ export default function Configurator({ locale, editCartItemId, productId, initia
                 className="rounded-lg border-2 border-[var(--accent)] bg-[var(--accent)]/10 px-5 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {addToCartLoading ? "…" : isEditMode ? (isFr ? "Mettre à jour le build" : "Update build in cart") : (isFr ? "Ajouter au panier" : "Add to cart")}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveBuildToAccount}
+                disabled={!canAddToCart || saveBuildLoading}
+                className="rounded-lg border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saveBuildLoading ? "…" : isFr ? "Enregistrer dans mon compte" : "Save to my account"}
               </button>
               <button
                 type="button"
@@ -1342,28 +1483,35 @@ export default function Configurator({ locale, editCartItemId, productId, initia
 
             <div className="flex flex-col items-center gap-5">
               <div
-                className="relative flex items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)]"
-                style={{
-                  width: Math.min(520, CONFIGURATOR_PREVIEW_SIZE_PX + 200),
-                  height: Math.min(520, CONFIGURATOR_PREVIEW_SIZE_PX + 200),
-                }}
+                className="relative z-0 isolate flex items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)]"
+                style={{ width: 520, height: 520 }}
               >
-                <WatchPreview
-                  selections={selections}
-                  options={options}
-                  stepsForFunction={stepsForFunction}
-                  functionId={functionId}
-                  stepIdsForFunction={stepIdsForFunction}
-                  functionStepId={functionStep?.id}
-                  isExtraStepForGmtOrSub={
-                    stepsForFunction.includes("extra") &&
-                    (functionId === "gmt" || functionId === "submariner")
-                  }
-                  extraStepImage="/images/configuratorextra.png"
-                  locale={locale}
-                  layerOffsets={publicLayerOffsets}
-                  layerScales={publicLayerScales}
-                />
+                <div
+                  className="relative"
+                  style={{
+                    width: CONFIGURATOR_PREVIEW_SIZE_PX,
+                    height: CONFIGURATOR_PREVIEW_SIZE_PX,
+                    transform: `scale(${520 / CONFIGURATOR_PREVIEW_SIZE_PX})`,
+                    transformOrigin: "center center",
+                  }}
+                >
+                  <WatchPreview
+                    selections={selections}
+                    options={options}
+                    stepsForFunction={stepsForFunction}
+                    functionId={functionId}
+                    stepIdsForFunction={stepIdsForFunction}
+                    functionStepId={functionStep?.id}
+                    isExtraStepForGmtOrSub={
+                      stepsForFunction.includes("extra") &&
+                      (functionId === "gmt" || functionId === "submariner")
+                    }
+                    extraStepImage="/images/configuratorextra.png"
+                    locale={locale}
+                    layerOffsets={publicLayerOffsets}
+                    layerScales={publicLayerScales}
+                  />
+                </div>
               </div>
 
               <div className="flex w-full flex-wrap items-center justify-between gap-4 rounded-xl border border-white/20 bg-white/10 px-4 py-3">
