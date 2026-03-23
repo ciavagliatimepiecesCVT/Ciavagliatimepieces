@@ -2,7 +2,15 @@
 
 import { ReactNode, useEffect, useRef } from "react";
 
-export default function ScrollReveal({ children, className = "" }: { children: ReactNode; className?: string }) {
+export default function ScrollReveal({
+  children,
+  className = "",
+  disableOnMobile = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  disableOnMobile?: boolean;
+}) {
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -10,6 +18,11 @@ export default function ScrollReveal({ children, className = "" }: { children: R
     if (!node) return;
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      node.classList.add("is-visible");
+      return;
+    }
+
+    if (disableOnMobile && window.matchMedia("(max-width: 767px)").matches) {
       node.classList.add("is-visible");
       return;
     }

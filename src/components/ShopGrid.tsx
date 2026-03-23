@@ -110,7 +110,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
   return (
     <div className="grid gap-8 md:grid-cols-3">
       {watches.map((watch) => (
-        <ScrollReveal key={watch.id}>
+        <ScrollReveal key={watch.id} disableOnMobile>
           <div className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
             <Link
               href={`/${activeLocale}/shop/product/${watch.id}`}

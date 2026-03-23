@@ -104,7 +104,7 @@ export default async function ShopPage({
             </div>
           </div>
         </ScrollReveal>
-        <ScrollReveal>
+        <ScrollReveal disableOnMobile>
           <ShopGrid watches={watches} locale={locale} />
         </ScrollReveal>
       </div>
