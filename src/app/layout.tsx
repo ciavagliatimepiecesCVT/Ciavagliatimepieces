@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Playfair_Display } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION_EN, fullUrl } from "@/lib/seo";
 
@@ -84,6 +85,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${displayFont.variable} ${bodyFont.variable} antialiased`}>
         {children}
+        <Script
+          src="https://www.spaxioassistant.com/embed/ai-search.js"
+          data-widget-id="2f329396-be12-42f1-968b-b8c8dd04ce68"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
