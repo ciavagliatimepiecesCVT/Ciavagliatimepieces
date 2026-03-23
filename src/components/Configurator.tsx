@@ -62,6 +62,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
   const [customCheckboxSelections, setCustomCheckboxSelections] = useState<Record<string, string[]>>({});
   const [addonChecked, setAddonChecked] = useState<Record<string, boolean>>({});
   const [totalExpanded, setTotalExpanded] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [addToCartLoading, setAddToCartLoading] = useState(false);
@@ -406,7 +407,7 @@ export default function Configurator({ locale, editCartItemId, productId, initia
 
   const handleContinue = () => {
     if (stepIndex < stepsForFunction.length - 1) setStepIndex((s) => s + 1);
-    else handleReviewOrder();
+    else setReviewModalOpen(true);
   };
 
   const stepsPayload = useMemo(() => {
@@ -1321,6 +1322,83 @@ export default function Configurator({ locale, editCartItemId, productId, initia
           </div>
         )}
       </div>
+
+      {reviewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
+          <div className="w-full max-w-4xl rounded-2xl border border-white/20 bg-[var(--logo-green)] p-5 text-white shadow-[0_40px_120px_rgba(0,0,0,0.6)] sm:p-7">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <h3 className="text-xl font-semibold">
+                {isFr ? "Vérifier la commande" : "Review order"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setReviewModalOpen(false)}
+                className="rounded-lg border border-white/30 px-3 py-1.5 text-sm font-medium text-white/90 transition hover:bg-white/10"
+              >
+                {isFr ? "Fermer" : "Close"}
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center gap-5">
+              <div
+                className="relative flex items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)]"
+                style={{
+                  width: Math.min(520, CONFIGURATOR_PREVIEW_SIZE_PX + 200),
+                  height: Math.min(520, CONFIGURATOR_PREVIEW_SIZE_PX + 200),
+                }}
+              >
+                <WatchPreview
+                  selections={selections}
+                  options={options}
+                  stepsForFunction={stepsForFunction}
+                  functionId={functionId}
+                  stepIdsForFunction={stepIdsForFunction}
+                  functionStepId={functionStep?.id}
+                  isExtraStepForGmtOrSub={
+                    stepsForFunction.includes("extra") &&
+                    (functionId === "gmt" || functionId === "submariner")
+                  }
+                  extraStepImage="/images/configuratorextra.png"
+                  locale={locale}
+                  layerOffsets={publicLayerOffsets}
+                  layerScales={publicLayerScales}
+                />
+              </div>
+
+              <div className="flex w-full flex-wrap items-center justify-between gap-4 rounded-xl border border-white/20 bg-white/10 px-4 py-3">
+                <p className="text-sm text-white/85">
+                  {isFr ? "Total de votre configuration" : "Total for your build"}
+                </p>
+                <p className="text-lg font-semibold text-white">{formatPrice(displayTotal)}</p>
+              </div>
+
+              {checkoutError && (
+                <div className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {checkoutError}
+                </div>
+              )}
+
+              <div className="flex w-full flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReviewModalOpen(false)}
+                  className="rounded-lg border border-white/30 px-5 py-2.5 text-sm font-medium text-white/90 transition hover:bg-white/10"
+                >
+                  {isFr ? "Retour à la configuration" : "Back to configurator"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReviewOrder}
+                  disabled={loading}
+                  className="rounded-lg bg-foreground px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? "…" : isFr ? "Continuer au paiement →" : "Continue to payment →"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
