@@ -46,15 +46,6 @@ type ConfiguratorProps = {
   adminPresetProduct?: { id: string; name: string };
 };
 
-type SavedConfigurationPayload = {
-  steps: string[];
-  extras?: string[];
-  addonIds?: string[];
-  dropdownSelections?: Record<string, string>;
-  customCheckboxSelections?: Record<string, string[]>;
-  summaryLines?: { label: string; price: number }[];
-};
-
 export default function Configurator({ locale, editCartItemId, productId, savedConfigurationId, initialProductConfig, initialData, adminPresetProduct }: ConfiguratorProps) {
   const isFr = locale === "fr";
   const router = useRouter();
@@ -78,9 +69,6 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
   const [loading, setLoading] = useState(false);
   const [addToCartLoading, setAddToCartLoading] = useState(false);
   const [addToCartError, setAddToCartError] = useState<string | null>(null);
-  const [saveBuildLoading, setSaveBuildLoading] = useState(false);
-  const [saveBuildError, setSaveBuildError] = useState<string | null>(null);
-  const [saveBuildMessage, setSaveBuildMessage] = useState<string | null>(null);
   const [adminPresetSaving, setAdminPresetSaving] = useState(false);
   const [adminPresetError, setAdminPresetError] = useState<string | null>(null);
   /** For non-function steps: which group card is expanded (groupId or null). */
@@ -725,56 +713,6 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
     }
   };
 
-  const handleSaveBuildToAccount = async () => {
-    if (!canAddToCart) return;
-    setSaveBuildError(null);
-    setSaveBuildMessage(null);
-    setSaveBuildLoading(true);
-    try {
-      const supabase = createBrowserClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push(`/${locale}/account/sign-up?redirect=${encodeURIComponent(`/${locale}/configurator`)}`);
-        return;
-      }
-
-      const previewImageUrl = await capturePreviewDataUrl();
-      const imageUrl = previewImageUrl ?? fallbackThumbnailUrl ?? "/images/configurator.svg";
-      const savedConfiguration: SavedConfigurationPayload = {
-        steps: stepsPayload,
-        extras: stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [],
-        addonIds: addonIdsPayload,
-        dropdownSelections: Object.keys(dropdownSelections).length ? dropdownSelections : undefined,
-        customCheckboxSelections: Object.keys(customCheckboxSelections).length ? customCheckboxSelections : undefined,
-        summaryLines: totalLineItems.length ? totalLineItems : undefined,
-      };
-
-      const defaultName =
-        (isFr ? "Montre personnalisée" : "Custom watch") +
-        ` • ${new Date().toLocaleDateString(locale === "fr" ? "fr-CA" : "en-CA")}`;
-
-      const { error } = await supabase.from("saved_watch_configurations").insert({
-        user_id: user.id,
-        name: defaultName,
-        configuration: savedConfiguration,
-        image_url: imageUrl,
-        total_price: total,
-      });
-
-      if (error) {
-        setSaveBuildError(error.message);
-        return;
-      }
-
-      setSaveBuildMessage(isFr ? "Configuration enregistrée dans votre compte." : "Build saved to your account.");
-      window.dispatchEvent(new CustomEvent("saved-configurations-updated"));
-    } catch {
-      setSaveBuildError(isFr ? "Impossible d'enregistrer la configuration." : "Failed to save this build.");
-    } finally {
-      setSaveBuildLoading(false);
-    }
-  };
-
   const totalLineItems = useMemo(() => {
     const lines: { label: string; price: number }[] = [];
     stepsForFunction.forEach((stepKey) => {
@@ -1337,15 +1275,11 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
             </div>
           )}
 
-          {(checkoutError || addToCartError || saveBuildError || saveBuildMessage) && (
+          {(checkoutError || addToCartError) && (
             <div
-              className={`mt-6 rounded-xl px-4 py-3 text-sm ${
-                saveBuildMessage && !checkoutError && !addToCartError && !saveBuildError
-                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border border-red-200 bg-red-50 text-red-700"
-              }`}
+              className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
             >
-              {checkoutError ?? addToCartError ?? saveBuildError ?? saveBuildMessage}
+              {checkoutError ?? addToCartError}
             </div>
           )}
 
@@ -1366,14 +1300,6 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
                 className="rounded-lg border-2 border-[var(--accent)] bg-[var(--accent)]/10 px-5 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {addToCartLoading ? "…" : isEditMode ? (isFr ? "Mettre à jour le build" : "Update build in cart") : (isFr ? "Ajouter au panier" : "Add to cart")}
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveBuildToAccount}
-                disabled={!canAddToCart || saveBuildLoading}
-                className="rounded-lg border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saveBuildLoading ? "…" : isFr ? "Enregistrer dans mon compte" : "Save to my account"}
               </button>
               <button
                 type="button"
@@ -1521,9 +1447,9 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
                 <p className="text-lg font-semibold text-white">{formatPrice(displayTotal)}</p>
               </div>
 
-              {checkoutError && (
+              {(checkoutError || addToCartError) && (
                 <div className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {checkoutError}
+                  {checkoutError ?? addToCartError}
                 </div>
               )}
 
@@ -1534,6 +1460,14 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
                   className="rounded-lg border border-white/30 px-5 py-2.5 text-sm font-medium text-white/90 transition hover:bg-white/10"
                 >
                   {isFr ? "Retour à la configuration" : "Back to configurator"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  disabled={!canAddToCart || addToCartLoading}
+                  className="rounded-lg border-2 border-[var(--accent)] bg-[var(--accent)]/10 px-5 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {addToCartLoading ? "…" : isEditMode ? (isFr ? "Mettre à jour le build" : "Update build in cart") : (isFr ? "Ajouter au panier" : "Add to cart")}
                 </button>
                 <button
                   type="button"

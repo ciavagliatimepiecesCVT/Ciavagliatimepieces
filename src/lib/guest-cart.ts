@@ -4,6 +4,7 @@
  */
 
 const GUEST_CART_KEY = "ciavaglia_guest_cart";
+const GUEST_CART_TTL_MS = 2 * 60 * 60 * 1000;
 
 export type GuestCartItem = {
   id: string;
@@ -18,35 +19,84 @@ export type GuestCartItem = {
 function safeParse<T>(json: string, fallback: T): T {
   try {
     const v = JSON.parse(json);
-    return Array.isArray(v) ? (v as T) : fallback;
+    return v as T;
   } catch {
     return fallback;
   }
 }
 
+type GuestCartStorage = {
+  items: GuestCartItem[];
+  updatedAt: number;
+};
+
+function normalizeGuestCartItems(value: unknown): GuestCartItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (x): x is GuestCartItem =>
+        typeof x === "object" &&
+        x !== null &&
+        typeof (x as GuestCartItem).id === "string" &&
+        typeof (x as GuestCartItem).product_id === "string" &&
+        typeof (x as GuestCartItem).quantity === "number" &&
+        typeof (x as GuestCartItem).price === "number"
+    )
+    .map((x) => ({
+      ...x,
+      title: x.title ?? null,
+      image_url: x.image_url ?? null,
+    }));
+}
+
+function readGuestCartStorage(): GuestCartStorage {
+  if (typeof window === "undefined") return { items: [], updatedAt: Date.now() };
+  const raw = localStorage.getItem(GUEST_CART_KEY);
+  if (!raw) return { items: [], updatedAt: Date.now() };
+
+  // Backward-compatible with legacy array-only storage.
+  const parsed = safeParse<unknown>(raw, []);
+  if (Array.isArray(parsed)) {
+    return { items: normalizeGuestCartItems(parsed), updatedAt: Date.now() };
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    return { items: [], updatedAt: Date.now() };
+  }
+
+  const obj = parsed as { items?: unknown; updatedAt?: unknown };
+  const updatedAt =
+    typeof obj.updatedAt === "number" && Number.isFinite(obj.updatedAt)
+      ? obj.updatedAt
+      : Date.now();
+
+  return {
+    items: normalizeGuestCartItems(obj.items),
+    updatedAt,
+  };
+}
+
+function writeGuestCartStorage(items: GuestCartItem[]): void {
+  if (typeof window === "undefined") return;
+  const payload: GuestCartStorage = {
+    items,
+    updatedAt: Date.now(),
+  };
+  localStorage.setItem(GUEST_CART_KEY, JSON.stringify(payload));
+}
+
 export function getGuestCart(): GuestCartItem[] {
   if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(GUEST_CART_KEY);
-  if (!raw) return [];
-  const arr = safeParse<unknown[]>(raw, []);
-  return arr.filter(
-    (x): x is GuestCartItem =>
-      typeof x === "object" &&
-      x !== null &&
-      typeof (x as GuestCartItem).id === "string" &&
-      typeof (x as GuestCartItem).product_id === "string" &&
-      typeof (x as GuestCartItem).quantity === "number" &&
-      typeof (x as GuestCartItem).price === "number"
-  ).map((x) => ({
-    ...x,
-    title: x.title ?? null,
-    image_url: x.image_url ?? null,
-  }));
+  const { items, updatedAt } = readGuestCartStorage();
+  if (Date.now() - updatedAt > GUEST_CART_TTL_MS) {
+    localStorage.removeItem(GUEST_CART_KEY);
+    return [];
+  }
+  return items;
 }
 
 export function setGuestCart(items: GuestCartItem[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
+  writeGuestCartStorage(items);
 }
 
 function configEqual(a: unknown, b: unknown): boolean {
