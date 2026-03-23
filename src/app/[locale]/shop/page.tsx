@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import Script from "next/script";
 import ShopGrid from "@/components/ShopGrid";
 import ShopSort from "@/components/ShopSort";
 import ScrollReveal from "@/components/ScrollReveal";
@@ -30,12 +29,13 @@ export default async function ShopPage({
   searchParams,
 }: {
   params: Promise<{ locale: Locale }>;
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ sort?: string; q?: string }>;
 }) {
   const { locale } = await params;
-  const { sort } = await searchParams;
+  const { sort, q } = await searchParams;
   const isFr = locale === "fr";
   const dictionary = getDictionary(locale);
+  const searchQuery = (q ?? "").trim().toLowerCase();
   const supabase = createServerClient();
   const { data: products } = await supabase
     .from("products")
@@ -57,6 +57,12 @@ export default async function ShopPage({
     watches = [...watches].sort((a, b) => a.price - b.price);
   } else if (sort === "price_desc") {
     watches = [...watches].sort((a, b) => b.price - a.price);
+  }
+
+  if (searchQuery) {
+    watches = watches.filter((watch) =>
+      `${watch.name} ${watch.description}`.toLowerCase().includes(searchQuery)
+    );
   }
 
   return (
@@ -83,26 +89,28 @@ export default async function ShopPage({
           </div>
         </ScrollReveal>
         <ScrollReveal>
-          <div className="rounded-2xl border border-white/20 bg-white/5 p-4 backdrop-blur-sm">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/70">
-                {isFr ? "Recherche IA" : "AI Search"}
-              </p>
-              <p className="text-xs text-white/50">
-                {isFr ? "Trouvez rapidement une montre" : "Find a watch faster"}
-              </p>
+          <form className="rounded-2xl border border-white/20 bg-white/5 p-4 backdrop-blur-sm">
+            <label htmlFor="watch-search" className="mb-3 block text-xs uppercase tracking-[0.3em] text-white/70">
+              {isFr ? "Recherche" : "Search"}
+            </label>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                id="watch-search"
+                name="q"
+                type="search"
+                defaultValue={q ?? ""}
+                placeholder={isFr ? "Rechercher une montre..." : "Search watches..."}
+                className="w-full rounded-xl border border-white/20 bg-black/20 px-4 py-2 text-sm text-white placeholder:text-white/50 focus:border-white/50 focus:outline-none"
+              />
+              {sort ? <input type="hidden" name="sort" value={sort} /> : null}
+              <button
+                type="submit"
+                className="btn-hover rounded-xl border border-white/30 px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/80"
+              >
+                {isFr ? "Chercher" : "Search"}
+              </button>
             </div>
-            <Script
-              src="https://www.spaxioassistant.com/embed/ai-search.js"
-              data-widget-id="2f329396-be12-42f1-968b-b8c8dd04ce68"
-              async
-            />
-            <div className="rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/70">
-              {isFr
-                ? "Utilisez le bouton flottant \"Recherche IA\" en bas a droite."
-                : 'Use the floating "AI search" button in the bottom-right corner.'}
-            </div>
-          </div>
+          </form>
         </ScrollReveal>
         <ScrollReveal disableOnMobile>
           <ShopGrid watches={watches} locale={locale} />
