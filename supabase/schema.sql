@@ -320,14 +320,6 @@ values
   ('sky', 'Sky', 'Sky', 11)
 on conflict (slug) do update set label_en = excluded.label_en, label_fr = excluded.label_fr, sort_order = excluded.sort_order;
 
--- Seed initial products (run once; safe to re-run)
-insert into products (id, name, description, price, image, stock, active, category)
-values
-  ('stealth', 'Stealth', 'Dive watch with rotating bezel and bold markers.', 12900, '/images/hero-1.svg', 5, true, 'stealth'),
-  ('chronograph', 'Chronograph', 'Column-wheel chronograph with subdials.', 15750, '/images/hero-2.svg', 3, true, 'chronograph'),
-  ('sub-gmt', 'Sub/GMT', 'Dual-time with ceramic bezel.', 11800, '/images/hero-3.svg', 4, true, 'sub-gmt')
-on conflict (id) do update set name = excluded.name, description = excluded.description, category = excluded.category;
-
 -- Seed initial journal posts (run once; safe to re-run)
 insert into journal_posts (id, title, excerpt, published_at, locale)
 values
