@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { fullUrl } from "@/lib/seo";
 import { locales } from "@/lib/i18n";
-import { SHOP_CATEGORY_SLUGS } from "@/data/categories";
+import { getWatchCategories } from "@/lib/watch-categories";
 
 const STATIC_PATHS = [
   "",
@@ -15,9 +15,17 @@ const STATIC_PATHS = [
   "track-order",
 ] as const;
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = fullUrl("");
   const entries: MetadataRoute.Sitemap = [];
+
+  let shopCategorySlugs: string[] = [];
+  try {
+    const categories = await getWatchCategories();
+    shopCategorySlugs = categories.map((c) => c.slug);
+  } catch {
+    // e.g. build without Supabase env
+  }
 
   for (const locale of locales) {
     for (const path of STATIC_PATHS) {
@@ -29,7 +37,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
         priority: path === "" ? 1 : path === "shop" || path === "configurator" ? 0.9 : 0.7,
       });
     }
-    for (const slug of SHOP_CATEGORY_SLUGS) {
+    for (const slug of shopCategorySlugs) {
       entries.push({
         url: `${base}/${locale}/shop/${slug}`,
         lastModified: new Date(),

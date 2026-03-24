@@ -312,6 +312,7 @@ export async function createWatchCategory(input: {
     display_price: input.display_price ?? null,
   });
   if (error) throw error;
+  revalidateTag("watch-categories", "max");
   revalidatePath("/[locale]/shop", "page");
   revalidatePath("/[locale]/shop/[category]", "page");
   revalidatePath("/[locale]", "page");
@@ -343,6 +344,7 @@ export async function updateWatchCategory(
   if (oldSlug && newSlug && oldSlug !== newSlug) {
     await supabase.from("products").update({ category: newSlug }).eq("category", oldSlug);
   }
+  revalidateTag("watch-categories", "max");
   revalidatePath("/[locale]/shop", "page");
   revalidatePath("/[locale]/shop/[category]", "page");
   revalidatePath("/[locale]", "page");
@@ -378,6 +380,7 @@ export async function deleteWatchCategory(id: string) {
   }
   const { error } = await supabase.from("watch_categories").delete().eq("id", id);
   if (error) throw error;
+  revalidateTag("watch-categories", "max");
   revalidatePath("/[locale]/shop", "page");
   revalidatePath("/[locale]/shop/[category]", "page");
   revalidatePath("/[locale]", "page");
