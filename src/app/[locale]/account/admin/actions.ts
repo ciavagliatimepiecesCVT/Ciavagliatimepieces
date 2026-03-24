@@ -1801,7 +1801,7 @@ export async function setFunctionSteps(
   }
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
 }
 
 // --- Configurator step checkbox sections (admin-defined custom checkboxes per step) ---
@@ -1877,7 +1877,7 @@ export async function createCheckboxSection(
   }
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
   return sectionId;
 }
 
@@ -1898,7 +1898,7 @@ export async function updateCheckboxSection(
   if (error) throw error;
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
 }
 
 export async function deleteCheckboxSection(sectionId: string): Promise<void> {
@@ -1909,7 +1909,7 @@ export async function deleteCheckboxSection(sectionId: string): Promise<void> {
   if (error) throw error;
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
 }
 
 export async function createCheckboxItem(sectionId: string, label_en: string, label_fr: string): Promise<string> {
@@ -1929,7 +1929,7 @@ export async function createCheckboxItem(sectionId: string, label_en: string, la
   if (error || !item) throw new Error(error?.message ?? "Failed to create item");
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
   return (item as { id: string }).id;
 }
 
@@ -1945,7 +1945,7 @@ export async function updateCheckboxItem(itemId: string, input: { label_en?: str
   if (error) throw error;
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
 }
 
 export async function deleteCheckboxItem(itemId: string): Promise<void> {
@@ -1956,7 +1956,7 @@ export async function deleteCheckboxItem(itemId: string): Promise<void> {
   if (error) throw error;
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
 }
 
 /** Which function_option_ids have this section enabled (for this step). */
@@ -1984,7 +1984,7 @@ export async function setSectionEnabledForFunctions(sectionId: string, functionO
   }
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
 }
 
 /** Get all function_option_ids that have a given step_id in their configurator flow (for "Apply to all watches"). */
@@ -2120,7 +2120,7 @@ export async function createConfiguratorOption(input: {
   if (error) throw error;
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
 }
 
 export async function updateConfiguratorOption(
@@ -2171,7 +2171,7 @@ export async function updateConfiguratorOption(
   if (error) throw error;
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
 }
 
 export async function deleteConfiguratorOption(id: string) {
@@ -2182,7 +2182,7 @@ export async function deleteConfiguratorOption(id: string) {
   if (error) throw error;
   revalidatePath("/[locale]/configurator", "page");
   revalidatePath("/[locale]/account/admin", "page");
-  revalidateTag("configurator-data");
+  revalidateTag("configurator-data", "max");
 }
 
 // ——— Configurator option groups (admin selects options by checkbox, creates group with name + image) ———
