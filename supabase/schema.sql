@@ -304,7 +304,7 @@ drop policy if exists "Anyone can view journal posts" on journal_posts;
 create policy "Anyone can view journal posts" on journal_posts
   for select using (true);
 
--- Seed watch categories (nav + admin). Run before products.
+-- Watch categories (nav + admin). Safe to re-run; does not recreate demo products.
 insert into watch_categories (slug, label_en, label_fr, sort_order)
 values
   ('stealth', 'Stealth', 'Stealth', 1),
