@@ -2806,23 +2806,8 @@ async function getPublicConfiguratorDataUncached(): Promise<PublicConfiguratorDa
       // configurator_option_groups table may not exist before migration
     }
 
-    const options = (allOptions ?? []).map((o) => ({
-      id: o.id,
-      step_id: o.step_id,
-      parent_option_id: (o as { parent_option_id?: string }).parent_option_id ?? null,
-      for_function_ids: (o as { for_function_ids?: string[] | null }).for_function_ids ?? null,
-      label_en: o.label_en,
-      label_fr: o.label_fr,
-      letter: (o as { letter?: string }).letter ?? "A",
-      price: Number((o as { price?: number }).price ?? 0),
-      discount_percent: Number((o as { discount_percent?: number }).discount_percent ?? 0),
-      image_url: (o as { image_url?: string }).image_url ?? null,
-      preview_image_url: (o as { preview_image_url?: string }).preview_image_url ?? null,
-      layer_image_url: (o as { layer_image_url?: string }).layer_image_url ?? null,
-      layer_z_index: Number((o as { layer_z_index?: number }).layer_z_index ?? 0),
-      option_group_en: (o as { option_group_en?: string | null }).option_group_en ?? null,
-      option_group_fr: (o as { option_group_fr?: string | null }).option_group_fr ?? null,
-      group_id: (o as { group_id?: string | null }).group_id ?? null,
+    const options = mapToPublicOptions(allOptions).map((o) => ({
+      ...o,
       dropdownItems: dropdownByOptionId[o.id]?.length ? dropdownByOptionId[o.id] : undefined,
     }));
 

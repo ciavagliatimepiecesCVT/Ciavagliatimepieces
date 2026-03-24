@@ -180,7 +180,13 @@ export default function HomeStyleCardsSection({
               >
                 <div className="relative h-52 overflow-hidden rounded-[22px] bg-white">
                   {styleCards.custom_build.image_url ? (
-                    <Image src={styleCards.custom_build.image_url} alt="" fill className="object-cover transition duration-500 group-hover:scale-[1.02]" />
+                    <Image
+                      src={styleCards.custom_build.image_url}
+                      alt=""
+                      fill
+                      sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, (max-width: 1023px) 33vw, 25vw"
+                      className="object-cover transition duration-500 group-hover:scale-[1.02]"
+                    />
                   ) : (
                     <span className="flex h-full items-center justify-center text-4xl text-foreground/40 group-hover:text-foreground/60">+</span>
                   )}
