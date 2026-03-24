@@ -304,7 +304,7 @@ drop policy if exists "Anyone can view journal posts" on journal_posts;
 create policy "Anyone can view journal posts" on journal_posts
   for select using (true);
 
--- Watch categories (nav + admin). Safe to re-run; does not recreate demo products.
+-- Seed watch categories (nav + admin). Run before products.
 insert into watch_categories (slug, label_en, label_fr, sort_order)
 values
   ('stealth', 'Stealth', 'Stealth', 1),
@@ -319,6 +319,14 @@ values
   ('g-oak', 'G-OAK', 'G-OAK', 10),
   ('sky', 'Sky', 'Sky', 11)
 on conflict (slug) do update set label_en = excluded.label_en, label_fr = excluded.label_fr, sort_order = excluded.sort_order;
+
+-- Seed initial products (run once; safe to re-run)
+insert into products (id, name, description, price, image, stock, active, category)
+values
+  ('stealth', 'Stealth', 'Dive watch with rotating bezel and bold markers.', 12900, '/images/hero-1.svg', 5, true, 'stealth'),
+  ('chronograph', 'Chronograph', 'Column-wheel chronograph with subdials.', 15750, '/images/hero-2.svg', 3, true, 'chronograph'),
+  ('sub-gmt', 'Sub/GMT', 'Dual-time with ceramic bezel.', 11800, '/images/hero-3.svg', 4, true, 'sub-gmt')
+on conflict (id) do update set name = excluded.name, description = excluded.description, category = excluded.category;
 
 -- Seed initial journal posts (run once; safe to re-run)
 insert into journal_posts (id, title, excerpt, published_at, locale)
