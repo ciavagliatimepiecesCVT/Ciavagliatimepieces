@@ -1628,6 +1628,7 @@ export type ConfiguratorOptionRow = {
   id: string;
   step_id: string;
   parent_option_id: string | null;
+  is_visible?: boolean;
   for_function_ids?: string[] | null;
   label_en: string;
   label_fr: string;
@@ -1723,12 +1724,19 @@ export async function getFunctionOptions(): Promise<ConfiguratorOptionRow[]> {
   if (!step?.id) return [];
   const { data, error } = await supabase
     .from("configurator_options")
+    .select("id, step_id, parent_option_id, is_visible, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, sort_order")
+    .eq("step_id", step.id)
+    .is("parent_option_id", null)
+    .order("sort_order", { ascending: true });
+  if (!error) return (data ?? []) as ConfiguratorOptionRow[];
+  const { data: fallbackData, error: fallbackError } = await supabase
+    .from("configurator_options")
     .select("id, step_id, parent_option_id, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, sort_order")
     .eq("step_id", step.id)
     .is("parent_option_id", null)
     .order("sort_order", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as ConfiguratorOptionRow[];
+  if (fallbackError) throw fallbackError;
+  return (fallbackData ?? []).map((row) => ({ ...row, is_visible: true })) as ConfiguratorOptionRow[];
 }
 
 /** Get step IDs (in order) that follow for a given function option. */
@@ -1986,7 +1994,7 @@ export async function getFunctionIdsForStep(stepId: string): Promise<string[]> {
 export async function getAdminConfiguratorOptions(stepId?: string | null, parentOptionId?: string | null): Promise<ConfiguratorOptionRow[]> {
   await requireAdmin();
   const supabase = createServerClient();
-  const baseSelect = "id, step_id, parent_option_id, for_function_ids, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index, sort_order";
+  const baseSelect = "id, step_id, parent_option_id, is_visible, for_function_ids, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index, sort_order";
   let q = supabase.from("configurator_options").select(`${baseSelect}, option_group_en, option_group_fr, group_id`).order("sort_order", { ascending: true });
   if (stepId) q = q.eq("step_id", stepId);
   if (parentOptionId === null) q = q.is("parent_option_id", null);
@@ -1999,7 +2007,7 @@ export async function getAdminConfiguratorOptions(stepId?: string | null, parent
     else if (parentOptionId != null) fallback = fallback.eq("parent_option_id", parentOptionId);
     const { data: data2, error: err2 } = await fallback;
     if (err2) throw err2;
-    return (data2 ?? []).map((r) => ({ ...r, group_id: null })) as ConfiguratorOptionRow[];
+    return (data2 ?? []).map((r) => ({ ...r, group_id: null, is_visible: true })) as ConfiguratorOptionRow[];
   }
   return (data ?? []) as ConfiguratorOptionRow[];
 }
@@ -2076,6 +2084,7 @@ export async function createConfiguratorOption(input: {
   sort_order?: number;
   option_group_en?: string | null;
   option_group_fr?: string | null;
+  is_visible?: boolean;
 }) {
   await requireAdmin();
   if (!input.step_id || !input.label_en?.trim()) throw new Error("Step and label required");
@@ -2098,6 +2107,7 @@ export async function createConfiguratorOption(input: {
     sort_order: input.sort_order ?? 0,
     option_group_en: input.option_group_en?.trim() || null,
     option_group_fr: input.option_group_fr?.trim() || null,
+    is_visible: input.is_visible ?? true,
   });
   if (error) throw error;
   revalidatePath("/[locale]/configurator", "page");
@@ -2121,6 +2131,7 @@ export async function updateConfiguratorOption(
     for_function_ids?: string[] | null;
     option_group_en?: string | null;
     option_group_fr?: string | null;
+    is_visible?: boolean;
   }
 ) {
   await requireAdmin();
@@ -2145,6 +2156,7 @@ export async function updateConfiguratorOption(
   }
   if (input.option_group_en !== undefined) updates.option_group_en = input.option_group_en?.trim() || null;
   if (input.option_group_fr !== undefined) updates.option_group_fr = input.option_group_fr?.trim() || null;
+  if (input.is_visible !== undefined) updates.is_visible = !!input.is_visible;
   if (Object.keys(updates).length === 0) return;
   const { error } = await supabase.from("configurator_options").update(updates).eq("id", id);
   if (error) throw error;
@@ -2638,8 +2650,9 @@ async function getPublicConfiguratorDataUncached(): Promise<PublicConfiguratorDa
     const functionStep = stepsMeta.find((s) => s.step_key === "function");
     if (!functionStep) return null;
 
-    const baseSelect = "id, step_id, parent_option_id, for_function_ids, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index";
-    const baseSelectWithoutForFunctionIds = "id, step_id, parent_option_id, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index";
+    const baseSelect = "id, step_id, parent_option_id, is_visible, for_function_ids, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index";
+    const baseSelectWithoutForFunctionIds = "id, step_id, parent_option_id, is_visible, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index";
+    const baseSelectLegacy = "id, step_id, parent_option_id, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index";
     let allOptions: (Record<string, unknown> & { id: string; step_id: string; label_en: string; label_fr: string })[] | null = null;
     const { data: optionsWithGroups, error: optErrWithGroups } = await supabase
       .from("configurator_options")
@@ -2653,12 +2666,31 @@ async function getPublicConfiguratorDataUncached(): Promise<PublicConfiguratorDa
         .from("configurator_options")
         .select(`${baseSelectWithoutForFunctionIds}, option_group_en, option_group_fr, group_id`)
         .order("sort_order", { ascending: true });
-      if (optErr) return null;
-      allOptions = (optionsBase ?? []).map((o) => ({ ...o, for_function_ids: null, option_group_en: (o as { option_group_en?: string }).option_group_en ?? null, option_group_fr: (o as { option_group_fr?: string }).option_group_fr ?? null, group_id: (o as { group_id?: string }).group_id ?? null })) as (Record<string, unknown> & { id: string; step_id: string; label_en: string; label_fr: string })[];
+      if (!optErr) {
+        allOptions = (optionsBase ?? []).map((o) => ({ ...o, is_visible: true, for_function_ids: null, option_group_en: (o as { option_group_en?: string }).option_group_en ?? null, option_group_fr: (o as { option_group_fr?: string }).option_group_fr ?? null, group_id: (o as { group_id?: string }).group_id ?? null })) as (Record<string, unknown> & { id: string; step_id: string; label_en: string; label_fr: string })[];
+      } else {
+        const { data: optionsLegacy, error: legacyErr } = await supabase
+          .from("configurator_options")
+          .select(`${baseSelectLegacy}, option_group_en, option_group_fr, group_id`)
+          .order("sort_order", { ascending: true });
+        if (legacyErr) return null;
+        allOptions = (optionsLegacy ?? []).map((o) => ({ ...o, is_visible: true, for_function_ids: null, option_group_en: (o as { option_group_en?: string }).option_group_en ?? null, option_group_fr: (o as { option_group_fr?: string }).option_group_fr ?? null, group_id: (o as { group_id?: string }).group_id ?? null })) as (Record<string, unknown> & { id: string; step_id: string; label_en: string; label_fr: string })[];
+      }
     }
 
+    const visibleFunctionOptionIds = new Set(
+      (allOptions ?? [])
+        .filter(
+          (o) =>
+            o.step_id === functionStep.id &&
+            (o as { parent_option_id?: string }).parent_option_id == null &&
+            ((o as { is_visible?: boolean | null }).is_visible ?? true)
+        )
+        .map((o) => o.id)
+    );
+
     const functionOptions = (allOptions ?? []).filter(
-      (o) => o.step_id === functionStep.id && (o as { parent_option_id?: string }).parent_option_id == null
+      (o) => visibleFunctionOptionIds.has(o.id)
     ).map((o) => ({
       id: o.id,
       label_en: o.label_en,
@@ -2669,7 +2701,9 @@ async function getPublicConfiguratorDataUncached(): Promise<PublicConfiguratorDa
     }));
 
     const mapToPublicOptions = (opts: typeof allOptions): PublicConfiguratorData["options"] =>
-      (opts ?? []).map((o) => ({
+      (opts ?? [])
+        .filter((o) => o.step_id !== functionStep.id || visibleFunctionOptionIds.has(o.id))
+        .map((o) => ({
         id: o.id,
         step_id: o.step_id,
         parent_option_id: (o as { parent_option_id?: string }).parent_option_id ?? null,
@@ -2685,8 +2719,8 @@ async function getPublicConfiguratorDataUncached(): Promise<PublicConfiguratorDa
         layer_z_index: Number((o as { layer_z_index?: number }).layer_z_index ?? 0),
         option_group_en: (o as { option_group_en?: string | null }).option_group_en ?? null,
         option_group_fr: (o as { option_group_fr?: string | null }).option_group_fr ?? null,
-        group_id: (o as { group_id?: string | null }).group_id ?? null,
-      }));
+          group_id: (o as { group_id?: string | null }).group_id ?? null,
+        }));
 
     const { data: fsRows, error: fsErr } = await supabase
       .from("configurator_function_steps")

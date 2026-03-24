@@ -1993,6 +1993,11 @@ export default function AdminConfiguratorPage() {
                     </div>
                   )}
                   <span className="mt-2 block w-full truncate text-center text-sm font-medium text-foreground">{label}</span>
+                  {currentStepKey === "function" && (opt as { is_visible?: boolean }).is_visible === false && (
+                    <span className="mt-0.5 text-xs font-medium text-amber-700">
+                      {isFr ? "Masqué sur le configurateur" : "Hidden on configurator"}
+                    </span>
+                  )}
                   <span className="text-sm font-medium text-[var(--accent)]">
                     ${(() => {
                       const p = Number(opt.price);
@@ -2069,6 +2074,25 @@ export default function AdminConfiguratorPage() {
                     >
                       {isFr ? "Modifier" : "Edit"}
                     </button>
+                    {currentStepKey === "function" && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            await updateConfiguratorOption(opt.id, { is_visible: !((opt as { is_visible?: boolean }).is_visible ?? true) });
+                            await load();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : (isFr ? "Échec du changement de visibilité" : "Failed to change visibility"));
+                          }
+                        }}
+                        className="rounded-full border border-foreground/20 bg-white px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-foreground hover:bg-foreground/5"
+                      >
+                        {((opt as { is_visible?: boolean }).is_visible ?? true)
+                          ? (isFr ? "Masquer" : "Hide")
+                          : (isFr ? "Afficher" : "Show")}
+                      </button>
+                    )}
                     {currentStepKey === "function" && (
                       <button
                         type="button"

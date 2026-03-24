@@ -142,6 +142,7 @@ create table if not exists configurator_options (
   id uuid primary key default gen_random_uuid(),
   step_id uuid not null references configurator_steps(id) on delete cascade,
   parent_option_id uuid references configurator_options(id) on delete cascade,
+  is_visible boolean not null default true,
   for_function_ids uuid[] default null,
   group_id uuid references configurator_option_groups(id) on delete set null,
   label_en text not null,
@@ -158,6 +159,9 @@ create table if not exists configurator_options (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+alter table configurator_options
+add column if not exists is_visible boolean not null default true;
 
 -- Optional add-ons per step (e.g. Frosted Finish on Case). Available only when specific options are selected.
 create table if not exists configurator_addons (
