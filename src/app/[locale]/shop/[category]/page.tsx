@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import ShopGrid from "@/components/ShopGrid";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createServerClient } from "@/lib/supabase/server";
+import { hasPublicConfiguratorPreset } from "@/lib/configurator-preset";
 import { getWatchCategories } from "@/lib/watch-categories";
 import { Locale } from "@/lib/i18n";
 import { notFound } from "next/navigation";
@@ -44,7 +45,7 @@ export default async function ShopCategoryPage({
   const supabase = createServerClient();
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, description, price, original_price, image, stock")
+    .select("id, name, description, price, original_price, image, stock, configurator_config")
     .eq("active", true)
     .eq("category", category)
     .order("created_at", { ascending: false });
@@ -57,6 +58,9 @@ export default async function ShopCategoryPage({
     original_price: p.original_price != null ? Number(p.original_price) : null,
     image: p.image ?? "/images/hero-1.svg",
     stock: p.stock ?? 0,
+    hasConfiguratorPreset: hasPublicConfiguratorPreset(
+      (p as { configurator_config?: unknown }).configurator_config
+    ),
   }));
 
   return (

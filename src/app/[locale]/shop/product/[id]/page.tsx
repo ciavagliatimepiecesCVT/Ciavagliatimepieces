@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { getWatchCategories } from "@/lib/watch-categories";
-import { getProductAddonsWithOptions, getProductBracelets } from "@/app/[locale]/account/admin/actions";
+import {
+  getProductAddonsWithOptions,
+  getProductBracelets,
+  getProductConfiguratorConfig,
+} from "@/app/[locale]/account/admin/actions";
 import ProductDetail from "@/components/ProductDetail";
 import type { Locale } from "@/lib/i18n";
 
@@ -44,7 +48,7 @@ export default async function ProductPage({ params }: Props) {
 
   if (productError || !product) notFound();
 
-  const [{ data: productImages }, addonsWithOptions, bracelets] = await Promise.all([
+  const [{ data: productImages }, addonsWithOptions, bracelets, productPreset] = await Promise.all([
     supabase
       .from("product_images")
       .select("id, url, sort_order")
@@ -52,6 +56,7 @@ export default async function ProductPage({ params }: Props) {
       .order("sort_order", { ascending: true }),
     getProductAddonsWithOptions(id),
     getProductBracelets(id),
+    getProductConfiguratorConfig(id),
   ]);
 
   const categories = await getWatchCategories();
@@ -91,6 +96,7 @@ export default async function ProductPage({ params }: Props) {
       bracelets={bracelets ?? []}
       locale={locale}
       categoryLabel={categoryLabel}
+      hasConfiguratorPreset={productPreset != null}
     />
   );
 }

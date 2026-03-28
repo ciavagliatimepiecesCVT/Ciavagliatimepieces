@@ -17,6 +17,7 @@ type Watch = {
   original_price?: number | null;
   image: string;
   stock?: number;
+  hasConfiguratorPreset?: boolean;
 };
 
 export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale: string }) {
@@ -162,6 +163,14 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
                   >
                     {isFr ? "Acheter" : "Buy now"}
                   </button>
+                  {watch.hasConfiguratorPreset ? (
+                    <Link
+                      href={`/${activeLocale}/configurator?product=${encodeURIComponent(watch.id)}`}
+                      className="btn-hover inline-flex items-center justify-center rounded-full border border-foreground/30 px-4 py-2 text-xs uppercase tracking-[0.3em] text-foreground/70 transition hover:border-foreground/45 hover:bg-foreground/[0.04]"
+                    >
+                      {isFr ? "Personnaliser" : "Customize now"}
+                    </Link>
+                  ) : null}
                 </>
               )}
             </div>

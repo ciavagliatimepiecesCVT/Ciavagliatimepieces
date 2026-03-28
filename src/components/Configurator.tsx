@@ -1497,6 +1497,7 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
                     locale={locale}
                     layerOffsets={publicLayerOffsets}
                     layerScales={publicLayerScales}
+                    hideFunctionLayerWhenCaseSelected
                   />
                 </div>
               </div>

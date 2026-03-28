@@ -60,9 +60,19 @@ type ProductDetailProps = {
   bracelets?: Bracelet[];
   locale: string;
   categoryLabel?: string;
+  /** When true, show link to open this SKU in the configurator (admin must save a preset). */
+  hasConfiguratorPreset?: boolean;
 };
 
-export default function ProductDetail({ product, images, addons = [], bracelets = [], locale, categoryLabel }: ProductDetailProps) {
+export default function ProductDetail({
+  product,
+  images,
+  addons = [],
+  bracelets = [],
+  locale,
+  categoryLabel,
+  hasConfiguratorPreset = false,
+}: ProductDetailProps) {
   const pathname = usePathname();
   const { currency, formatPrice } = useCurrency();
   const activeLocale = locale || pathname?.split("/").filter(Boolean)[0] || "en";
@@ -692,12 +702,14 @@ export default function ProductDetail({ product, images, addons = [], bracelets 
                 >
                   {isFr ? "Acheter maintenant" : "Buy now"}
                 </button>
-                <Link
-                  href={`/${activeLocale}/configurator?product=${encodeURIComponent(product.id)}`}
-                  className="btn-hover rounded-full border border-white/40 px-6 py-3 text-sm uppercase tracking-[0.2em] text-white transition hover:border-white hover:bg-white/10"
-                >
-                  {isFr ? "Modifier" : "Edit now"}
-                </Link>
+                {hasConfiguratorPreset ? (
+                  <Link
+                    href={`/${activeLocale}/configurator?product=${encodeURIComponent(product.id)}`}
+                    className="btn-hover rounded-full border border-white/40 px-6 py-3 text-sm uppercase tracking-[0.2em] text-white transition hover:border-white hover:bg-white/10"
+                  >
+                    {isFr ? "Personnaliser maintenant" : "Customize now"}
+                  </Link>
+                ) : null}
               </>
             )}
           </div>

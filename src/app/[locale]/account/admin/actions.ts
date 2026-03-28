@@ -8,6 +8,7 @@ import { DEFAULT_FOOTER, type FooterSettings } from "@/lib/footer-settings";
 import { DEFAULT_FAQ, type FaqSettings } from "@/lib/faq-settings";
 import { DEFAULT_HOME_STYLE_CARDS, type HomeStyleCards } from "@/lib/home-style-cards";
 import { builtWatches } from "@/data/watches";
+import { hasPublicConfiguratorPreset } from "@/lib/configurator-preset";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -2903,7 +2904,7 @@ export async function getProductConfiguratorConfig(productId: string): Promise<{
       .single();
     if (error || !data) return null;
     const raw = (data as { configurator_config?: unknown }).configurator_config;
-    if (raw == null || typeof raw !== "object") return null;
+    if (!hasPublicConfiguratorPreset(raw)) return null;
     const config = raw as Record<string, unknown>;
     const steps = Array.isArray(config.steps) ? (config.steps as string[]) : undefined;
     const addonIds = Array.isArray(config.addonIds) ? (config.addonIds as string[]) : undefined;
@@ -2911,7 +2912,6 @@ export async function getProductConfiguratorConfig(productId: string): Promise<{
       config.dropdownSelections && typeof config.dropdownSelections === "object" && !Array.isArray(config.dropdownSelections)
         ? (config.dropdownSelections as Record<string, string>)
         : undefined;
-    if (!steps?.length) return null;
     return { steps, addonIds, dropdownSelections };
   } catch {
     return null;

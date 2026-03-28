@@ -4,6 +4,7 @@ import ShopGrid from "@/components/ShopGrid";
 import ShopSort from "@/components/ShopSort";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createServerClient } from "@/lib/supabase/server";
+import { hasPublicConfiguratorPreset } from "@/lib/configurator-preset";
 import { Locale, getDictionary } from "@/lib/i18n";
 
 export async function generateMetadata({
@@ -39,7 +40,7 @@ export default async function ShopPage({
   const supabase = createServerClient();
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, description, price, original_price, image, stock")
+    .select("id, name, description, price, original_price, image, stock, configurator_config")
     .eq("active", true)
     .order("created_at", { ascending: false });
 
@@ -51,6 +52,9 @@ export default async function ShopPage({
     original_price: p.original_price != null ? Number(p.original_price) : null,
     image: p.image ?? "/images/hero-1.svg",
     stock: p.stock ?? 0,
+    hasConfiguratorPreset: hasPublicConfiguratorPreset(
+      (p as { configurator_config?: unknown }).configurator_config
+    ),
   }));
 
   if (sort === "price_asc") {
