@@ -564,7 +564,70 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
     setAddonChecked({});
   };
 
-  const canAddToCart = !!selections.function && total > 0;
+  /** All steps satisfied (required options, dropdowns, mandatory checkbox sections); optional steps may be skipped per step rules. */
+  const configurationComplete = useMemo(() => {
+    if (!functionId || !selections.function) return false;
+    const sections = configData?.checkboxSections ?? [];
+    const enabledMap = configData?.checkboxSectionEnabledMap ?? {};
+
+    for (let i = 0; i < stepsForFunction.length; i++) {
+      const stepKey = stepsForFunction[i];
+
+      if (stepKey === "function") {
+        const stepId = functionStep?.id;
+        if (stepId) {
+          const checkboxSectionsForStep = sections.filter(
+            (s) => s.step_id === stepId && (enabledMap[s.id]?.includes(functionId) ?? false)
+          );
+          const mandatoryOk = checkboxSectionsForStep
+            .filter((s) => s.mandatory)
+            .every((s) => (customCheckboxSelections[s.id]?.length ?? 0) >= 1);
+          if (!mandatoryOk) return false;
+        }
+        continue;
+      }
+
+      const stepDbId = stepIdsForFunction[i - 1];
+      if (!stepDbId) return false;
+      const stepMeta = stepIdToMeta.get(stepDbId);
+      const isOptional = stepMeta?.optional ?? false;
+      const selectedIdForStep = selections[stepKey] ?? null;
+
+      const checkboxSectionsForStep = sections.filter(
+        (s) => s.step_id === stepDbId && (enabledMap[s.id]?.includes(functionId) ?? false)
+      );
+      const mandatoryOk = checkboxSectionsForStep
+        .filter((s) => s.mandatory)
+        .every((s) => (customCheckboxSelections[s.id]?.length ?? 0) >= 1);
+      if (!mandatoryOk) return false;
+
+      if (isOptional && !selectedIdForStep) continue;
+
+      if (!selectedIdForStep) return false;
+
+      const opts = options.filter((o) => o.step_id === stepDbId && optionAppliesToFunction(o, functionId));
+      const o = opts.find((x) => x.id === selectedIdForStep);
+      if (!o) return false;
+      const dropdownItems = (o as { dropdownItems?: { id: string }[] }).dropdownItems;
+      if (dropdownItems?.length && !dropdownSelections[o.id]) return false;
+    }
+    return true;
+  }, [
+    functionId,
+    selections,
+    stepsForFunction,
+    stepIdsForFunction,
+    functionStep?.id,
+    stepIdToMeta,
+    configData?.checkboxSections,
+    configData?.checkboxSectionEnabledMap,
+    customCheckboxSelections,
+    options,
+    dropdownSelections,
+  ]);
+
+  const canAddToCart =
+    configurationComplete && isLastStep && total > 0;
   const isEditMode = !!editCartItemId;
 
   /** First selected layer image URL (for cart thumbnail when html2canvas fails due to cross-origin). */
@@ -933,6 +996,41 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
             {isOptionalStep ? ` • ${isFr ? "Optionnel" : "Optional"}` : ""}
           </p>
 
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => setStepIndex((s) => Math.max(0, s - 1))}
+              disabled={stepIndex === 0}
+              className="rounded-lg border border-white/30 bg-transparent px-5 py-2.5 text-sm font-medium text-white/90 transition hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ← {isFr ? "Retour" : "Back"}
+            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={!canAddToCart || addToCartLoading}
+                className="rounded-lg border-2 border-[var(--accent)] bg-[var(--accent)]/10 px-5 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {addToCartLoading ? "…" : isEditMode ? (isFr ? "Mettre à jour le build" : "Update build in cart") : (isFr ? "Ajouter au panier" : "Add to cart")}
+              </button>
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={!canContinue() || loading}
+                className="rounded-lg bg-foreground px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLastStep ? (isFr ? "Vérifier la commande →" : "Review Order →") : `${isFr ? "Continuer" : "Continue"} →`}
+              </button>
+            </div>
+          </div>
+
+          {(checkoutError || addToCartError) && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {checkoutError ?? addToCartError}
+            </div>
+          )}
+
           {currentStepKey === "function" ? (
             <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {optionsForCurrentStep.map((opt) => {
@@ -1274,43 +1372,6 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
               ))}
             </div>
           )}
-
-          {(checkoutError || addToCartError) && (
-            <div
-              className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-            >
-              {checkoutError ?? addToCartError}
-            </div>
-          )}
-
-          <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
-            <button
-              type="button"
-              onClick={() => setStepIndex((s) => Math.max(0, s - 1))}
-              disabled={stepIndex === 0}
-              className="rounded-lg border border-white/30 bg-transparent px-5 py-2.5 text-sm font-medium text-white/90 transition hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              ← {isFr ? "Retour" : "Back"}
-            </button>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                disabled={!canAddToCart || addToCartLoading}
-                className="rounded-lg border-2 border-[var(--accent)] bg-[var(--accent)]/10 px-5 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {addToCartLoading ? "…" : isEditMode ? (isFr ? "Mettre à jour le build" : "Update build in cart") : (isFr ? "Ajouter au panier" : "Add to cart")}
-              </button>
-              <button
-                type="button"
-                onClick={handleContinue}
-                disabled={!canContinue() || loading}
-                className="rounded-lg bg-foreground px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLastStep ? (isFr ? "Vérifier la commande →" : "Review Order →") : `${isFr ? "Continuer" : "Continue"} →`}
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 

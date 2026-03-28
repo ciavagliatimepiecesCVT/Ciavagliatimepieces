@@ -77,6 +77,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
         purchaseLabel={hero.purchaseLabel}
         jumpLabel={home.jumpToWatches}
         jumpHref={`/${locale}/shop`}
+        welcomeContinueHref="#watch-collections"
         fallbackImage={heroFallbackImage}
       />
 

@@ -34,6 +34,7 @@ export default function FeaturedScroll({
   jumpLabel,
   jumpHref,
   purchaseLabel,
+  welcomeContinueHref,
 }: {
   slides: FeaturedSlide[];
   locale: string;
@@ -41,6 +42,8 @@ export default function FeaturedScroll({
   jumpLabel: string;
   jumpHref?: string;
   purchaseLabel: string;
+  /** When set, the first slide’s primary “Continue” control scrolls here (e.g. in-page section id). */
+  welcomeContinueHref?: string;
 }) {
   const items =
     slides.length > 0
@@ -132,6 +135,7 @@ export default function FeaturedScroll({
               purchaseLabel={purchaseLabel}
               purchaseUrl={resolvePurchaseUrl(slide.link_url, locale)}
               showWelcome={index === 0}
+              welcomeContinueHref={welcomeContinueHref}
               locale={locale}
               slideIndex={index}
               scrollProgress={index}
@@ -176,6 +180,7 @@ export default function FeaturedScroll({
             purchaseLabel={purchaseLabel}
             purchaseUrl={resolvePurchaseUrl(slide.link_url, locale)}
             showWelcome={index === 0}
+            welcomeContinueHref={welcomeContinueHref}
             locale={locale}
             slideIndex={index}
             scrollProgress={scrollProgress}
@@ -205,6 +210,7 @@ function FeaturedSlideLayer({
   purchaseLabel,
   purchaseUrl,
   showWelcome,
+  welcomeContinueHref,
   locale,
   slideIndex,
   scrollProgress,
@@ -221,6 +227,7 @@ function FeaturedSlideLayer({
   purchaseLabel: string;
   purchaseUrl: string | null;
   showWelcome: boolean;
+  welcomeContinueHref?: string;
   locale: string;
   slideIndex: number;
   scrollProgress: number;
@@ -289,7 +296,15 @@ function FeaturedSlideLayer({
             </p>
           )}
           <div className="mt-8 flex flex-wrap justify-center gap-4 [&_a]:cursor-pointer [&_a]:touch-manipulation [&_a]:relative [&_a]:z-10">
-            {purchaseUrl ? (
+            {showWelcome && welcomeContinueHref ? (
+              <a
+                href={welcomeContinueHref}
+                className="inline-flex items-center gap-2 rounded-full bg-white/95 px-8 py-3.5 text-sm font-medium uppercase tracking-[0.2em] text-foreground transition hover:bg-white"
+              >
+                {continueLabel}
+                <span aria-hidden>&rarr;</span>
+              </a>
+            ) : purchaseUrl ? (
               <Link
                 href={purchaseUrl}
                 className="inline-flex items-center gap-2 rounded-full bg-white/95 px-8 py-3.5 text-sm font-medium uppercase tracking-[0.2em] text-foreground transition hover:bg-white"
