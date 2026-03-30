@@ -74,7 +74,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
 
   const handleBuyNow = (watch: Watch) => {
     if ((watch.stock ?? 1) < 1) return;
-    window.location.href = `/${activeLocale}/checkout?type=built&productId=${encodeURIComponent(watch.id)}`;
+    window.location.href = `/${activeLocale}/checkout/review?type=built&productId=${encodeURIComponent(watch.id)}`;
   };
 
   return (

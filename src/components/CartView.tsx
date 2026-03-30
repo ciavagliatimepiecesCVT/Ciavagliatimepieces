@@ -312,7 +312,7 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
                 {labels.subtotal}: {formatPrice(subtotal)}
               </p>
               <Link
-                href={`/${activeLocale}/checkout`}
+                href={`/${activeLocale}/checkout/review`}
                 className="btn-hover inline-block rounded-full bg-foreground px-8 py-3 text-sm font-medium uppercase tracking-[0.2em] text-white transition hover:bg-foreground/90"
               >
                 {labels.checkout}

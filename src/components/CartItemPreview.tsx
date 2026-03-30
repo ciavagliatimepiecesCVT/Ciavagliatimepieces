@@ -5,9 +5,11 @@ import { WatchPreview } from "@/components/WatchPreview";
 import type { PublicConfiguratorData } from "@/app/[locale]/account/admin/actions";
 import { CONFIGURATOR_PREVIEW_SIZE_PX } from "@/lib/configurator-constants";
 
-const PREVIEW_SIZE = 80;
-/** Scale factor so layer offsets (stored for full-size 420px preview) map correctly to thumbnail. */
-const OFFSET_SCALE = PREVIEW_SIZE / CONFIGURATOR_PREVIEW_SIZE_PX;
+const DEFAULT_PREVIEW_SIZE = 80;
+/** Scale factor so layer offsets (stored for full-size preview) map correctly to this thumbnail size. */
+function offsetScaleForSize(sizePx: number) {
+  return sizePx / CONFIGURATOR_PREVIEW_SIZE_PX;
+}
 
 type Configuration = {
   steps?: unknown[];
@@ -18,11 +20,15 @@ export function CartItemPreview({
   configuration,
   configData,
   locale,
+  /** Thumbnail size in px (cart uses 80; order review may use larger). */
+  sizePx = DEFAULT_PREVIEW_SIZE,
 }: {
   configuration: Configuration | undefined;
   configData: PublicConfiguratorData | null;
   locale: string;
+  sizePx?: number;
 }) {
+  const offsetScale = offsetScaleForSize(sizePx);
   const { selections, stepsForFunction, stepIdsForFunction, functionStepId, layerOffsets, layerScales, functionId, isExtraStepForGmtOrSub } = useMemo(() => {
     if (!configData || !configuration || !Array.isArray(configuration.steps) || configuration.steps.length === 0) {
       return {
@@ -62,8 +68,8 @@ export function CartItemPreview({
     rows.forEach((r: { option_id?: string | null; step_key: string; offset_x: number; offset_y: number; scale: number }) => {
       const key = r.option_id ? `${functionId}:${r.step_key}:${r.option_id}` : `${functionId}:${r.step_key}`;
       layerOffsets[key] = {
-        x: Number(r.offset_x ?? 0) * OFFSET_SCALE,
-        y: Number(r.offset_y ?? 0) * OFFSET_SCALE,
+        x: Number(r.offset_x ?? 0) * offsetScale,
+        y: Number(r.offset_y ?? 0) * offsetScale,
       };
       layerScales[key] = Number(r.scale ?? 1);
     });
@@ -81,14 +87,14 @@ export function CartItemPreview({
       functionId,
       isExtraStepForGmtOrSub,
     };
-  }, [configuration, configData]);
+  }, [configuration, configData, offsetScale]);
 
   const canRender = configData && functionId && stepsForFunction.length > 1;
 
   return (
     <div
       className="relative overflow-hidden rounded-xl bg-white"
-      style={{ width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
+      style={{ width: sizePx, height: sizePx }}
     >
       {canRender ? (
       <WatchPreview

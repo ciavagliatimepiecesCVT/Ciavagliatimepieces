@@ -315,7 +315,7 @@ export default function ProductDetail({
         return;
       }
 
-      window.location.href = `/${activeLocale}/checkout?type=built&productId=${encodeURIComponent(product.id)}`;
+      window.location.href = `/${activeLocale}/checkout/review?type=built&productId=${encodeURIComponent(product.id)}`;
       return;
     } finally {
       setLoading(false);

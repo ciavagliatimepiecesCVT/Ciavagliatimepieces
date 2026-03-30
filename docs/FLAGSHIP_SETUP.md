@@ -6,7 +6,7 @@
 
 3. Run `supabase/migrations/add_flagship_shipping.sql` on your database.
 
-4. **Checkout** at `/{locale}/checkout` collects address and FlagShip rates before Stripe. **Configurator** shows rates when site setting configurator free shipping is off. **Buy now** uses `?type=built&productId=`.
+4. **Review order** at `/{locale}/checkout/review` (or `/{locale}/checkout`, which redirects there) collects address and FlagShip rates before Stripe. **Configurator** shows rates when site setting configurator free shipping is off. **Buy now** uses `?type=built&productId=`.
 
 5. **Admin** order detail (`/account/admin/orders/[orderId]`) creates shipments and opens label URLs.
 

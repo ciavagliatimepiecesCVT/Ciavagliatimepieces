@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useCurrency } from "@/components/CurrencyContext";
 import { localeLabels, locales } from "@/lib/i18n";
 import { CURRENCIES, type CurrencyCode } from "@/lib/currency";
@@ -261,7 +261,9 @@ export default function NavBar({
             </>
           )}
           <CurrencySwitcher />
-          <LocaleSwitcher currentLocale={activeLocale} />
+          <Suspense fallback={<LocaleSwitcherFallback />}>
+            <LocaleSwitcher currentLocale={activeLocale} />
+          </Suspense>
           <Link
             href={`/${activeLocale}/cart`}
             className="relative flex items-center gap-2 rounded-full border border-white/40 px-3 py-2 text-xs uppercase tracking-[0.2em] text-white/90 transition hover:border-white hover:text-white"
@@ -381,7 +383,9 @@ export default function NavBar({
             </Link>
             <div className="h-px bg-white/20" />
             <CurrencySwitcher />
-            <LocaleSwitcher currentLocale={activeLocale} />
+            <Suspense fallback={<LocaleSwitcherFallback />}>
+              <LocaleSwitcher currentLocale={activeLocale} />
+            </Suspense>
           </div>
         </div>
       )}
@@ -443,17 +447,39 @@ function CurrencySwitcher() {
   );
 }
 
+function LocaleSwitcherFallback() {
+  return (
+    <div
+      className="flex min-h-[2.25rem] min-w-[4.5rem] items-center gap-2 rounded-full border border-white/40 bg-white/10 px-2 py-1 text-xs uppercase tracking-[0.2em] text-white/30"
+      aria-hidden
+    >
+      ···
+    </div>
+  );
+}
+
+/**
+ * Preserves path *and* query string when switching locale (e.g. checkout/review?type=built&productId=…).
+ */
 function LocaleSwitcher({ currentLocale }: { currentLocale: string }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const segments = pathname.split("/").filter(Boolean);
   const rest = segments.slice(1).join("/");
+  const query = searchParams.toString();
+  const qs = query ? `?${query}` : "";
+
+  const hrefForLocale = (locale: string) => {
+    if (!rest) return `/${locale}${qs}`;
+    return `/${locale}/${rest}${qs}`;
+  };
 
   return (
     <div className="flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-2 py-1 text-xs uppercase tracking-[0.2em]">
       {locales.map((locale) => (
         <Link
           key={locale}
-          href={`/${locale}/${rest}`.replace(/\/$/, "")}
+          href={hrefForLocale(locale)}
           className={`px-2 py-1 transition ${currentLocale === locale ? "text-white" : "text-white/50"}`}
         >
           {localeLabels[locale].slice(0, 2)}

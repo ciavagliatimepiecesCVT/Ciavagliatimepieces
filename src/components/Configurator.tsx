@@ -1479,10 +1479,15 @@ export default function Configurator({
       </div>
 
       {reviewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
-          <div className="w-full max-w-4xl rounded-2xl border border-white/20 bg-[var(--logo-green)] p-5 text-white shadow-[0_40px_120px_rgba(0,0,0,0.6)] sm:p-7">
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-black/65 p-4 py-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="configurator-review-order-title"
+        >
+          <div className="my-auto w-full max-w-4xl rounded-2xl border border-white/20 bg-[var(--logo-green)] p-5 text-white shadow-[0_40px_120px_rgba(0,0,0,0.6)] sm:p-7">
             <div className="mb-5 flex items-center justify-between gap-3">
-              <h3 className="text-xl font-semibold">
+              <h3 id="configurator-review-order-title" className="text-xl font-semibold">
                 {isFr ? "Vérifier la commande" : "Review order"}
               </h3>
               <button
@@ -1495,6 +1500,9 @@ export default function Configurator({
             </div>
 
             <div className="flex flex-col items-center gap-5">
+              <p className="w-full text-center text-sm font-medium uppercase tracking-[0.2em] text-white/80">
+                {isFr ? "Aperçu de votre montre" : "Your watch preview"}
+              </p>
               <div
                 className="relative z-0 isolate flex items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)]"
                 style={{ width: 520, height: 520 }}
