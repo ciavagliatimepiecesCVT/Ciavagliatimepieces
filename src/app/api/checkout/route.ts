@@ -4,6 +4,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getUsdToCadRate } from "@/lib/currency";
 import { optionAppliesToFunction } from "@/lib/configurator-constants";
 import { getSiteUrl, getStripe } from "@/lib/stripe";
+import { parseShippingSelection } from "@/lib/shipping/parse-selection";
+import { SHIPPING_ALLOWED_COUNTRIES, type SelectedShippingPayload } from "@/lib/shipping/types";
 
 /** Stripe line item name: include chosen variant so checkout clearly shows what they're buying. */
 function getBuiltProductLineItemName(
@@ -369,6 +371,8 @@ export async function POST(request: NextRequest) {
     }>;
     configuration?: Record<string, string | number>;
     productId?: string;
+    /** FlagShip-selected rate from /api/shipping/quote (required when shipping is not free). */
+    shippingSelection?: unknown;
   };
   const body = payload as CheckoutPayload;
   const { locale, type, userId } = body;
@@ -423,6 +427,7 @@ export async function POST(request: NextRequest) {
     };
     const lineItems: LineItem[] = [];
     let freeShippingApplicable = false;
+    let paidShipping: SelectedShippingPayload | null = null;
 
     if (type === "custom" && body.configuration) {
       const cfg = body.configuration as Record<string, unknown>;
@@ -705,6 +710,17 @@ export async function POST(request: NextRequest) {
           unit_amount: 0,
         },
       });
+    } else {
+      paidShipping = parseShippingSelection(body.shippingSelection);
+      if (!paidShipping) {
+        return NextResponse.json(
+          {
+            error:
+              "Please complete shipping: open checkout, enter your address, choose a carrier, then pay.",
+          },
+          { status: 400 }
+        );
+      }
     }
 
     if (lineItems.length === 0) {
@@ -712,25 +728,35 @@ export async function POST(request: NextRequest) {
     }
 
     // All line amounts are in CAD. If user chose USD, convert to USD.
+    let usdToCad = 1;
+    if (currency === "usd") {
+      usdToCad = await getUsdToCadRate();
+    }
     let finalLineItems = lineItems;
     if (currency === "usd") {
-      const rate = await getUsdToCadRate();
       finalLineItems = lineItems.map((item) => ({
         ...item,
         price_data: {
           ...item.price_data,
           currency: "usd",
-          unit_amount: Math.round(item.price_data.unit_amount / rate),
+          unit_amount: Math.round(item.price_data.unit_amount / usdToCad),
         },
       }));
     }
 
-    // Stripe minimum is 0.50 in the selected currency
+    // Stripe minimum is 0.50 in the selected currency (include FlagShip shipping when applicable).
     const STRIPE_MIN_CENTS = 50;
-    const totalCents = finalLineItems.reduce(
+    const lineSumCents = finalLineItems.reduce(
       (sum, item) => sum + item.quantity * item.price_data.unit_amount,
       0
     );
+    let shippingCentsForMin = 0;
+    if (paidShipping) {
+      const shipCadCents = Math.round(paidShipping.price * 100);
+      shippingCentsForMin =
+        currency === "usd" ? Math.round(shipCadCents / usdToCad) : shipCadCents;
+    }
+    const totalCents = lineSumCents + shippingCentsForMin;
     if (totalCents < STRIPE_MIN_CENTS) {
       const symbol = currency === "cad" ? "C$" : "$";
       const totalFormatted = (totalCents / 100).toFixed(2);
@@ -763,21 +789,55 @@ export async function POST(request: NextRequest) {
       metadata.cart_product_quantities = guestCartProductQuantitiesJson;
     }
 
-    const sessionParams = {
-      mode: "payment" as const,
+    if (paidShipping) {
+      // Compact JSON for Stripe metadata (500 char limit per value). Used again when purchasing labels.
+      metadata.flagship_quote = JSON.stringify({
+        cn: paidShipping.courier_name,
+        cc: paidShipping.courier_code,
+        p: paidShipping.price,
+        car: paidShipping.carrier,
+        svc: paidShipping.service_name,
+      });
+    }
+
+    const stripeCurrency = currency === "cad" ? "cad" : "usd";
+    const shippingStripeCents = paidShipping
+      ? currency === "usd"
+        ? Math.max(0, Math.round((paidShipping.price * 100) / usdToCad))
+        : Math.max(0, Math.round(paidShipping.price * 100))
+      : 0;
+
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
+      mode: "payment",
       line_items: finalLineItems,
       success_url: `${siteUrl}/${localeSegment}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/${localeSegment}/checkout/cancel`,
       metadata,
-      locale: (localeSegment === "fr" ? "fr" : "en") as "fr" | "en",
-      billing_address_collection: "required" as const,
+      locale: localeSegment === "fr" ? "fr" : "en",
+      billing_address_collection: "required",
       shipping_address_collection: {
-        allowed_countries: ["US", "CA", "GB", "FR", "DE", "IT", "ES", "CH", "AU", "JP"] as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection["allowed_countries"],
+        allowed_countries: [...SHIPPING_ALLOWED_COUNTRIES],
       },
       allow_promotion_codes: true,
       automatic_tax: { enabled: true },
       invoice_creation: { enabled: true },
     };
+
+    if (paidShipping && shippingStripeCents >= 0) {
+      const displayName = `${paidShipping.carrier} — ${paidShipping.service_name}`.slice(0, 100);
+      sessionParams.shipping_options = [
+        {
+          shipping_rate_data: {
+            type: "fixed_amount",
+            fixed_amount: {
+              amount: shippingStripeCents,
+              currency: stripeCurrency,
+            },
+            display_name: displayName,
+          },
+        },
+      ];
+    }
 
     let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>;
     try {

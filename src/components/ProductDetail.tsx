@@ -315,28 +315,8 @@ export default function ProductDetail({
         return;
       }
 
-      const response = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          locale: activeLocale,
-          type: "built",
-          productId: product.id,
-          userId: user?.id ?? null,
-          currency,
-        }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (response.ok && data?.url) {
-        window.location.href = data.url;
-        return;
-      }
-      const message =
-        typeof data?.error === "string"
-          ? data.error
-          : isFr ? "Impossible de lancer la commande. Réessayez." : "Could not start checkout. Please try again.";
-      alert(message);
+      window.location.href = `/${activeLocale}/checkout?type=built&productId=${encodeURIComponent(product.id)}`;
+      return;
     } finally {
       setLoading(false);
     }

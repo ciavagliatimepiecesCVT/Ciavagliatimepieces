@@ -26,6 +26,10 @@ type ProductInput = {
   active: boolean;
   category?: string | null;
   free_shipping?: boolean;
+  weight_lb?: number | null;
+  length_in?: number | null;
+  width_in?: number | null;
+  height_in?: number | null;
 };
 
 async function requireAdmin() {
@@ -2992,13 +2996,20 @@ export type OrderRow = {
   tracking_number: string | null;
   tracking_carrier: string | null;
   tracking_url: string | null;
+  shipping_carrier: string | null;
+  shipping_service: string | null;
+  shipping_cost: number | null;
+  flagship_shipment_id: string | null;
+  shipping_label_url: string | null;
+  shipment_status: string | null;
   created_at: string;
 };
 
 export async function getAdminOrders(): Promise<OrderRow[]> {
   await requireAdmin();
   const supabase = createServerClient();
-  const fullSelect = "id, order_number, configuration_id, user_id, total, status, summary, stripe_session_id, customer_email, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, tracking_number, tracking_carrier, tracking_url, created_at";
+  const fullSelect =
+    "id, order_number, configuration_id, user_id, total, status, summary, stripe_session_id, customer_email, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, tracking_number, tracking_carrier, tracking_url, shipping_carrier, shipping_service, shipping_cost, flagship_shipment_id, shipping_label_url, shipment_status, created_at";
   const { data, error } = await supabase
     .from("orders")
     .select(fullSelect)
@@ -3024,9 +3035,26 @@ export async function getAdminOrders(): Promise<OrderRow[]> {
       tracking_number: null,
       tracking_carrier: null,
       tracking_url: null,
+      shipping_carrier: null,
+      shipping_service: null,
+      shipping_cost: null,
+      flagship_shipment_id: null,
+      shipping_label_url: null,
+      shipment_status: null,
     })) as OrderRow[];
   }
   return [];
+}
+
+export async function getAdminOrderById(orderId: string): Promise<OrderRow | null> {
+  await requireAdmin();
+  if (!orderId?.trim()) return null;
+  const supabase = createServerClient();
+  const fullSelect =
+    "id, order_number, configuration_id, user_id, total, status, summary, stripe_session_id, customer_email, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, tracking_number, tracking_carrier, tracking_url, shipping_carrier, shipping_service, shipping_cost, flagship_shipment_id, shipping_label_url, shipment_status, created_at";
+  const { data, error } = await supabase.from("orders").select(fullSelect).eq("id", orderId.trim()).maybeSingle();
+  if (!error && data) return data as OrderRow;
+  return null;
 }
 
 export type OrderStatus = "new" | "shipped" | "completed";

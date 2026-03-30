@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { getPublicConfiguratorData, getProductConfiguratorConfig } from "@/app/[locale]/account/admin/actions";
+import { createServerClient } from "@/lib/supabase/server";
 import { Locale } from "@/lib/i18n";
 
 const Configurator = dynamic(() => import("@/components/Configurator"), {
@@ -39,10 +40,14 @@ export default async function ConfiguratorPage({
 }) {
   const { locale } = await params;
   const { edit: editCartItemId, product: productId, adminPreset, productName, saved: savedConfigurationId } = await searchParams;
-  const [initialConfigData, initialProductConfig] = await Promise.all([
+  const supabase = createServerClient();
+  const [{ data: freeShipRow }, initialConfigData, initialProductConfig] = await Promise.all([
+    supabase.from("site_settings").select("value").eq("key", "configurator_free_shipping").maybeSingle(),
     getPublicConfiguratorData(),
     productId ? getProductConfiguratorConfig(productId) : Promise.resolve(null),
   ]);
+  const configuratorFreeShipping =
+    freeShipRow?.value === "true" || freeShipRow?.value === "1";
 
   const decodedProductName =
     typeof productName === "string"
@@ -67,6 +72,7 @@ export default async function ConfiguratorPage({
         initialProductConfig={initialProductConfig ?? undefined}
         initialData={initialConfigData}
         adminPresetProduct={adminPresetProduct}
+        configuratorFreeShipping={configuratorFreeShipping}
       />
     </section>
   );

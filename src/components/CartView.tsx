@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getPublicConfiguratorData } from "@/app/[locale]/account/admin/actions";
 import { CartItemPreview } from "@/components/CartItemPreview";
@@ -40,12 +40,10 @@ type CartLabels = {
 
 export default function CartView({ locale, labels }: { locale: string; labels: CartLabels }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { currency, formatPrice } = useCurrency();
+  const { formatPrice } = useCurrency();
   const activeLocale = locale || pathname.split("/").filter(Boolean)[0] || "en";
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
@@ -131,45 +129,6 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
     await supabase.from("cart_items").delete().eq("id", itemId);
     setItems((prev) => prev.filter((i) => i.id !== itemId));
     window.dispatchEvent(new CustomEvent("cart-updated"));
-  };
-
-  const handleCheckout = async () => {
-    if (items.length === 0) return;
-    setCheckoutLoading(true);
-    setError(null);
-    try {
-      const supabase = createBrowserClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      const body: Record<string, unknown> = {
-        locale: activeLocale,
-        type: "cart",
-        currency,
-      };
-      if (user) {
-        body.userId = user.id;
-      } else {
-        body.guestCart = items.map((i) => ({
-          product_id: i.product_id,
-          quantity: i.quantity,
-          price: i.price,
-          title: i.title,
-          configuration: i.configuration,
-        }));
-      }
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data?.url) {
-        window.location.href = data.url;
-        return;
-      }
-      setError(typeof data?.error === "string" ? data.error : "Could not start checkout.");
-    } finally {
-      setCheckoutLoading(false);
-    }
   };
 
   if (loading) {
@@ -352,14 +311,12 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
               <p className="text-lg font-semibold">
                 {labels.subtotal}: {formatPrice(subtotal)}
               </p>
-              <button
-                type="button"
-                onClick={handleCheckout}
-                disabled={checkoutLoading}
-                className="btn-hover rounded-full bg-foreground px-8 py-3 text-sm font-medium uppercase tracking-[0.2em] text-white transition hover:bg-foreground/90 disabled:opacity-60"
+              <Link
+                href={`/${activeLocale}/checkout`}
+                className="btn-hover inline-block rounded-full bg-foreground px-8 py-3 text-sm font-medium uppercase tracking-[0.2em] text-white transition hover:bg-foreground/90"
               >
-                {checkoutLoading ? "…" : labels.checkout}
-              </button>
+                {labels.checkout}
+              </Link>
             </div>
           </>
         )}

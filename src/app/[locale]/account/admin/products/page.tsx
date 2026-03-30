@@ -38,6 +38,10 @@ type Product = {
   active: boolean | null;
   category: string | null;
   free_shipping: boolean | null;
+  weight_lb?: number | null;
+  length_in?: number | null;
+  width_in?: number | null;
+  height_in?: number | null;
 };
 
 export default function AdminProductsPage() {
@@ -121,6 +125,10 @@ export default function AdminProductsPage() {
       active: p.active ?? true,
       category: p.category ?? undefined,
       free_shipping: p.free_shipping ?? false,
+      weight_lb: p.weight_lb ?? undefined,
+      length_in: p.length_in ?? undefined,
+      width_in: p.width_in ?? undefined,
+      height_in: p.height_in ?? undefined,
     });
     setError(null);
     try {
@@ -169,6 +177,10 @@ export default function AdminProductsPage() {
         active: formData.active ?? true,
         category: formData.category ?? null,
         free_shipping: formData.free_shipping ?? false,
+        weight_lb: formData.weight_lb != null ? Number(formData.weight_lb) : null,
+        length_in: formData.length_in != null ? Number(formData.length_in) : null,
+        width_in: formData.width_in != null ? Number(formData.width_in) : null,
+        height_in: formData.height_in != null ? Number(formData.height_in) : null,
       });
       setProducts(await getAdminProducts());
       cancelEdit();
@@ -198,6 +210,10 @@ export default function AdminProductsPage() {
         active: formData.active ?? true,
         category: formData.category ?? null,
         free_shipping: formData.free_shipping ?? false,
+        weight_lb: formData.weight_lb != null ? Number(formData.weight_lb) : null,
+        length_in: formData.length_in != null ? Number(formData.length_in) : null,
+        width_in: formData.width_in != null ? Number(formData.width_in) : null,
+        height_in: formData.height_in != null ? Number(formData.height_in) : null,
       });
       const newId = getProductIdFromName(formData.name);
       for (let i = 0; i < newProductExtraImages.length; i++) {
@@ -360,6 +376,10 @@ export default function AdminProductsPage() {
                 active: true,
                 category: undefined,
                 free_shipping: false,
+                weight_lb: undefined,
+                length_in: undefined,
+                width_in: undefined,
+                height_in: undefined,
               });
               setNewProductExtraImages([]);
               setNewProductExtraUrlInput("");
@@ -548,6 +568,16 @@ export default function AdminProductsPage() {
                 />
                 <label htmlFor="new-free-shipping" className="text-sm">{isFr ? "Livraison gratuite" : "Free shipping"}</label>
               </div>
+              <div className="sm:col-span-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-foreground/60">{isFr ? "Expédition (FlagShip)" : "Shipping (FlagShip)"}</p>
+                <p className="mt-1 text-xs text-foreground/50">{isFr ? "Optionnel. Livres et pouces — sinon dimensions par défaut." : "Optional. Pounds and inches; fallback package rules apply if empty."}</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-4">
+                  <input type="number" min={0} step="0.01" placeholder={isFr ? "Poids (lb)" : "Weight (lb)"} value={formData.weight_lb ?? ""} onChange={(e) => setFormData((p) => ({ ...p, weight_lb: e.target.value === "" ? undefined : Number(e.target.value) }))} className="rounded-full border border-foreground/20 px-3 py-2 text-sm" />
+                  <input type="number" min={0} step="0.1" placeholder={isFr ? "L (po)" : "L (in)"} value={formData.length_in ?? ""} onChange={(e) => setFormData((p) => ({ ...p, length_in: e.target.value === "" ? undefined : Number(e.target.value) }))} className="rounded-full border border-foreground/20 px-3 py-2 text-sm" />
+                  <input type="number" min={0} step="0.1" placeholder={isFr ? "l (po)" : "W (in)"} value={formData.width_in ?? ""} onChange={(e) => setFormData((p) => ({ ...p, width_in: e.target.value === "" ? undefined : Number(e.target.value) }))} className="rounded-full border border-foreground/20 px-3 py-2 text-sm" />
+                  <input type="number" min={0} step="0.1" placeholder={isFr ? "H (po)" : "H (in)"} value={formData.height_in ?? ""} onChange={(e) => setFormData((p) => ({ ...p, height_in: e.target.value === "" ? undefined : Number(e.target.value) }))} className="rounded-full border border-foreground/20 px-3 py-2 text-sm" />
+                </div>
+              </div>
             </div>
             <div className="mt-4 flex gap-3">
               <button type="button" onClick={handleAdd} className="btn-hover rounded-full bg-foreground px-6 py-2 text-xs uppercase tracking-[0.2em] text-white">
@@ -717,6 +747,15 @@ export default function AdminProductsPage() {
                       <div className="flex items-center gap-2 pt-2">
                         <input type="checkbox" id={`free-shipping-${p.id}`} checked={formData.free_shipping ?? false} onChange={(e) => setFormData((prev) => ({ ...prev, free_shipping: e.target.checked }))} className="h-4 w-4 rounded" />
                         <label htmlFor={`free-shipping-${p.id}`} className="text-sm">{isFr ? "Livraison gratuite" : "Free shipping"}</label>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <p className="text-xs uppercase tracking-[0.2em] text-foreground/60">{isFr ? "Expédition (FlagShip)" : "Shipping (FlagShip)"}</p>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-4">
+                          <input type="number" min={0} step="0.01" placeholder={isFr ? "Poids (lb)" : "Weight (lb)"} value={formData.weight_lb ?? ""} onChange={(e) => setFormData((prev) => ({ ...prev, weight_lb: e.target.value === "" ? undefined : Number(e.target.value) }))} className="rounded-full border border-foreground/20 px-3 py-2 text-sm" />
+                          <input type="number" min={0} step="0.1" placeholder={isFr ? "L (po)" : "L (in)"} value={formData.length_in ?? ""} onChange={(e) => setFormData((prev) => ({ ...prev, length_in: e.target.value === "" ? undefined : Number(e.target.value) }))} className="rounded-full border border-foreground/20 px-3 py-2 text-sm" />
+                          <input type="number" min={0} step="0.1" placeholder={isFr ? "l (po)" : "W (in)"} value={formData.width_in ?? ""} onChange={(e) => setFormData((prev) => ({ ...prev, width_in: e.target.value === "" ? undefined : Number(e.target.value) }))} className="rounded-full border border-foreground/20 px-3 py-2 text-sm" />
+                          <input type="number" min={0} step="0.1" placeholder={isFr ? "H (po)" : "H (in)"} value={formData.height_in ?? ""} onChange={(e) => setFormData((prev) => ({ ...prev, height_in: e.target.value === "" ? undefined : Number(e.target.value) }))} className="rounded-full border border-foreground/20 px-3 py-2 text-sm" />
+                        </div>
                       </div>
                       <div className="sm:col-span-2 pt-2">
                         <p className="text-xs uppercase tracking-[0.2em] text-foreground/60">{isFr ? "Bouton « Modifier » (configurateur)" : "« Edit now » button (configurator)"}</p>

@@ -165,6 +165,23 @@ export async function POST(request: NextRequest) {
         await supabase.from("cart_items").delete().eq("user_id", userId);
       }
 
+      let shippingCarrier: string | null = null;
+      let shippingService: string | null = null;
+      let shippingCost: number | null = null;
+      let shipmentStatus: string | null = null;
+      const fqRaw = session.metadata?.flagship_quote;
+      if (typeof fqRaw === "string" && fqRaw.trim()) {
+        try {
+          const fq = JSON.parse(fqRaw) as { car?: string; svc?: string; p?: number };
+          shippingCarrier = typeof fq.car === "string" ? fq.car : null;
+          shippingService = typeof fq.svc === "string" ? fq.svc : null;
+          shippingCost = typeof fq.p === "number" && Number.isFinite(fq.p) ? fq.p : null;
+          shipmentStatus = "quoted";
+        } catch {
+          console.warn("[Webhook] Could not parse flagship_quote metadata");
+        }
+      }
+
       const { data: insertedOrder, error: insertOrderError } = await supabase
         .from("orders")
         .insert({
@@ -182,6 +199,10 @@ export async function POST(request: NextRequest) {
           shipping_state: shippingState,
           shipping_postal_code: shippingPostalCode,
           shipping_country: shippingCountry,
+          shipping_carrier: shippingCarrier,
+          shipping_service: shippingService,
+          shipping_cost: shippingCost,
+          shipment_status: shipmentStatus,
         })
         .select("id")
         .single();

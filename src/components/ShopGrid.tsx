@@ -72,40 +72,9 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
     }
   };
 
-  const handleBuyNow = async (watch: Watch) => {
+  const handleBuyNow = (watch: Watch) => {
     if ((watch.stock ?? 1) < 1) return;
-    setLoadingId(watch.id);
-    try {
-      const supabase = createBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      const response = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          locale: activeLocale,
-          type: "built",
-          productId: watch.id,
-          userId: user?.id ?? null,
-          currency,
-        }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (response.ok && data?.url) {
-        window.location.href = data.url;
-        return;
-      }
-      const message =
-        typeof data?.error === "string"
-          ? data.error
-          : isFr ? "Impossible de lancer la commande. Réessayez." : "Could not start checkout. Please try again.";
-      alert(message);
-    } finally {
-      setLoadingId(null);
-    }
+    window.location.href = `/${activeLocale}/checkout?type=built&productId=${encodeURIComponent(watch.id)}`;
   };
 
   return (

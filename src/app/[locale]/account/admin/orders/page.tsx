@@ -301,7 +301,12 @@ export default function AdminOrdersPage() {
                 {displayedOrders.map((order) => (
                   <tr key={order.id} className="border-b border-foreground/5">
                     <td className="p-4 font-mono text-sm text-foreground/80">
-                      {order.order_number ?? "—"}
+                      <a
+                        href={`/${locale}/account/admin/orders/${order.id}`}
+                        className="text-[var(--accent)] underline hover:no-underline"
+                      >
+                        {order.order_number ?? "—"}
+                      </a>
                     </td>
                     <td className="p-4 text-foreground/80">
                       {new Date(order.created_at).toLocaleString()}

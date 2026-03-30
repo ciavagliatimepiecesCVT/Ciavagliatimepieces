@@ -11,6 +11,8 @@ import { useCurrency } from "@/components/CurrencyContext";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getPublicConfiguratorData, setProductConfiguratorConfig } from "@/app/[locale]/account/admin/actions";
 import { addGuestCartItem } from "@/lib/guest-cart";
+import { ShippingQuoteSection } from "@/components/shipping/ShippingQuoteSection";
+import type { SelectedShippingPayload } from "@/lib/shipping/types";
 
 // Use site theme from globals.css: --accent, --foreground, --background
 
@@ -44,9 +46,20 @@ type ConfiguratorProps = {
   initialData?: Awaited<ReturnType<typeof getPublicConfiguratorData>> | null;
   /** When set, show admin bar to save current build as preset for this product. */
   adminPresetProduct?: { id: string; name: string };
+  /** From site_settings: when true, skip FlagShip quotes (free configurator shipping). */
+  configuratorFreeShipping?: boolean;
 };
 
-export default function Configurator({ locale, editCartItemId, productId, savedConfigurationId, initialProductConfig, initialData, adminPresetProduct }: ConfiguratorProps) {
+export default function Configurator({
+  locale,
+  editCartItemId,
+  productId,
+  savedConfigurationId,
+  initialProductConfig,
+  initialData,
+  adminPresetProduct,
+  configuratorFreeShipping = false,
+}: ConfiguratorProps) {
   const isFr = locale === "fr";
   const router = useRouter();
   const { currency, formatPrice } = useCurrency();
@@ -71,6 +84,7 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
   const [addToCartError, setAddToCartError] = useState<string | null>(null);
   const [adminPresetSaving, setAdminPresetSaving] = useState(false);
   const [adminPresetError, setAdminPresetError] = useState<string | null>(null);
+  const [shippingSelection, setShippingSelection] = useState<SelectedShippingPayload | null>(null);
   /** For non-function steps: which group card is expanded (groupId or null). */
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -514,29 +528,41 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
 
   const handleReviewOrder = async () => {
     setCheckoutError(null);
+    if (!configuratorFreeShipping && !shippingSelection) {
+      setCheckoutError(
+        isFr
+          ? "Indiquez l’adresse de livraison et choisissez un transporteur."
+          : "Enter your shipping address and choose a carrier."
+      );
+      return;
+    }
     setLoading(true);
     try {
       const supabase = createBrowserClient();
       const { data: { user } } = await supabase.auth.getUser();
       const extras = stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [];
+      const body: Record<string, unknown> = {
+        locale,
+        type: "custom",
+        userId: user?.id ?? null,
+        currency,
+        configuration: {
+          steps: stepsPayload,
+          extras,
+          addonIds: addonIdsPayload,
+          dropdownSelections: Object.keys(dropdownSelections).length ? dropdownSelections : undefined,
+          customCheckboxSelections: Object.keys(customCheckboxSelections).length ? customCheckboxSelections : undefined,
+          summaryLines: totalLineItems.length ? totalLineItems : undefined,
+          price: total,
+        },
+      };
+      if (!configuratorFreeShipping && shippingSelection) {
+        body.shippingSelection = shippingSelection;
+      }
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          locale,
-          type: "custom",
-          userId: user?.id ?? null,
-          currency,
-          configuration: {
-            steps: stepsPayload,
-            extras,
-            addonIds: addonIdsPayload,
-            dropdownSelections: Object.keys(dropdownSelections).length ? dropdownSelections : undefined,
-            customCheckboxSelections: Object.keys(customCheckboxSelections).length ? customCheckboxSelections : undefined,
-            summaryLines: totalLineItems.length ? totalLineItems : undefined,
-            price: total,
-          },
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1515,6 +1541,32 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
                 </div>
               )}
 
+              {!configuratorFreeShipping && (
+                <div className="w-full text-left">
+                  <ShippingQuoteSection
+                    locale={locale}
+                    isFr={isFr}
+                    quoteRequest={{
+                      type: "custom",
+                      configuration: {
+                        steps: stepsPayload,
+                        extras:
+                          stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [],
+                        addonIds: addonIdsPayload,
+                        dropdownSelections: Object.keys(dropdownSelections).length ? dropdownSelections : undefined,
+                        customCheckboxSelections: Object.keys(customCheckboxSelections).length
+                          ? customCheckboxSelections
+                          : undefined,
+                        summaryLines: totalLineItems.length ? totalLineItems : undefined,
+                        price: total,
+                      },
+                    }}
+                    selected={shippingSelection}
+                    onSelect={setShippingSelection}
+                  />
+                </div>
+              )}
+
               <div className="flex w-full flex-wrap justify-end gap-3">
                 <button
                   type="button"
@@ -1534,7 +1586,10 @@ export default function Configurator({ locale, editCartItemId, productId, savedC
                 <button
                   type="button"
                   onClick={handleReviewOrder}
-                  disabled={loading}
+                  disabled={
+                    loading ||
+                    (!configuratorFreeShipping && !shippingSelection)
+                  }
                   className="rounded-lg bg-foreground px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? "…" : isFr ? "Continuer au paiement →" : "Continue to payment →"}
