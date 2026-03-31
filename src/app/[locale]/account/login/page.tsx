@@ -105,6 +105,14 @@ export default function LoginPage() {
                   className="mt-2 w-full rounded-full border border-foreground/20 bg-white/80 px-4 py-3 text-sm"
                 />
               </div>
+              <div className="flex justify-end">
+                <Link
+                  href={`/${locale}/account/forgot-password`}
+                  className="text-xs uppercase tracking-[0.2em] text-foreground/70 underline underline-offset-4"
+                >
+                  {isFr ? "Mot de passe oublie ?" : "Forgot password?"}
+                </Link>
+              </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
               <button
                 type="submit"
