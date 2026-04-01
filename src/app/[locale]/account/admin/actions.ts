@@ -6,6 +6,7 @@ import { isAdmin } from "@/lib/admin";
 import { getWatchCategories as getWatchCategoriesLib } from "@/lib/watch-categories";
 import { DEFAULT_FOOTER, type FooterSettings } from "@/lib/footer-settings";
 import { DEFAULT_FAQ, type FaqSettings } from "@/lib/faq-settings";
+import { DEFAULT_ABOUT, type AboutSettings } from "@/lib/about-settings";
 import { DEFAULT_HOME_STYLE_CARDS, type HomeStyleCards } from "@/lib/home-style-cards";
 import { builtWatches } from "@/data/watches";
 import { hasPublicConfiguratorPreset } from "@/lib/configurator-preset";
@@ -1318,6 +1319,37 @@ export async function setFaqSettings(data: FaqSettings) {
     { onConflict: "key" }
   );
   revalidatePath("/[locale]/faq", "page");
+}
+
+// ——— About (admin-editable page content) ———
+export async function getAboutSettings(): Promise<AboutSettings> {
+  try {
+    const supabase = createServerClient();
+    const { data, error } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", "about")
+      .single();
+    if (error || !data?.value) return DEFAULT_ABOUT;
+    const parsed = JSON.parse((data as { value: string }).value) as Partial<AboutSettings>;
+    return {
+      title: parsed.title ?? DEFAULT_ABOUT.title,
+      body: parsed.body ?? DEFAULT_ABOUT.body,
+    };
+  } catch {
+    return DEFAULT_ABOUT;
+  }
+}
+
+export async function setAboutSettings(data: AboutSettings) {
+  await requireAdmin();
+  const supabase = createServerClient();
+  await supabase.from("site_settings").upsert(
+    { key: "about", value: JSON.stringify(data), updated_at: new Date().toISOString() },
+    { onConflict: "key" }
+  );
+  revalidatePath("/[locale]/about", "page");
+  revalidatePath("/[locale]/account/admin/about", "page");
 }
 
 // ——— Home style cards (Custom Build + Shop, inline edit on home) ———

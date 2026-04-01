@@ -15,6 +15,7 @@ const navItems = [
   { href: "featured", labelEn: "Featured", labelFr: "À la une" },
   { href: "giveaway", labelEn: "Giveaway", labelFr: "Concours" },
   { href: "footer", labelEn: "Footer", labelFr: "Pied de page" },
+  { href: "about", labelEn: "About", labelFr: "À propos" },
 ] as const;
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

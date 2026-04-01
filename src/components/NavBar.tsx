@@ -14,6 +14,7 @@ import type { WatchCategory } from "@/lib/watch-categories";
 
 type NavLabels = {
   home: string;
+  about: string;
   shop: string;
   configurator: string;
   allWatches: string;
@@ -27,6 +28,7 @@ type NavLabels = {
 
 const navItems = [
   { key: "home", href: "" },
+  { key: "about", href: "about" },
   { key: "contact", href: "contact" },
 ];
 

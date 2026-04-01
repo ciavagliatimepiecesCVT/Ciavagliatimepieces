@@ -10,6 +10,7 @@ export const dictionaries = {
   en: {
     nav: {
       home: "Home",
+      about: "About",
       shop: "Watches",
       configurator: "Custom Build",
       allWatches: "All watches",
@@ -71,6 +72,7 @@ export const dictionaries = {
   fr: {
     nav: {
       home: "Accueil",
+      about: "A propos",
       shop: "Montres",
       configurator: "Construction sur mesure",
       allWatches: "Toutes les montres",

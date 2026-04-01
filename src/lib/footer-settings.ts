@@ -45,6 +45,7 @@ export const DEFAULT_FOOTER: FooterSettings = {
   resources_heading_en: "Resources",
   resources_heading_fr: "Ressources",
   resources_links: [
+    { label_en: "About Me", label_fr: "A propos", path: "/about" },
     { label_en: "Track Order", label_fr: "Suivre une commande", path: "/track-order" },
     { label_en: "Shipping", label_fr: "Expédition", path: "/faq" },
     { label_en: "Contact", label_fr: "Contact", path: "/contact" },
