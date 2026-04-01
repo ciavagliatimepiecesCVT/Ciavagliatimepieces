@@ -15,11 +15,30 @@ const Configurator = dynamic(() => import("@/components/Configurator"), {
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: Locale }>;
+  searchParams: Promise<{ share?: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const { share } = await searchParams;
   const isFr = locale === "fr";
+  let shareImage: string | undefined;
+  if (typeof share === "string" && share.trim()) {
+    const supabase = createServerClient();
+    const { data } = await supabase
+      .from("shared_watch_configurations")
+      .select("id, image_url, preview_data_url")
+      .eq("id", share.trim())
+      .maybeSingle();
+    if (data) {
+      const hasPreview = typeof (data as { preview_data_url?: string | null }).preview_data_url === "string";
+      shareImage =
+        hasPreview
+          ? `/api/configurator/share-image?id=${encodeURIComponent(share.trim())}`
+          : ((data as { image_url?: string | null }).image_url ?? undefined);
+    }
+  }
   return {
     title: isFr ? "Configurateur | Créez votre montre" : "Configurator | Design Your Watch",
     description: isFr
@@ -27,7 +46,9 @@ export async function generateMetadata({
       : "Design your custom watch: case, dial, hands, strap. Live pricing and instant add-to-cart.",
     openGraph: {
       title: isFr ? "Configurateur | Ciavaglia Timepieces" : "Configurator | Ciavaglia Timepieces",
+      images: shareImage ? [{ url: shareImage }] : undefined,
     },
+    twitter: shareImage ? { card: "summary_large_image", images: [shareImage] } : undefined,
   };
 }
 
@@ -36,15 +57,29 @@ export default async function ConfiguratorPage({
   searchParams,
 }: {
   params: Promise<{ locale: Locale }>;
-  searchParams: Promise<{ edit?: string; product?: string; adminPreset?: string; productName?: string; saved?: string }>;
+  searchParams: Promise<{ edit?: string; product?: string; adminPreset?: string; productName?: string; saved?: string; share?: string }>;
 }) {
   const { locale } = await params;
-  const { edit: editCartItemId, product: productId, adminPreset, productName, saved: savedConfigurationId } = await searchParams;
+  const {
+    edit: editCartItemId,
+    product: productId,
+    adminPreset,
+    productName,
+    saved: savedConfigurationId,
+    share: sharedConfigurationId,
+  } = await searchParams;
   const supabase = createServerClient();
-  const [{ data: freeShipRow }, initialConfigData, initialProductConfig] = await Promise.all([
+  const [{ data: freeShipRow }, initialConfigData, initialProductConfig, initialSharedConfigurationResult] = await Promise.all([
     supabase.from("site_settings").select("value").eq("key", "configurator_free_shipping").maybeSingle(),
     getPublicConfiguratorData(),
     productId ? getProductConfiguratorConfig(productId) : Promise.resolve(null),
+    sharedConfigurationId
+      ? supabase
+          .from("shared_watch_configurations")
+          .select("id, configuration")
+          .eq("id", sharedConfigurationId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   const configuratorFreeShipping =
     freeShipRow?.value === "true" || freeShipRow?.value === "1";
@@ -69,6 +104,7 @@ export default async function ConfiguratorPage({
         editCartItemId={editCartItemId ?? undefined}
         productId={productId ?? undefined}
         savedConfigurationId={savedConfigurationId ?? undefined}
+        sharedConfiguration={initialSharedConfigurationResult?.data ?? undefined}
         initialProductConfig={initialProductConfig ?? undefined}
         initialData={initialConfigData}
         adminPresetProduct={adminPresetProduct}

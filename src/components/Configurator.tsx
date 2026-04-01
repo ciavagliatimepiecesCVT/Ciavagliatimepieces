@@ -37,11 +37,17 @@ type ProductConfigShape = {
   customCheckboxSelections?: Record<string, string[]>;
 };
 
+type SharedConfiguration = {
+  id: string;
+  configuration: ConfigShape | null;
+};
+
 type ConfiguratorProps = {
   locale: string;
   editCartItemId?: string;
   productId?: string;
   savedConfigurationId?: string;
+  sharedConfiguration?: SharedConfiguration | null;
   initialProductConfig?: ProductConfigShape | null;
   initialData?: Awaited<ReturnType<typeof getPublicConfiguratorData>> | null;
   /** When set, show admin bar to save current build as preset for this product. */
@@ -55,6 +61,7 @@ export default function Configurator({
   editCartItemId,
   productId,
   savedConfigurationId,
+  sharedConfiguration,
   initialProductConfig,
   initialData,
   adminPresetProduct,
@@ -68,6 +75,7 @@ export default function Configurator({
   const [editLoadDone, setEditLoadDone] = useState(false);
   const [productPresetLoadDone, setProductPresetLoadDone] = useState(false);
   const [savedConfigurationLoadDone, setSavedConfigurationLoadDone] = useState(false);
+  const [sharedConfigurationLoadDone, setSharedConfigurationLoadDone] = useState(false);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [selections, setSelections] = useState<Partial<Record<string, string>>>({});
@@ -84,6 +92,9 @@ export default function Configurator({
   const [addToCartError, setAddToCartError] = useState<string | null>(null);
   const [adminPresetSaving, setAdminPresetSaving] = useState(false);
   const [adminPresetError, setAdminPresetError] = useState<string | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [shippingSelection, setShippingSelection] = useState<SelectedShippingPayload | null>(null);
   /** For non-function steps: which group card is expanded (groupId or null). */
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
@@ -128,6 +139,10 @@ export default function Configurator({
   useEffect(() => {
     if (savedConfigurationId) setSavedConfigurationLoadDone(false);
   }, [savedConfigurationId]);
+
+  useEffect(() => {
+    if (sharedConfiguration?.id) setSharedConfigurationLoadDone(false);
+  }, [sharedConfiguration?.id]);
 
   useEffect(() => {
     if (!editCartItemId || !configData || editLoadDone) return;
@@ -244,6 +259,51 @@ export default function Configurator({
       cancelled = true;
     };
   }, [editCartItemId, savedConfigurationId, configData, savedConfigurationLoadDone]);
+
+  useEffect(() => {
+    if (
+      editCartItemId ||
+      savedConfigurationId ||
+      !sharedConfiguration?.configuration ||
+      !configData ||
+      sharedConfigurationLoadDone
+    ) {
+      return;
+    }
+    const config = sharedConfiguration.configuration as ConfigShape;
+    const stepsMeta = configData.stepsMeta ?? [];
+    const functionStepsMap = configData.functionStepsMap ?? {};
+    const stepIdToMeta = new Map(stepsMeta.map((s) => [s.id, s]));
+    const steps = Array.isArray(config.steps) ? config.steps : [];
+    const funcId = steps[0] && typeof steps[0] === "string" ? steps[0] : "";
+    const stepIds = functionStepsMap[funcId] ?? [];
+    const stepKeys = stepIds
+      .map((sid) => stepIdToMeta.get(sid)?.step_key)
+      .filter((k): k is string => !!k);
+    const stepsForSharedConfig = ["function", ...stepKeys];
+    const nextSelections: Partial<Record<string, string>> = { function: funcId };
+    stepsForSharedConfig.forEach((key, i) => {
+      const val = steps[i] && typeof steps[i] === "string" ? steps[i] : "";
+      if (val && key !== "function") nextSelections[key] = val;
+    });
+    const addonIds = Array.isArray(config.addonIds) ? config.addonIds : [];
+    const nextAddons: Record<string, boolean> = {};
+    addonIds.forEach((id) => {
+      if (typeof id === "string") nextAddons[id] = true;
+    });
+    const nextDropdowns = (config.dropdownSelections && typeof config.dropdownSelections === "object")
+      ? config.dropdownSelections as Record<string, string>
+      : {};
+    const nextCheckbox = (config.customCheckboxSelections && typeof config.customCheckboxSelections === "object" && !Array.isArray(config.customCheckboxSelections))
+      ? (config.customCheckboxSelections as Record<string, string[]>)
+      : {};
+    setSelections(nextSelections);
+    setAddonChecked(nextAddons);
+    setDropdownSelections(nextDropdowns);
+    setCustomCheckboxSelections(nextCheckbox);
+    setStepIndex(Math.max(0, stepsForSharedConfig.length - 1));
+    setSharedConfigurationLoadDone(true);
+  }, [editCartItemId, savedConfigurationId, sharedConfiguration, configData, sharedConfigurationLoadDone]);
 
   useEffect(() => {
     if (editCartItemId || !configData || !initialProductConfig?.steps?.length || productPresetLoadDone) return;
@@ -676,12 +736,11 @@ export default function Configurator({
   }, [selections, options, stepsForFunction, functionId, stepIdsForFunction, functionStep?.id]);
 
   /** Capture the watch preview as a data URL for cart thumbnail (smaller size to keep payload reasonable). */
-  const capturePreviewDataUrl = useCallback(async (): Promise<string | null> => {
+  const capturePreviewDataUrl = useCallback(async (targetPx = 200): Promise<string | null> => {
     const el = previewContainerRef.current;
     if (!el) return null;
     const doCapture = async (): Promise<string | null> => {
-      const CART_PREVIEW_PX = 200;
-      const scale = CART_PREVIEW_PX / CONFIGURATOR_PREVIEW_SIZE_PX;
+      const scale = targetPx / CONFIGURATOR_PREVIEW_SIZE_PX;
       const canvas = await html2canvas(el, {
         scale,
         useCORS: true,
@@ -835,6 +894,89 @@ export default function Configurator({
     });
     return lines;
   }, [stepsForFunction, selections, dropdownSelections, functionId, functionStep?.id, stepIdsForFunction, options, addons, addonChecked, isFr, stepIdToMeta]);
+
+  const handleShareBuild = useCallback(async () => {
+    if (!stepsPayload.length || !stepsPayload[0]) {
+      setShareError(isFr ? "Sélectionnez au moins un modèle à partager." : "Pick a watch function before sharing.");
+      setShareStatus(null);
+      return;
+    }
+    setShareLoading(true);
+    setShareError(null);
+    setShareStatus(null);
+    try {
+      const previewDataUrl = await capturePreviewDataUrl(560);
+      const supabase = createBrowserClient();
+      const configuration: ConfigShape = {
+        steps: stepsPayload,
+        extras: stepsForFunction.includes("extra") && selections.extra ? [selections.extra] : [],
+        addonIds: addonIdsPayload,
+        dropdownSelections: Object.keys(dropdownSelections).length ? dropdownSelections : undefined,
+        customCheckboxSelections: Object.keys(customCheckboxSelections).length ? customCheckboxSelections : undefined,
+        summaryLines: totalLineItems.length ? totalLineItems : undefined,
+      };
+      const { data, error } = await supabase
+        .from("shared_watch_configurations")
+        .insert({
+          configuration,
+          image_url: fallbackThumbnailUrl ?? null,
+          preview_data_url: previewDataUrl,
+          total_price: total,
+        })
+        .select("id")
+        .single();
+      if (error || !data?.id) {
+        setShareError(error?.message ?? (isFr ? "Le partage a échoué." : "Failed to create share link."));
+        return;
+      }
+      const shareUrl = `${window.location.origin}/${locale}/configurator?share=${encodeURIComponent(data.id)}`;
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        copied = true;
+      } catch {
+        copied = false;
+      }
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: isFr ? "Montre personnalisée" : "Custom watch build",
+            text: isFr ? "Regarde la montre que j’ai configurée." : "Check out the watch build I created.",
+            url: shareUrl,
+          });
+          setShareStatus(isFr ? "Lien prêt à partager." : "Share link is ready.");
+          return;
+        } catch {
+          // User dismissed or share failed; clipboard fallback handled below.
+        }
+      }
+
+      if (copied) {
+        setShareStatus(isFr ? "Lien copié dans le presse-papiers." : "Share link copied to clipboard.");
+      } else {
+        window.prompt(isFr ? "Copiez ce lien :" : "Copy this link:", shareUrl);
+        setShareStatus(isFr ? "Lien généré." : "Share link generated.");
+      }
+    } catch {
+      setShareError(isFr ? "Le partage a échoué." : "Failed to create share link.");
+    } finally {
+      setShareLoading(false);
+    }
+  }, [
+    stepsPayload,
+    isFr,
+    capturePreviewDataUrl,
+    stepsForFunction,
+    selections.extra,
+    addonIdsPayload,
+    dropdownSelections,
+    customCheckboxSelections,
+    totalLineItems,
+    fallbackThumbnailUrl,
+    total,
+    locale,
+  ]);
 
   const caseAddons = useMemo(() => {
     const caseStepId = stepsMeta.find((s) => s.step_key === "case")?.id;
@@ -1399,6 +1541,26 @@ export default function Configurator({
             </div>
           )}
         </div>
+      </div>
+
+      <div className="fixed left-4 top-1/2 z-20 -translate-y-1/2">
+        <button
+          type="button"
+          onClick={handleShareBuild}
+          disabled={shareLoading}
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-white/40 bg-white/15 px-3 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-white/25 disabled:opacity-60"
+          aria-label={isFr ? "Partager cette configuration" : "Share this configuration"}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342A3 3 0 017 9a3 3 0 013-3h5a3 3 0 010 6h-1m-4.316-1.342A3 3 0 0017 15a3 3 0 01-3 3H9a3 3 0 010-6h1" />
+          </svg>
+          <span>{shareLoading ? "..." : (isFr ? "Partager" : "Share")}</span>
+        </button>
+        {(shareError || shareStatus) && (
+          <p className={`mt-2 max-w-[14rem] text-xs ${shareError ? "text-red-200" : "text-white/85"}`}>
+            {shareError ?? shareStatus}
+          </p>
+        )}
       </div>
 
       <div className="fixed bottom-6 left-6 z-10 w-[min(20rem,calc(100vw-3rem))]">
