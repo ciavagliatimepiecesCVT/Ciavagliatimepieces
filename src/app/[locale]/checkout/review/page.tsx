@@ -34,6 +34,8 @@ export default function ReviewOrderPage() {
   const [shippingSelection, setShippingSelection] = useState<SelectedShippingPayload | null>(null);
   const [payLoading, setPayLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [builtProduct, setBuiltProduct] = useState<{ name: string; price: number; image: string | null } | null>(null);
   const [configuratorData, setConfiguratorData] = useState<PublicConfiguratorData | null>(null);
 
@@ -228,6 +230,45 @@ export default function ReviewOrderPage() {
       setPayLoading(false);
     }
   };
+
+  const handleShareBuiltWatch = useCallback(async () => {
+    if (checkoutType !== "built" || !productIdParam) return;
+    setShareLoading(true);
+    setShareStatus(null);
+    try {
+      const shareUrl = `${window.location.origin}/${locale}/shop/product/${encodeURIComponent(productIdParam)}`;
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        copied = true;
+      } catch {
+        copied = false;
+      }
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: builtProduct?.name ?? (isFr ? "Montre Ciavaglia" : "Ciavaglia watch"),
+            text: isFr ? "Regarde cette montre." : "Check out this watch.",
+            url: shareUrl,
+          });
+          setShareStatus(isFr ? "Lien prêt à partager." : "Share link is ready.");
+          return;
+        } catch {
+          // User dismissed or share failed; clipboard fallback handled below.
+        }
+      }
+
+      if (copied) {
+        setShareStatus(isFr ? "Lien copié dans le presse-papiers." : "Share link copied to clipboard.");
+      } else {
+        window.prompt(isFr ? "Copiez ce lien :" : "Copy this link:", shareUrl);
+        setShareStatus(isFr ? "Lien généré." : "Share link generated.");
+      }
+    } finally {
+      setShareLoading(false);
+    }
+  }, [checkoutType, productIdParam, locale, builtProduct?.name, isFr]);
 
   if (loadingCart || freeShipping === null) {
     return (
@@ -451,6 +492,21 @@ export default function ReviewOrderPage() {
               ? "Étape suivante : page de paiement Stripe (carte, etc.)."
               : "Next: Stripe’s hosted checkout to enter payment details."}
           </p>
+          {checkoutType === "built" && (
+            <button
+              type="button"
+              onClick={handleShareBuiltWatch}
+              disabled={shareLoading}
+              className="btn-hover rounded-full border border-foreground/20 bg-white px-8 py-3 text-sm font-medium uppercase tracking-[0.2em] text-foreground shadow-[0_8px_24px_-8px_rgba(0,0,0,0.2)] disabled:pointer-events-none disabled:opacity-45"
+            >
+              {shareLoading ? "…" : isFr ? "Partager cette montre" : "Share this watch"}
+            </button>
+          )}
+          {checkoutType === "built" && shareStatus && (
+            <p className="rounded-xl border border-foreground/15 bg-foreground/[0.03] px-4 py-2.5 text-sm text-foreground/75">
+              {shareStatus}
+            </p>
+          )}
           <button
             type="button"
             onClick={handleContinueToPayment}

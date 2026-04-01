@@ -1543,26 +1543,6 @@ export default function Configurator({
         </div>
       </div>
 
-      <div className="fixed left-4 top-1/2 z-20 -translate-y-1/2">
-        <button
-          type="button"
-          onClick={handleShareBuild}
-          disabled={shareLoading}
-          className="inline-flex h-10 items-center gap-2 rounded-full border border-white/40 bg-white/15 px-3 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-white/25 disabled:opacity-60"
-          aria-label={isFr ? "Partager cette configuration" : "Share this configuration"}
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342A3 3 0 017 9a3 3 0 013-3h5a3 3 0 010 6h-1m-4.316-1.342A3 3 0 0017 15a3 3 0 01-3 3H9a3 3 0 010-6h1" />
-          </svg>
-          <span>{shareLoading ? "..." : (isFr ? "Partager" : "Share")}</span>
-        </button>
-        {(shareError || shareStatus) && (
-          <p className={`mt-2 max-w-[14rem] text-xs ${shareError ? "text-red-200" : "text-white/85"}`}>
-            {shareError ?? shareStatus}
-          </p>
-        )}
-      </div>
-
       <div className="fixed bottom-6 left-6 z-10 w-[min(20rem,calc(100vw-3rem))]">
         <button
           type="button"
@@ -1740,6 +1720,14 @@ export default function Configurator({
               <div className="flex w-full flex-wrap justify-end gap-3">
                 <button
                   type="button"
+                  onClick={handleShareBuild}
+                  disabled={shareLoading}
+                  className="rounded-lg border border-white/30 px-5 py-2.5 text-sm font-medium text-white/90 transition hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {shareLoading ? "…" : (isFr ? "Partager cette montre" : "Share this watch")}
+                </button>
+                <button
+                  type="button"
                   onClick={() => setReviewModalOpen(false)}
                   className="rounded-lg border border-white/30 px-5 py-2.5 text-sm font-medium text-white/90 transition hover:bg-white/10"
                 >
@@ -1765,6 +1753,15 @@ export default function Configurator({
                   {loading ? "…" : isFr ? "Continuer au paiement →" : "Continue to payment →"}
                 </button>
               </div>
+              {(shareError || shareStatus) && (
+                <div className={`w-full rounded-xl border px-4 py-3 text-sm ${
+                  shareError
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-white/25 bg-white/10 text-white/90"
+                }`}>
+                  {shareError ?? shareStatus}
+                </div>
+              )}
             </div>
           </div>
         </div>
