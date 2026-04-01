@@ -236,6 +236,7 @@ export async function createShipmentForOrder(orderId: string, force: boolean): P
 
   const paid = String(order.status ?? "").toLowerCase() === "paid";
   if (!paid) throw new Error("Order must be paid before creating a shipment.");
+  const customerEmail = (order as { customer_email?: string | null }).customer_email?.trim() || null;
 
   if ((order as { flagship_shipment_id?: string | null }).flagship_shipment_id && !force) {
     throw new Error("A shipment already exists for this order. Pass force=true to create another.");
@@ -329,6 +330,7 @@ export async function createShipmentForOrder(orderId: string, force: boolean): P
     options: {
       reference: ((order as { id: string }).id.replace(/-/g, "").slice(0, 12)),
       return_documents_as: "url",
+      ...(customerEmail ? { shipment_tracking_emails: customerEmail } : {}),
     },
   };
 

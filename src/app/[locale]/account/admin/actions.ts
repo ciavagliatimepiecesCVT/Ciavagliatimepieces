@@ -3114,7 +3114,7 @@ export async function updateOrderTracking(orderId: string, input: OrderTrackingI
 
   const { data: order } = await supabase
     .from("orders")
-    .select("customer_email, order_number")
+    .select("customer_email, order_number, flagship_shipment_id")
     .eq("id", orderId)
     .single();
 
@@ -3128,12 +3128,15 @@ export async function updateOrderTracking(orderId: string, input: OrderTrackingI
   if (error) throw error;
 
   const customerEmail = (order as { customer_email?: string | null } | null)?.customer_email?.trim();
+  const hasFlagShipShipment = Boolean(
+    (order as { flagship_shipment_id?: string | null } | null)?.flagship_shipment_id
+  );
   const orderNumber = (order as { order_number?: string | null } | null)?.order_number ?? null;
   const trackingNumber = updates.tracking_number ?? input.tracking_number ?? null;
   const trackingCarrier = updates.tracking_carrier ?? input.tracking_carrier ?? null;
   const trackingUrl = updates.tracking_url ?? input.tracking_url ?? null;
 
-  if (customerEmail && (trackingNumber || trackingUrl)) {
+  if (!hasFlagShipShipment && customerEmail && (trackingNumber || trackingUrl)) {
     const { sendTrackingEmail } = await import("@/lib/email");
     sendTrackingEmail({
       to: customerEmail,

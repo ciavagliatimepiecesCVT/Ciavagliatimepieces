@@ -9,5 +9,6 @@
 4. **Review order** at `/{locale}/checkout/review` (or `/{locale}/checkout`, which redirects there) collects address and FlagShip rates before Stripe. **Configurator** shows rates when site setting configurator free shipping is off. **Buy now** uses `?type=built&productId=`.
 
 5. **Admin** order detail (`/account/admin/orders/[orderId]`) creates shipments and opens label URLs.
+   - When a shipment is created, the order's `customer_email` is sent to FlagShip via `options.shipment_tracking_emails`, so FlagShip/courier tracking emails are sent from the shipping side.
 
 6. HTTP mapping lives in `src/lib/shipping/flagship-adapter.ts` for easy updates.
