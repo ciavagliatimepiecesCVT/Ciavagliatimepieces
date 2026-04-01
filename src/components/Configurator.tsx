@@ -56,6 +56,8 @@ type ConfiguratorProps = {
   configuratorFreeShipping?: boolean;
 };
 
+const REVIEW_MODAL_MAX_PREVIEW_PX = 520;
+
 export default function Configurator({
   locale,
   editCartItemId,
@@ -96,6 +98,7 @@ export default function Configurator({
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [shippingSelection, setShippingSelection] = useState<SelectedShippingPayload | null>(null);
+  const [reviewPreviewSizePx, setReviewPreviewSizePx] = useState(REVIEW_MODAL_MAX_PREVIEW_PX);
   /** For non-function steps: which group card is expanded (groupId or null). */
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -143,6 +146,20 @@ export default function Configurator({
   useEffect(() => {
     if (sharedConfiguration?.id) setSharedConfigurationLoadDone(false);
   }, [sharedConfiguration?.id]);
+
+  useEffect(() => {
+    if (!reviewModalOpen) return;
+    const updateReviewPreviewSize = () => {
+      const viewportPadding = 32; // modal overlay p-4 (left + right)
+      const modalPadding = window.innerWidth >= 640 ? 56 : 40; // sm:p-7 or p-5 (left + right)
+      const availableWidth = window.innerWidth - viewportPadding - modalPadding;
+      const nextSize = Math.max(1, Math.min(REVIEW_MODAL_MAX_PREVIEW_PX, Math.floor(availableWidth)));
+      setReviewPreviewSizePx(nextSize);
+    };
+    updateReviewPreviewSize();
+    window.addEventListener("resize", updateReviewPreviewSize);
+    return () => window.removeEventListener("resize", updateReviewPreviewSize);
+  }, [reviewModalOpen]);
 
   useEffect(() => {
     if (!editCartItemId || !configData || editLoadDone) return;
@@ -1647,14 +1664,14 @@ export default function Configurator({
               </p>
               <div
                 className="relative z-0 isolate flex items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)]"
-                style={{ width: 520, height: 520 }}
+                style={{ width: reviewPreviewSizePx, height: reviewPreviewSizePx }}
               >
                 <div
                   className="relative"
                   style={{
                     width: CONFIGURATOR_PREVIEW_SIZE_PX,
                     height: CONFIGURATOR_PREVIEW_SIZE_PX,
-                    transform: `scale(${520 / CONFIGURATOR_PREVIEW_SIZE_PX})`,
+                    transform: `scale(${reviewPreviewSizePx / CONFIGURATOR_PREVIEW_SIZE_PX})`,
                     transformOrigin: "center center",
                   }}
                 >
