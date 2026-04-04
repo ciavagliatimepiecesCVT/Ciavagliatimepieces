@@ -26,7 +26,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} | Custom Luxury Watches & Watchmaking Montreal`,
+    default: `${SITE_NAME} | Custom Luxury Watches, Seiko Mods & Watchmaking Montreal`,
     template: `%s | ${SITE_NAME}`,
   },
   description: DEFAULT_DESCRIPTION_EN,
@@ -37,6 +37,8 @@ export const metadata: Metadata = {
     "artisan watches",
     "bespoke timepieces",
     "watch configurator",
+    "Seiko mod",
+    "Seiko mods",
     "Ciavaglia",
   ],
   authors: [{ name: SITE_NAME, url: SITE_URL }],
@@ -49,13 +51,13 @@ export const metadata: Metadata = {
     alternateLocale: ["fr_CA"],
     url: SITE_URL,
     siteName: SITE_NAME,
-    title: `${SITE_NAME} | Custom Luxury Watches Montreal`,
+    title: `${SITE_NAME} | Custom Luxury Watches & Seiko Mods Montreal`,
     description: DEFAULT_DESCRIPTION_EN,
     images: [{ url: ogImage, width: 512, height: 512, alt: SITE_NAME }],
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE_NAME} | Custom Luxury Watches`,
+    title: `${SITE_NAME} | Custom Luxury Watches & Seiko Mods`,
     description: DEFAULT_DESCRIPTION_EN,
     images: [ogImage],
   },

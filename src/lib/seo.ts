@@ -18,9 +18,9 @@ export const SITE_URL = (() => {
 
 export const SITE_NAME = "Ciavaglia Timepieces";
 export const DEFAULT_DESCRIPTION_EN =
-  "Custom luxury timepieces and artisan watchmaking in Montreal. Design your own watch with our configurator or explore ready-to-ship collections.";
+  "Custom luxury timepieces, Seiko mod builds, and artisan watchmaking in Montreal. Design your own watch with our configurator or explore ready-to-ship collections.";
 export const DEFAULT_DESCRIPTION_FR =
-  "Montres de luxe sur mesure et horlogerie artisanale à Montréal. Concevez votre montre avec notre configurateur ou explorez les collections prêtes à expédier.";
+  "Montres de luxe sur mesure, mods Seiko et horlogerie artisanale à Montréal. Concevez votre montre avec notre configurateur ou explorez les collections prêtes à expédier.";
 
 export const LOCALE_DESCRIPTIONS: Record<string, string> = {
   en: DEFAULT_DESCRIPTION_EN,

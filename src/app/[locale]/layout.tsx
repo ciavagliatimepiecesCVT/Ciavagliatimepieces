@@ -31,11 +31,11 @@ export async function generateMetadata({
 
   return {
     title: isFr
-      ? "Montres de luxe sur mesure | Configurateur | Montréal"
-      : "Custom Luxury Watches | Watch Configurator | Montreal",
+      ? "Montres de luxe & mods Seiko | Configurateur | Montréal"
+      : "Custom Luxury Watches & Seiko Mods | Watch Configurator | Montreal",
     description: desc,
     openGraph: {
-      title: `${SITE_NAME} | ${isFr ? "Montres sur mesure Montréal" : "Custom Watches Montreal"}`,
+      title: `${SITE_NAME} | ${isFr ? "Montres & mods Seiko Montréal" : "Custom Watches & Seiko Mods Montreal"}`,
       description: desc,
       url: canonical,
       locale: isFr ? "fr_CA" : "en_CA",

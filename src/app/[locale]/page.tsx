@@ -20,11 +20,11 @@ export async function generateMetadata({
   const isFr = locale === "fr";
   return {
     title: isFr
-      ? "Accueil | Montres de luxe sur mesure Montréal"
-      : "Home | Custom Luxury Watches Montreal",
+      ? "Accueil | Montres de luxe & mods Seiko Montréal"
+      : "Home | Custom Luxury Watches & Seiko Mods Montreal",
     description: isFr
-      ? "Bienvenue chez Ciavaglia Timepieces. Montres sur mesure, configurateur et collections prêtes à expédier."
-      : "Welcome to Ciavaglia Timepieces. Custom timepieces, watch configurator, and ready-to-ship collections.",
+      ? "Bienvenue chez Ciavaglia Timepieces. Montres sur mesure, mods Seiko, configurateur et collections prêtes à expédier."
+      : "Welcome to Ciavaglia Timepieces. Custom timepieces, Seiko mod builds, watch configurator, and ready-to-ship collections.",
     openGraph: {
       title: isFr ? "Ciavaglia Timepieces | Accueil" : "Ciavaglia Timepieces | Home",
     },
