@@ -814,6 +814,7 @@ export async function POST(request: NextRequest) {
       cancel_url: `${siteUrl}/${localeSegment}/checkout/cancel`,
       metadata,
       locale: localeSegment === "fr" ? "fr" : "en",
+      phone_number_collection: { enabled: true },
       billing_address_collection: "required",
       shipping_address_collection: {
         allowed_countries: [...SHIPPING_ALLOWED_COUNTRIES],

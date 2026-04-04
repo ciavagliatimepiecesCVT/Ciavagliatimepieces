@@ -227,7 +227,7 @@ export async function createShipmentForOrder(orderId: string, force: boolean): P
   const { data: order, error } = await supabase
     .from("orders")
     .select(
-      "id, status, flagship_shipment_id, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, configuration_id, stripe_session_id, customer_email"
+      "id, status, flagship_shipment_id, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, configuration_id, stripe_session_id, customer_email, customer_phone"
     )
     .eq("id", orderId)
     .single();
@@ -242,6 +242,7 @@ export async function createShipmentForOrder(orderId: string, force: boolean): P
     throw new Error("A shipment already exists for this order. Pass force=true to create another.");
   }
 
+  const orderPhone = (order as { customer_phone?: string | null }).customer_phone?.trim() || null;
   const to: ShippingAddressInput = {
     name: (order as { shipping_name?: string }).shipping_name || "Customer",
     line1: (order as { shipping_line1?: string }).shipping_line1 || "",
@@ -250,7 +251,7 @@ export async function createShipmentForOrder(orderId: string, force: boolean): P
     state: (order as { shipping_state?: string }).shipping_state || "",
     postal_code: (order as { shipping_postal_code?: string }).shipping_postal_code || "",
     country: (order as { shipping_country?: string }).shipping_country || "",
-    phone: null,
+    phone: orderPhone,
   };
 
   if (!to.line1 || !to.city || !to.postal_code || !to.country) {

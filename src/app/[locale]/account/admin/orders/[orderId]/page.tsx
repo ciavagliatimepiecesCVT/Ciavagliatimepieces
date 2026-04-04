@@ -152,6 +152,14 @@ export default function AdminOrderDetailPage() {
               {isFr ? "Commande" : "Order"} {order.order_number ?? order.id.slice(0, 8)}
             </h1>
             <p className="mt-1 text-white/80">{order.summary}</p>
+            {(order.customer_email || order.customer_phone) && (
+              <p className="mt-3 text-sm text-white/70">
+                {order.customer_email && <span className="block">{order.customer_email}</span>}
+                {order.customer_phone?.trim() && (
+                  <span className="mt-1 block">{order.customer_phone.trim()}</span>
+                )}
+              </p>
+            )}
           </div>
         </div>
       </ScrollReveal>

@@ -68,6 +68,8 @@ export async function POST(request: NextRequest) {
         console.warn("[Webhook] No customer email on session; only atelier notification will be sent.");
       }
 
+      const customerPhone = session.customer_details?.phone?.trim() || null;
+
       const shipping = session.collected_information?.shipping_details ?? (session as { shipping_details?: { address?: { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string }; name?: string } }).shipping_details;
       const addr = shipping?.address;
       const shippingName = shipping?.name ?? session.customer_details?.name ?? null;
@@ -192,6 +194,7 @@ export async function POST(request: NextRequest) {
           summary,
           stripe_session_id: session.id,
           customer_email: customerEmail ?? null,
+          customer_phone: customerPhone || null,
           shipping_name: shippingName,
           shipping_line1: shippingLine1,
           shipping_line2: shippingLine2,

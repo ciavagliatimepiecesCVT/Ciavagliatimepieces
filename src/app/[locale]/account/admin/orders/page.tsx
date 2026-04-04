@@ -25,6 +25,7 @@ function formatAddress(order: OrderRow): string {
   const cityLine = [order.shipping_city, order.shipping_state, order.shipping_postal_code].filter(Boolean).join(", ");
   if (cityLine) parts.push(cityLine);
   if (order.shipping_country) parts.push(order.shipping_country);
+  if (order.customer_phone?.trim()) parts.push(order.customer_phone.trim());
   return parts.join("\n") || (order.customer_email ?? "—");
 }
 

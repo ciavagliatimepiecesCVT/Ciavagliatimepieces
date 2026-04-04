@@ -13,7 +13,48 @@ import { hasPublicConfiguratorPreset } from "@/lib/configurator-preset";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+const BUCKET_MEDIA_MIME_TYPES = [...ALLOWED_TYPES, ...ALLOWED_VIDEO_TYPES];
+
+function isAllowedVideoUpload(file: File): boolean {
+  if (ALLOWED_VIDEO_TYPES.includes(file.type)) return true;
+  return /\.(mp4|webm|mov)$/i.test(file.name);
+}
+
+function videoUploadContentType(file: File): string {
+  if (file.type && ALLOWED_VIDEO_TYPES.includes(file.type)) return file.type;
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext === "webm") return "video/webm";
+  if (ext === "mov") return "video/quicktime";
+  return "video/mp4";
+}
+
+function videoUploadExtension(file: File): string {
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext && ["mp4", "webm", "mov"].includes(ext)) return ext;
+  const ct = videoUploadContentType(file);
+  if (ct === "video/webm") return "webm";
+  if (ct === "video/quicktime") return "mov";
+  return "mp4";
+}
+
+async function ensureProductMediaBucket(supabase: ReturnType<typeof createServerClient>) {
+  const opts = {
+    public: true as const,
+    fileSizeLimit: MAX_VIDEO_SIZE,
+    allowedMimeTypes: BUCKET_MEDIA_MIME_TYPES,
+  };
+  const { error: updateErr } = await supabase.storage.updateBucket(PRODUCT_IMAGES_BUCKET, opts);
+  if (!updateErr) return;
+  const { error: createErr } = await supabase.storage.createBucket(PRODUCT_IMAGES_BUCKET, opts);
+  if (createErr && !String(createErr.message).toLowerCase().includes("already exists")) {
+    throw new Error(createErr.message);
+  }
+  const { error: updateAgain } = await supabase.storage.updateBucket(PRODUCT_IMAGES_BUCKET, opts);
+  if (updateAgain) throw new Error(updateAgain.message);
+}
 
 type ProductInput = {
   id?: string;
@@ -222,6 +263,102 @@ export async function uploadCategoryImage(formData: FormData): Promise<{ url: st
   return { url: urlData.publicUrl };
 }
 
+export async function uploadJournalImage(formData: FormData): Promise<{ url: string }> {
+  await requireAdmin();
+  const file = formData.get("image") as File | null;
+  if (!file || !(file instanceof File)) throw new Error("No image file provided");
+  if (file.size > MAX_IMAGE_SIZE) throw new Error("Image must be under 5MB");
+  if (!ALLOWED_TYPES.includes(file.type)) throw new Error("Image must be JPEG, PNG, WebP, or GIF");
+  const supabase = createServerClient();
+  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const path = `journal/${crypto.randomUUID()}.${ext}`;
+  const { error: bucketError } = await supabase.storage.createBucket(PRODUCT_IMAGES_BUCKET, {
+    public: true,
+    fileSizeLimit: MAX_IMAGE_SIZE,
+    allowedMimeTypes: ALLOWED_TYPES,
+  });
+  if (bucketError && !String(bucketError.message).toLowerCase().includes("already exists")) {
+    throw new Error(bucketError.message);
+  }
+  const { error } = await supabase.storage
+    .from(PRODUCT_IMAGES_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: true });
+  if (error) throw new Error(error.message);
+  const { data: urlData } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
+  return { url: urlData.publicUrl };
+}
+
+export async function uploadJournalVideo(formData: FormData): Promise<{ url: string }> {
+  await requireAdmin();
+  const file = formData.get("video") as File | null;
+  if (!file || !(file instanceof File)) throw new Error("No video file provided");
+  if (file.size > MAX_VIDEO_SIZE) throw new Error("Video must be under 100MB");
+  if (!isAllowedVideoUpload(file)) throw new Error("Video must be MP4, WebM, or MOV");
+  const supabase = createServerClient();
+  await ensureProductMediaBucket(supabase);
+  const ext = videoUploadExtension(file);
+  const path = `journal/video/${crypto.randomUUID()}.${ext}`;
+  const contentType = videoUploadContentType(file);
+  const { error } = await supabase.storage
+    .from(PRODUCT_IMAGES_BUCKET)
+    .upload(path, file, { contentType, upsert: true });
+  if (error) throw new Error(error.message);
+  const { data: urlData } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
+  return { url: urlData.publicUrl };
+}
+
+export async function uploadAboutImage(formData: FormData): Promise<{ url: string }> {
+  await requireAdmin();
+  const file = formData.get("image") as File | null;
+  if (!file || !(file instanceof File)) throw new Error("No image file provided");
+  if (file.size > MAX_IMAGE_SIZE) throw new Error("Image must be under 5MB");
+  if (!ALLOWED_TYPES.includes(file.type)) throw new Error("Image must be JPEG, PNG, WebP, or GIF");
+  const supabase = createServerClient();
+  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const path = `about/${crypto.randomUUID()}.${ext}`;
+  const { error: bucketError } = await supabase.storage.createBucket(PRODUCT_IMAGES_BUCKET, {
+    public: true,
+    fileSizeLimit: MAX_IMAGE_SIZE,
+    allowedMimeTypes: ALLOWED_TYPES,
+  });
+  if (bucketError && !String(bucketError.message).toLowerCase().includes("already exists")) {
+    throw new Error(bucketError.message);
+  }
+  const { error } = await supabase.storage
+    .from(PRODUCT_IMAGES_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: true });
+  if (error) throw new Error(error.message);
+  const { data: urlData } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
+  return { url: urlData.publicUrl };
+}
+
+export async function uploadAboutVideo(formData: FormData): Promise<{ url: string }> {
+  await requireAdmin();
+  const file = formData.get("video") as File | null;
+  if (!file || !(file instanceof File)) throw new Error("No video file provided");
+  if (file.size > MAX_VIDEO_SIZE) throw new Error("Video must be under 100MB");
+  if (!isAllowedVideoUpload(file)) throw new Error("Video must be MP4, WebM, or MOV");
+  const supabase = createServerClient();
+  await ensureProductMediaBucket(supabase);
+  const ext = videoUploadExtension(file);
+  const path = `about/video/${crypto.randomUUID()}.${ext}`;
+  const contentType = videoUploadContentType(file);
+  const { error } = await supabase.storage
+    .from(PRODUCT_IMAGES_BUCKET)
+    .upload(path, file, { contentType, upsert: true });
+  if (error) throw new Error(error.message);
+  const { data: urlData } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
+  return { url: urlData.publicUrl };
+}
+
+function normalizeJournalMediaUrl(url: string | null | undefined): string | null {
+  const t = url?.trim() ?? "";
+  if (!t) return null;
+  if (t.length > 2000) throw new Error("Media URL is too long");
+  if (!/^https?:\/\//i.test(t)) throw new Error("Media URL must start with http:// or https://");
+  return t;
+}
+
 // ——— Journal (admin only) ———
 type JournalPostInput = {
   title: string;
@@ -229,6 +366,8 @@ type JournalPostInput = {
   body?: string | null;
   published_at?: string;
   locale?: string;
+  image_url?: string | null;
+  video_url?: string | null;
 };
 
 export async function getAdminJournalPosts() {
@@ -250,6 +389,8 @@ export async function createJournalPost(input: JournalPostInput) {
     title: input.title,
     excerpt: input.excerpt ?? "",
     body: input.body ?? null,
+    image_url: normalizeJournalMediaUrl(input.image_url),
+    video_url: normalizeJournalMediaUrl(input.video_url),
     published_at: input.published_at ?? new Date().toISOString(),
     locale: input.locale ?? "en",
   });
@@ -269,6 +410,8 @@ export async function updateJournalPost(id: string, input: JournalPostInput) {
       title: input.title,
       excerpt: input.excerpt ?? "",
       body: input.body ?? null,
+      image_url: normalizeJournalMediaUrl(input.image_url),
+      video_url: normalizeJournalMediaUrl(input.video_url),
       published_at: input.published_at ?? undefined,
       locale: input.locale ?? "en",
       updated_at: new Date().toISOString(),
@@ -1335,6 +1478,8 @@ export async function getAboutSettings(): Promise<AboutSettings> {
     return {
       title: parsed.title ?? DEFAULT_ABOUT.title,
       body: parsed.body ?? DEFAULT_ABOUT.body,
+      image_url: typeof parsed.image_url === "string" ? parsed.image_url : DEFAULT_ABOUT.image_url,
+      video_url: typeof parsed.video_url === "string" ? parsed.video_url : DEFAULT_ABOUT.video_url,
     };
   } catch {
     return DEFAULT_ABOUT;
@@ -1344,8 +1489,14 @@ export async function getAboutSettings(): Promise<AboutSettings> {
 export async function setAboutSettings(data: AboutSettings) {
   await requireAdmin();
   const supabase = createServerClient();
+  const payload = {
+    title: data.title.trim(),
+    body: data.body,
+    image_url: normalizeJournalMediaUrl(data.image_url) ?? "",
+    video_url: normalizeJournalMediaUrl(data.video_url) ?? "",
+  };
   await supabase.from("site_settings").upsert(
-    { key: "about", value: JSON.stringify(data), updated_at: new Date().toISOString() },
+    { key: "about", value: JSON.stringify(payload), updated_at: new Date().toISOString() },
     { onConflict: "key" }
   );
   revalidatePath("/[locale]/about", "page");
@@ -3018,6 +3169,7 @@ export type OrderRow = {
   summary: string | null;
   stripe_session_id: string | null;
   customer_email: string | null;
+  customer_phone: string | null;
   shipping_name: string | null;
   shipping_line1: string | null;
   shipping_line2: string | null;
@@ -3041,7 +3193,7 @@ export async function getAdminOrders(): Promise<OrderRow[]> {
   await requireAdmin();
   const supabase = createServerClient();
   const fullSelect =
-    "id, order_number, configuration_id, user_id, total, status, summary, stripe_session_id, customer_email, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, tracking_number, tracking_carrier, tracking_url, shipping_carrier, shipping_service, shipping_cost, flagship_shipment_id, shipping_label_url, shipment_status, created_at";
+    "id, order_number, configuration_id, user_id, total, status, summary, stripe_session_id, customer_email, customer_phone, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, tracking_number, tracking_carrier, tracking_url, shipping_carrier, shipping_service, shipping_cost, flagship_shipment_id, shipping_label_url, shipment_status, created_at";
   const { data, error } = await supabase
     .from("orders")
     .select(fullSelect)
@@ -3057,6 +3209,7 @@ export async function getAdminOrders(): Promise<OrderRow[]> {
       ...row,
       order_number: null,
       customer_email: null,
+      customer_phone: null,
       shipping_name: null,
       shipping_line1: null,
       shipping_line2: null,
@@ -3083,7 +3236,7 @@ export async function getAdminOrderById(orderId: string): Promise<OrderRow | nul
   if (!orderId?.trim()) return null;
   const supabase = createServerClient();
   const fullSelect =
-    "id, order_number, configuration_id, user_id, total, status, summary, stripe_session_id, customer_email, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, tracking_number, tracking_carrier, tracking_url, shipping_carrier, shipping_service, shipping_cost, flagship_shipment_id, shipping_label_url, shipment_status, created_at";
+    "id, order_number, configuration_id, user_id, total, status, summary, stripe_session_id, customer_email, customer_phone, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, tracking_number, tracking_carrier, tracking_url, shipping_carrier, shipping_service, shipping_cost, flagship_shipment_id, shipping_label_url, shipment_status, created_at";
   const { data, error } = await supabase.from("orders").select(fullSelect).eq("id", orderId.trim()).maybeSingle();
   if (!error && data) return data as OrderRow;
   return null;

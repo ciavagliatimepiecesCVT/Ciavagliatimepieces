@@ -8,6 +8,8 @@ import {
   createJournalPost,
   updateJournalPost,
   deleteJournalPost,
+  uploadJournalImage,
+  uploadJournalVideo,
 } from "../actions";
 
 type JournalPost = {
@@ -15,9 +17,29 @@ type JournalPost = {
   title: string | null;
   excerpt: string | null;
   body: string | null;
+  image_url: string | null;
+  video_url: string | null;
   published_at: string | null;
   locale: string | null;
 };
+
+type JournalFormState = {
+  title: string;
+  excerpt: string;
+  body: string;
+  locale: string;
+  image_url: string;
+  video_url: string;
+};
+
+const emptyJournalForm = (): JournalFormState => ({
+  title: "",
+  excerpt: "",
+  body: "",
+  locale: "en",
+  image_url: "",
+  video_url: "",
+});
 
 export default function AdminJournalPage() {
   const params = useParams<{ locale?: string | string[] }>();
@@ -28,12 +50,9 @@ export default function AdminJournalPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAddJournal, setShowAddJournal] = useState(false);
   const [editingJournalId, setEditingJournalId] = useState<string | null>(null);
-  const [journalForm, setJournalForm] = useState<{ title: string; excerpt: string; body: string; locale: string }>({
-    title: "",
-    excerpt: "",
-    body: "",
-    locale: "en",
-  });
+  const [journalForm, setJournalForm] = useState<JournalFormState>(emptyJournalForm);
+  const [uploadingJournalImage, setUploadingJournalImage] = useState(false);
+  const [uploadingJournalVideo, setUploadingJournalVideo] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -56,13 +75,61 @@ export default function AdminJournalPage() {
       excerpt: post.excerpt ?? "",
       body: post.body ?? "",
       locale: post.locale ?? "en",
+      image_url: post.image_url ?? "",
+      video_url: post.video_url ?? "",
     });
     setError(null);
   };
 
   const cancelEditJournal = () => {
     setEditingJournalId(null);
-    setJournalForm({ title: "", excerpt: "", body: "", locale: "en" });
+    setJournalForm(emptyJournalForm());
+  };
+
+  const pickJournalImage = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/jpeg,image/png,image/webp,image/gif";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setUploadingJournalImage(true);
+      setError(null);
+      try {
+        const fd = new FormData();
+        fd.set("image", file);
+        const { url } = await uploadJournalImage(fd);
+        setJournalForm((p) => ({ ...p, image_url: url }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        setUploadingJournalImage(false);
+      }
+    };
+    input.click();
+  };
+
+  const pickJournalVideo = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setUploadingJournalVideo(true);
+      setError(null);
+      try {
+        const fd = new FormData();
+        fd.set("video", file);
+        const { url } = await uploadJournalVideo(fd);
+        setJournalForm((p) => ({ ...p, video_url: url }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        setUploadingJournalVideo(false);
+      }
+    };
+    input.click();
   };
 
   const handleSaveJournal = async () => {
@@ -74,6 +141,8 @@ export default function AdminJournalPage() {
         excerpt: journalForm.excerpt,
         body: journalForm.body || null,
         locale: journalForm.locale,
+        image_url: journalForm.image_url || null,
+        video_url: journalForm.video_url || null,
       });
       setJournalPosts(await getAdminJournalPosts());
       cancelEditJournal();
@@ -91,10 +160,12 @@ export default function AdminJournalPage() {
         excerpt: journalForm.excerpt,
         body: journalForm.body || null,
         locale: journalForm.locale,
+        image_url: journalForm.image_url || null,
+        video_url: journalForm.video_url || null,
       });
       setJournalPosts(await getAdminJournalPosts());
       setShowAddJournal(false);
-      setJournalForm({ title: "", excerpt: "", body: "", locale: "en" });
+      setJournalForm(emptyJournalForm());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to add post");
     }
@@ -144,7 +215,7 @@ export default function AdminJournalPage() {
             type="button"
             onClick={() => {
               setShowAddJournal(true);
-              setJournalForm({ title: "", excerpt: "", body: "", locale: "en" });
+              setJournalForm(emptyJournalForm());
               setError(null);
             }}
             className="rounded-full bg-foreground px-6 py-3 text-xs uppercase tracking-[0.3em] text-white"
@@ -170,6 +241,48 @@ export default function AdminJournalPage() {
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">Excerpt</label>
                 <input value={journalForm.excerpt} onChange={(e) => setJournalForm((p) => ({ ...p, excerpt: e.target.value }))} className="mt-1 w-full rounded-full border border-foreground/20 bg-white px-4 py-2" />
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">
+                  {isFr ? "Image (optionnel)" : "Image (optional)"}
+                </label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    value={journalForm.image_url}
+                    onChange={(e) => setJournalForm((p) => ({ ...p, image_url: e.target.value }))}
+                    placeholder="https://…"
+                    className="min-w-0 flex-1 rounded-full border border-foreground/20 bg-white px-4 py-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={pickJournalImage}
+                    disabled={uploadingJournalImage}
+                    className="shrink-0 rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] disabled:opacity-50"
+                  >
+                    {uploadingJournalImage ? "…" : isFr ? "Envoyer" : "Upload"}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">
+                  {isFr ? "Vidéo (optionnel)" : "Video (optional)"}
+                </label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    value={journalForm.video_url}
+                    onChange={(e) => setJournalForm((p) => ({ ...p, video_url: e.target.value }))}
+                    placeholder={isFr ? "URL ou fichier MP4/WebM/MOV" : "URL or upload MP4/WebM/MOV (max 100MB)"}
+                    className="min-w-0 flex-1 rounded-full border border-foreground/20 bg-white px-4 py-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={pickJournalVideo}
+                    disabled={uploadingJournalVideo}
+                    className="shrink-0 rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.2em] disabled:opacity-50"
+                  >
+                    {uploadingJournalVideo ? "…" : isFr ? "Envoyer" : "Upload"}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">Body (optional)</label>
@@ -208,6 +321,47 @@ export default function AdminJournalPage() {
                   <div>
                     <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">Excerpt</label>
                     <input value={journalForm.excerpt} onChange={(e) => setJournalForm((p) => ({ ...p, excerpt: e.target.value }))} className="mt-1 w-full rounded-full border border-foreground/20 bg-white px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">
+                      {isFr ? "Image" : "Image"}
+                    </label>
+                    <div className="mt-1 flex gap-2">
+                      <input
+                        value={journalForm.image_url}
+                        onChange={(e) => setJournalForm((p) => ({ ...p, image_url: e.target.value }))}
+                        className="min-w-0 flex-1 rounded-full border border-foreground/20 bg-white px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={pickJournalImage}
+                        disabled={uploadingJournalImage}
+                        className="shrink-0 rounded-full border border-foreground/20 px-3 py-2 text-xs disabled:opacity-50"
+                      >
+                        {uploadingJournalImage ? "…" : isFr ? "Envoyer" : "Upload"}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">
+                      {isFr ? "Vidéo" : "Video"}
+                    </label>
+                    <div className="mt-1 flex gap-2">
+                      <input
+                        value={journalForm.video_url}
+                        onChange={(e) => setJournalForm((p) => ({ ...p, video_url: e.target.value }))}
+                        placeholder={isFr ? "URL ou fichier" : "URL or file"}
+                        className="min-w-0 flex-1 rounded-full border border-foreground/20 bg-white px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={pickJournalVideo}
+                        disabled={uploadingJournalVideo}
+                        className="shrink-0 rounded-full border border-foreground/20 px-3 py-2 text-xs disabled:opacity-50"
+                      >
+                        {uploadingJournalVideo ? "…" : isFr ? "Envoyer" : "Upload"}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs uppercase tracking-[0.2em] text-foreground/60">Body</label>

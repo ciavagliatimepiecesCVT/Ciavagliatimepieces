@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createAuthServerClient } from "@/lib/supabase/server";
 import { Locale } from "@/lib/i18n";
+import { resolveJournalVideo } from "@/lib/journal-video-embed";
 
 export async function generateMetadata({
   params,
@@ -34,7 +35,7 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: L
   const supabase = await createAuthServerClient();
   const { data: posts } = await supabase
     .from("journal_posts")
-    .select("id, title, excerpt, body, published_at, locale")
+    .select("id, title, excerpt, body, image_url, video_url, published_at, locale")
     .order("published_at", { ascending: false });
 
   const list = (posts ?? []).filter((p) => !p.locale || p.locale === locale);
@@ -73,6 +74,54 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: L
                   </p>
                   <h2 className="mt-4 text-2xl">{post.title}</h2>
                   <p className="mt-3 text-foreground/70">{post.excerpt}</p>
+                  {post.image_url ? (
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-foreground/10">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- admin-supplied URLs from any https origin */}
+                      <img
+                        src={post.image_url}
+                        alt={post.title ? `${post.title}` : ""}
+                        className="max-h-[min(480px,70vh)] w-full object-cover"
+                      />
+                    </div>
+                  ) : null}
+                  {(() => {
+                    const v = resolveJournalVideo(post.video_url);
+                    if (!v) return null;
+                    if (v.kind === "iframe") {
+                      return (
+                        <div className="mt-4 aspect-video w-full overflow-hidden rounded-2xl border border-foreground/10 bg-black/5">
+                          <iframe
+                            src={v.src}
+                            className="h-full w-full border-0"
+                            title={post.title ? `${post.title} — video` : "Video"}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                          />
+                        </div>
+                      );
+                    }
+                    if (v.kind === "video") {
+                      return (
+                        <div className="mt-4 overflow-hidden rounded-2xl border border-foreground/10">
+                          <video src={v.src} controls className="max-h-[min(480px,70vh)] w-full" playsInline>
+                            {isFr ? "Vidéo non prise en charge." : "Your browser does not support video."}
+                          </video>
+                        </div>
+                      );
+                    }
+                    return (
+                      <p className="mt-4">
+                        <a
+                          href={v.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-foreground underline underline-offset-4"
+                        >
+                          {isFr ? "Voir la vidéo" : "Watch video"}
+                        </a>
+                      </p>
+                    );
+                  })()}
                   {post.body && (
                     <p className="mt-4 whitespace-pre-wrap text-foreground/80">{post.body}</p>
                   )}
