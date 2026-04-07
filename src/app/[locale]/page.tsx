@@ -10,6 +10,8 @@ import { getWatchCategories } from "@/lib/watch-categories";
 import { createAuthServerClient } from "@/lib/supabase/server";
 import { isAdmin } from "@/lib/admin";
 import { getFeaturedSlides, getActiveGiveaway, getHomeStyleCards } from "@/app/[locale]/account/admin/actions";
+import ReviewSection from "@/components/ReviewSection";
+import { createServerClient } from "@/lib/supabase/server";
 
 export async function generateMetadata({
   params,
@@ -40,15 +42,17 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
   const hero = dictionary.hero;
   const home = dictionary.home;
   const isFr = locale === "fr";
-  const [watchCategories, featuredSlidesRaw, activeGiveaway, cookieStore, styleCards, supabase] = await Promise.all([
+  const [watchCategories, featuredSlidesRaw, activeGiveaway, cookieStore, styleCards, supabase, productsData] = await Promise.all([
     getWatchCategories(),
     getFeaturedSlides(),
     getActiveGiveaway(),
     cookies(),
     getHomeStyleCards(),
     createAuthServerClient(),
+    createServerClient().from("products").select("id, name").eq("active", true).order("name"),
   ]);
   const { data: { user } } = await supabase.auth.getUser();
+  const activeProducts = (productsData.data ?? []) as { id: string; name: string }[];
   const isAdminUser = isAdmin(user?.id);
 
   const heroFallbackForGiveaway = heroFallbackImage;
@@ -112,6 +116,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
           </Link>
         </ScrollReveal>
       </StorySection>
+
+      <section className="bg-foreground text-white">
+        <ReviewSection locale={locale} products={activeProducts} />
+      </section>
     </div>
   );
 }

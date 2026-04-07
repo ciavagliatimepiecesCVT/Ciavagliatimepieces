@@ -6,7 +6,8 @@
       "Bash(rm -f C:/3-WebsiteCreation/civaglia-timepieces/src/lib/edit-mode.ts C:/3-WebsiteCreation/civaglia-timepieces/src/lib/story-section-settings.ts C:/3-WebsiteCreation/civaglia-timepieces/src/lib/announcement-bar-settings.ts C:/3-WebsiteCreation/civaglia-timepieces/src/lib/page-layout-settings.ts C:/3-WebsiteCreation/civaglia-timepieces/src/components/admin/EditableSection.tsx C:/3-WebsiteCreation/civaglia-timepieces/src/components/AnnouncementBar.tsx C:/3-WebsiteCreation/civaglia-timepieces/src/components/admin/visual/HeroPanel.tsx C:/3-WebsiteCreation/civaglia-timepieces/src/components/admin/visual/StyleCardsPanel.tsx C:/3-WebsiteCreation/civaglia-timepieces/src/components/admin/visual/StorySectionPanel.tsx C:/3-WebsiteCreation/civaglia-timepieces/src/components/admin/visual/FooterPanel.tsx C:/3-WebsiteCreation/civaglia-timepieces/src/components/admin/visual/AboutPanel.tsx C:/3-WebsiteCreation/civaglia-timepieces/src/components/admin/visual/FaqPanel.tsx C:/3-WebsiteCreation/civaglia-timepieces/src/components/admin/visual/AnnouncementPanel.tsx 'C:/3-WebsiteCreation/civaglia-timepieces/src/app/[locale]/account/admin/visual/page.tsx')",
       "Bash(rmdir \"C:/3-WebsiteCreation/civaglia-timepieces/src/app/[locale]/account/admin/visual\")",
       "Bash(rm:*)",
-      "Bash(npx --prefix \"C:/3-WebsiteCreation/civaglia-timepieces\" tsc --noEmit)"
+      "Bash(npx --prefix \"C:/3-WebsiteCreation/civaglia-timepieces\" tsc --noEmit)",
+      "Bash(xargs grep:*)"
     ]
   }
 }
