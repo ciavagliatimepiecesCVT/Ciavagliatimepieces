@@ -9,6 +9,8 @@ export type AboutSettings = {
   image_url: string;
   /** Optional YouTube, Vimeo, or direct .mp4/.webm URL. */
   video_url: string;
+  /** CSS object-position value for the hero image, e.g. "50% 30%". */
+  image_position: string;
 };
 
 export const DEFAULT_ABOUT: AboutSettings = {
@@ -16,4 +18,5 @@ export const DEFAULT_ABOUT: AboutSettings = {
   body: "Ciavaglia Timepieces is built around hand-finished watchmaking and personal craftsmanship. This section can be edited from the admin panel.",
   image_url: "",
   video_url: "",
+  image_position: "50% 50%",
 };

@@ -3,6 +3,10 @@ import ScrollReveal from "@/components/ScrollReveal";
 import { getAboutSettings } from "@/app/[locale]/account/admin/actions";
 import { Locale } from "@/lib/i18n";
 import { resolveJournalVideo } from "@/lib/journal-video-embed";
+import { isAdmin } from "@/lib/admin";
+import { createAuthServerClient } from "@/lib/supabase/server";
+import AboutImageReposition from "@/components/AboutImageReposition";
+import VideoLinkCard from "@/components/VideoLinkCard";
 
 export async function generateMetadata({
   params,
@@ -22,7 +26,12 @@ export async function generateMetadata({
 export default async function AboutPage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
   const isFr = locale === "fr";
-  const about = await getAboutSettings();
+  const [about, supabase] = await Promise.all([
+    getAboutSettings(),
+    createAuthServerClient(),
+  ]);
+  const { data: { user } } = await supabase.auth.getUser();
+  const adminUser = isAdmin(user?.id);
   const video = resolveJournalVideo(about.video_url);
 
   return (
@@ -37,14 +46,24 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
         <ScrollReveal>
           <div className="rounded-[26px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_20px_70px_rgba(15,20,23,0.1)]">
             {about.image_url ? (
-              <div className="mb-6 overflow-hidden rounded-2xl border border-foreground/10">
-                {/* eslint-disable-next-line @next/next/no-img-element -- admin-supplied URLs from any https origin */}
-                <img
+              adminUser ? (
+                <AboutImageReposition
                   src={about.image_url}
                   alt={about.title}
-                  className="max-h-[min(480px,70vh)] w-full object-cover"
+                  initialPosition={about.image_position ?? "50% 50%"}
+                  isFr={isFr}
                 />
-              </div>
+              ) : (
+                <div className="mb-6 overflow-hidden rounded-2xl border border-foreground/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- admin-supplied URLs from any https origin */}
+                  <img
+                    src={about.image_url}
+                    alt={about.title}
+                    className="max-h-[min(480px,70vh)] w-full object-cover"
+                    style={{ objectPosition: about.image_position ?? "50% 50%" }}
+                  />
+                </div>
+              )
             ) : null}
             {video ? (
               video.kind === "iframe" ? (
@@ -63,18 +82,11 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
                     {isFr ? "Vidéo non prise en charge." : "Your browser does not support video."}
                   </video>
                 </div>
-              ) : (
-                <p className="mb-6">
-                  <a
-                    href={video.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-foreground underline underline-offset-4"
-                  >
-                    {isFr ? "Voir la vidéo" : "Watch video"}
-                  </a>
-                </p>
-              )
+              ) : video.kind === "link" ? (
+                <div className="mb-6">
+                  <VideoLinkCard href={video.href} platform={video.platform} />
+                </div>
+              ) : null
             ) : null}
             <p className="whitespace-pre-line text-foreground/80">{about.body}</p>
           </div>

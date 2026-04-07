@@ -38,7 +38,7 @@ const nextConfig: NextConfig = {
       "font-src 'self' data:",
       "media-src 'self' https:",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://js.stripe.com https://www.spaxioassistant.com",
-      "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com",
+      "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.instagram.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

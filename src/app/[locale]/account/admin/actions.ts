@@ -1480,6 +1480,7 @@ export async function getAboutSettings(): Promise<AboutSettings> {
       body: parsed.body ?? DEFAULT_ABOUT.body,
       image_url: typeof parsed.image_url === "string" ? parsed.image_url : DEFAULT_ABOUT.image_url,
       video_url: typeof parsed.video_url === "string" ? parsed.video_url : DEFAULT_ABOUT.video_url,
+      image_position: typeof parsed.image_position === "string" ? parsed.image_position : DEFAULT_ABOUT.image_position,
     };
   } catch {
     return DEFAULT_ABOUT;
@@ -1494,6 +1495,7 @@ export async function setAboutSettings(data: AboutSettings) {
     body: data.body,
     image_url: normalizeJournalMediaUrl(data.image_url) ?? "",
     video_url: normalizeJournalMediaUrl(data.video_url) ?? "",
+    image_position: data.image_position ?? "50% 50%",
   };
   await supabase.from("site_settings").upsert(
     { key: "about", value: JSON.stringify(payload), updated_at: new Date().toISOString() },
@@ -1501,6 +1503,12 @@ export async function setAboutSettings(data: AboutSettings) {
   );
   revalidatePath("/[locale]/about", "page");
   revalidatePath("/[locale]/account/admin/about", "page");
+}
+
+export async function setAboutImagePosition(position: string) {
+  await requireAdmin();
+  const current = await getAboutSettings();
+  await setAboutSettings({ ...current, image_position: position });
 }
 
 // ——— Home style cards (Custom Build + Shop, inline edit on home) ———

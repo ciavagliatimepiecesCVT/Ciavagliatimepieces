@@ -1,8 +1,20 @@
+export type VideoPlatform = "youtube" | "vimeo" | "instagram" | "tiktok" | "facebook" | "x" | "generic";
+
 export type JournalVideoRender =
   | { kind: "iframe"; src: string }
   | { kind: "video"; src: string }
-  | { kind: "external"; href: string }
+  | { kind: "link"; href: string; platform: VideoPlatform }
   | null;
+
+export function detectVideoPlatform(url: string): VideoPlatform {
+  if (/youtube\.com|youtu\.be/i.test(url)) return "youtube";
+  if (/vimeo\.com/i.test(url)) return "vimeo";
+  if (/instagram\.com/i.test(url)) return "instagram";
+  if (/tiktok\.com/i.test(url)) return "tiktok";
+  if (/facebook\.com|fb\.watch/i.test(url)) return "facebook";
+  if (/twitter\.com|x\.com/i.test(url)) return "x";
+  return "generic";
+}
 
 /** Resolves admin-entered URLs to safe embed targets or direct video sources. */
 export function resolveJournalVideo(url: string | null | undefined): JournalVideoRender {
@@ -35,8 +47,8 @@ export function resolveJournalVideo(url: string | null | undefined): JournalVide
     return { kind: "video", src: trimmed };
   }
 
-  if (/^https:\/\//i.test(trimmed)) {
-    return { kind: "external", href: trimmed };
+  if (/^https?:\/\//i.test(trimmed)) {
+    return { kind: "link", href: trimmed, platform: detectVideoPlatform(trimmed) };
   }
 
   return null;
