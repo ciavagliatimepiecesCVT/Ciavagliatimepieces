@@ -12,6 +12,7 @@ const navItems = [
   { href: "addons", labelEn: "Add-ons", labelFr: "Extras" },
   { href: "categories", labelEn: "Categories", labelFr: "Catégories" },
   { href: "configurator", labelEn: "Configurator", labelFr: "Configurateur" },
+  { href: "reviews", labelEn: "Reviews", labelFr: "Avis" },
   { href: "featured", labelEn: "Featured", labelFr: "À la une" },
   { href: "giveaway", labelEn: "Giveaway", labelFr: "Concours" },
   { href: "footer", labelEn: "Footer", labelFr: "Pied de page" },

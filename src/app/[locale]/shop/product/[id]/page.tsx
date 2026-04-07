@@ -8,6 +8,7 @@ import {
   getProductConfiguratorConfig,
 } from "@/app/[locale]/account/admin/actions";
 import ProductDetail from "@/components/ProductDetail";
+import ReviewSection from "@/components/ReviewSection";
 import type { Locale } from "@/lib/i18n";
 
 type Props = { params: Promise<{ locale: Locale; id: string }> };
@@ -89,14 +90,21 @@ export default async function ProductPage({ params }: Props) {
   const addons = addonsWithOptions ?? [];
 
   return (
-    <ProductDetail
-      product={productData}
-      images={images}
-      addons={addons}
-      bracelets={bracelets ?? []}
-      locale={locale}
-      categoryLabel={categoryLabel}
-      hasConfiguratorPreset={productPreset != null}
-    />
+    <>
+      <ProductDetail
+        product={productData}
+        images={images}
+        addons={addons}
+        bracelets={bracelets ?? []}
+        locale={locale}
+        categoryLabel={categoryLabel}
+        hasConfiguratorPreset={productPreset != null}
+      />
+      <ReviewSection
+        productId={productData.id}
+        productName={productData.name}
+        locale={locale}
+      />
+    </>
   );
 }

@@ -106,9 +106,18 @@ export default function Footer({
           ))}
         </div>
       </div>
-      <p className="mt-12 text-center text-xs uppercase tracking-[0.3em] text-white/40">
-        © {new Date().getFullYear()} {copyrightText}
-      </p>
+      <div className="mt-12 flex flex-col items-center gap-3">
+        <Link
+          href={`/${locale}/reviews`}
+          className="inline-flex items-center gap-2 rounded-full border border-white/30 px-6 py-2.5 text-xs font-medium uppercase tracking-[0.25em] text-white/80 transition hover:border-white hover:bg-white/10 hover:text-white"
+        >
+          <span className="text-[var(--logo-gold)]">★★★★★</span>
+          {isFr ? "Laisser un avis" : "Leave a review"}
+        </Link>
+        <p className="text-center text-xs uppercase tracking-[0.3em] text-white/40">
+          © {new Date().getFullYear()} {copyrightText}
+        </p>
+      </div>
     </footer>
   );
 }
