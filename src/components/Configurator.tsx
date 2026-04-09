@@ -1663,7 +1663,7 @@ export default function Configurator({
                 {isFr ? "Aperçu de votre montre" : "Your watch preview"}
               </p>
               <div
-                className="relative z-0 isolate flex items-center justify-center overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)]"
+                className="relative z-0 isolate overflow-hidden rounded-[var(--radius-xl)] border border-foreground/10 bg-white shadow-[var(--shadow)]"
                 style={{ width: reviewPreviewSizePx, height: reviewPreviewSizePx }}
               >
                 <div
@@ -1672,7 +1672,7 @@ export default function Configurator({
                     width: CONFIGURATOR_PREVIEW_SIZE_PX,
                     height: CONFIGURATOR_PREVIEW_SIZE_PX,
                     transform: `scale(${reviewPreviewSizePx / CONFIGURATOR_PREVIEW_SIZE_PX})`,
-                    transformOrigin: "center center",
+                    transformOrigin: "top left",
                   }}
                 >
                   <WatchPreview
