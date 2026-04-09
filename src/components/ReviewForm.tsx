@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { submitReview } from "@/app/[locale]/reviews/actions";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 type Product = { id: string; name: string };
 
@@ -11,6 +12,8 @@ type Props = {
   products?: Product[];
   locale: string;
 };
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 export default function ReviewForm({ productId, productName, products = [], locale }: Props) {
   const isFr = locale === "fr";
@@ -22,6 +25,30 @@ export default function ReviewForm({ productId, productName, products = [], loca
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    if (!file) return;
+    if (file.size > MAX_IMAGE_SIZE) {
+      setError(isFr ? "L'image doit faire moins de 5 Mo." : "Image must be under 5 MB.");
+      e.target.value = "";
+      return;
+    }
+    setError("");
+    setImageFile(file);
+    const url = URL.createObjectURL(file);
+    setImagePreview(url);
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +63,20 @@ export default function ReviewForm({ productId, productName, products = [], loca
     setLoading(true);
     setError("");
     try {
+      let uploadedImageUrl: string | undefined;
+
+      if (imageFile) {
+        const supabase = createBrowserClient();
+        const ext = imageFile.name.split(".").pop() ?? "jpg";
+        const path = `${crypto.randomUUID()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("review-images")
+          .upload(path, imageFile, { cacheControl: "3600", upsert: false });
+        if (uploadError) throw new Error(uploadError.message);
+        const { data: { publicUrl } } = supabase.storage.from("review-images").getPublicUrl(path);
+        uploadedImageUrl = publicUrl;
+      }
+
       const isCustomBuild = selectedProductId === "__custom_build__";
       const watchName = isCustomBuild
         ? (isFr ? "Construction sur mesure" : "Custom Build")
@@ -49,6 +90,7 @@ export default function ReviewForm({ productId, productName, products = [], loca
         message: message.trim() || undefined,
         product_id: isCustomBuild ? undefined : (selectedProductId || undefined),
         watch_purchased: watchName,
+        image_url: uploadedImageUrl,
       });
       setSuccess(true);
     } catch (err) {
@@ -177,6 +219,45 @@ export default function ReviewForm({ productId, productName, products = [], loca
           className="mt-2 w-full resize-none rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder-white/25 outline-none transition focus:border-white/50"
         />
         <p className="mt-1 text-right text-xs text-white/25">{message.length}/1000</p>
+      </div>
+
+      {/* Image upload */}
+      <div>
+        <p className="text-xs uppercase tracking-[0.3em] text-white/60">
+          {isFr ? "Photo (optionnel)" : "Photo (optional)"}
+        </p>
+        {imagePreview ? (
+          <div className="mt-3 flex items-start gap-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imagePreview}
+              alt={isFr ? "Aperçu" : "Preview"}
+              className="h-24 w-24 rounded-xl object-cover border border-white/20"
+            />
+            <button
+              type="button"
+              onClick={removeImage}
+              className="rounded-full border border-white/20 px-3 py-1 text-xs text-white/50 transition hover:border-white/50 hover:text-white"
+            >
+              {isFr ? "Supprimer" : "Remove"}
+            </button>
+          </div>
+        ) : (
+          <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-white/20 px-4 py-4 transition hover:border-white/40">
+            <span className="text-xl text-white/30">📷</span>
+            <span className="text-sm text-white/40">
+              {isFr ? "Ajouter une photo de votre montre" : "Add a photo of your watch"}
+              <span className="ml-2 text-xs text-white/25">(max 5 MB)</span>
+            </span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              className="sr-only"
+            />
+          </label>
+        )}
       </div>
 
       {error && (

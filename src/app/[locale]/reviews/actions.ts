@@ -11,6 +11,7 @@ export type Review = {
   rating: number;
   message: string | null;
   watch_purchased: string | null;
+  image_url: string | null;
   approved: boolean;
   created_at: string;
 };
@@ -21,6 +22,7 @@ export async function submitReview(data: {
   message?: string;
   product_id?: string;
   watch_purchased?: string;
+  image_url?: string;
 }): Promise<{ success: boolean }> {
   if (!data.reviewer_name || data.reviewer_name.trim().length < 2) {
     throw new Error("Name is required (min 2 characters).");
@@ -36,6 +38,7 @@ export async function submitReview(data: {
     message: data.message?.trim().slice(0, 1000) || null,
     product_id: data.product_id || null,
     watch_purchased: data.watch_purchased?.trim().slice(0, 200) || null,
+    image_url: data.image_url || null,
     approved: false,
   });
 
@@ -47,7 +50,7 @@ export async function getApprovedReviews(productId?: string): Promise<Review[]> 
   const supabase = createServerClient();
   let query = supabase
     .from("reviews")
-    .select("id, product_id, reviewer_name, rating, message, watch_purchased, approved, created_at")
+    .select("id, product_id, reviewer_name, rating, message, watch_purchased, image_url, approved, created_at")
     .eq("approved", true)
     .order("created_at", { ascending: false });
 
@@ -70,7 +73,7 @@ export async function getAdminReviews(): Promise<Review[]> {
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("reviews")
-    .select("id, product_id, reviewer_name, rating, message, watch_purchased, approved, created_at")
+    .select("id, product_id, reviewer_name, rating, message, watch_purchased, image_url, approved, created_at")
     .order("created_at", { ascending: false });
 
   if (error) throw error;

@@ -188,6 +188,14 @@ export default function AdminReviewsPage() {
                   {review.message && (
                     <p className="mt-3 text-sm leading-relaxed text-white/70">{review.message}</p>
                   )}
+                  {review.image_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={review.image_url}
+                      alt="Review photo"
+                      className="mt-3 h-32 w-32 rounded-xl object-cover border border-white/15"
+                    />
+                  )}
                 </div>
 
                 {/* Actions */}

@@ -88,6 +88,14 @@ export default async function ReviewSection({
                 {review.message && (
                   <p className="text-sm leading-relaxed text-white/70">{review.message}</p>
                 )}
+                {review.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={review.image_url}
+                    alt={`${review.reviewer_name}'s watch`}
+                    className="mt-1 h-40 w-full rounded-xl object-cover"
+                  />
+                )}
                 <p className="mt-auto text-xs text-white/25">
                   {new Date(review.created_at).toLocaleDateString(
                     isFr ? "fr-FR" : "en-US",
