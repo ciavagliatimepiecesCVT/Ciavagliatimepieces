@@ -7,7 +7,8 @@
       "Bash(rmdir \"C:/3-WebsiteCreation/civaglia-timepieces/src/app/[locale]/account/admin/visual\")",
       "Bash(rm:*)",
       "Bash(npx --prefix \"C:/3-WebsiteCreation/civaglia-timepieces\" tsc --noEmit)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(ls src/app/api/contact/route.ts src/app/[locale]/not-found.tsx)"
     ]
   }
 }

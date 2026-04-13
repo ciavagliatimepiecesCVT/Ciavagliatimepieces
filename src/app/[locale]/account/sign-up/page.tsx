@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { getGuestCart, clearGuestCart } from "@/lib/guest-cart";
 
 export default function SignUpPage() {
   const params = useParams<{ locale?: string | string[] }>();
@@ -69,6 +70,24 @@ export default function SignUpPage() {
           postal_code: form.postalCode,
           preferences: form.preferences,
         });
+
+        // Merge guest cart items into new user's cart
+        const guestItems = getGuestCart();
+        if (guestItems.length > 0) {
+          for (const item of guestItems) {
+            await supabase.from("cart_items").insert({
+              user_id: data.user.id,
+              product_id: item.product_id,
+              quantity: item.quantity,
+              price: item.price,
+              title: item.title,
+              image_url: item.image_url,
+              configuration: item.configuration ?? null,
+            });
+          }
+          clearGuestCart();
+          window.dispatchEvent(new CustomEvent("cart-updated"));
+        }
       }
 
       // Session is set by signUp when email confirmation is disabled; refresh so the app sees it

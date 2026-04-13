@@ -10,12 +10,42 @@ type ContactLabels = {
   success: string;
 };
 
-export default function ContactForm({ labels }: { labels: ContactLabels }) {
+export default function ContactForm({ labels, locale }: { labels: ContactLabels; locale?: string }) {
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isFr = locale === "fr";
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSending(true);
+    setError(null);
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const name = (formData.get("name") as string)?.trim() ?? "";
+    const email = (formData.get("email") as string)?.trim() ?? "";
+    const message = (formData.get("message") as string)?.trim() ?? "";
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, message }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? (isFr ? "Erreur lors de l'envoi." : "Failed to send message."));
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setError(isFr ? "Erreur de connexion." : "Connection error. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   if (submitted) {
@@ -71,11 +101,15 @@ export default function ContactForm({ labels }: { labels: ContactLabels }) {
             placeholder={labels.message}
           />
         </div>
+        {error && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>
+        )}
         <button
           type="submit"
-          className="btn-hover w-full rounded-full border border-foreground bg-foreground px-6 py-3 text-sm uppercase tracking-[0.2em] text-background transition hover:bg-foreground/90"
+          disabled={sending}
+          className="btn-hover w-full rounded-full border border-foreground bg-foreground px-6 py-3 text-sm uppercase tracking-[0.2em] text-background transition hover:bg-foreground/90 disabled:opacity-60"
         >
-          {labels.send}
+          {sending ? (isFr ? "Envoi..." : "Sending...") : labels.send}
         </button>
       </div>
     </form>

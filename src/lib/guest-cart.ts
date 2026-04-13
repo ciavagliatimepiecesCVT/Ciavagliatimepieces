@@ -4,7 +4,7 @@
  */
 
 const GUEST_CART_KEY = "ciavaglia_guest_cart";
-const GUEST_CART_TTL_MS = 2 * 60 * 60 * 1000;
+const GUEST_CART_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type GuestCartItem = {
   id: string;
@@ -152,3 +152,9 @@ export function removeGuestCartItem(id: string): GuestCartItem[] {
 export function getGuestCartCount(): number {
   return getGuestCart().reduce((sum, i) => sum + i.quantity, 0);
 }
+
+export function clearGuestCart(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(GUEST_CART_KEY);
+}
+

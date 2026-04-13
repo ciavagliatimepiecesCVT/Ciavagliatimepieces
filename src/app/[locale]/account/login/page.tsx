@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { getGuestCart, clearGuestCart } from "@/lib/guest-cart";
 
 export default function LoginPage() {
   const params = useParams<{ locale?: string | string[] }>();
@@ -35,13 +36,33 @@ export default function LoginPage() {
         return;
       }
 
+      // Merge guest cart items into logged-in user's cart
+      const { data: { user: authedUser } } = await supabase.auth.getUser();
+      if (authedUser) {
+        const guestItems = getGuestCart();
+        if (guestItems.length > 0) {
+          for (const item of guestItems) {
+            await supabase.from("cart_items").insert({
+              user_id: authedUser.id,
+              product_id: item.product_id,
+              quantity: item.quantity,
+              price: item.price,
+              title: item.title,
+              image_url: item.image_url,
+              configuration: item.configuration ?? null,
+            });
+          }
+          clearGuestCart();
+          window.dispatchEvent(new CustomEvent("cart-updated"));
+        }
+      }
+
       if (redirectTo && redirectTo.startsWith("/")) {
         router.push(redirectTo);
         return;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      if (!authedUser) {
         router.push(`/${locale}/account/manage`);
         return;
       }
@@ -49,7 +70,7 @@ export default function LoginPage() {
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name, shipping_address, phone")
-        .eq("id", user.id)
+        .eq("id", authedUser.id)
         .maybeSingle();
 
       const hasSetupProfile =

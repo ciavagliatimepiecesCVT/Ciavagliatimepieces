@@ -40,8 +40,28 @@ export default function TrackOrderPage() {
   const [result, setResult] = useState<TrackResult | null>(null);
 
   useEffect(() => {
-    if (q) setOrderNumber(q);
-  }, [q]);
+    if (q) {
+      setOrderNumber(q);
+      // Auto-search when arriving with a query param (e.g. from email link)
+      const num = q.trim().toUpperCase();
+      if (num) {
+        setLoading(true);
+        fetch(`/api/track-order?order_number=${encodeURIComponent(num)}`)
+          .then(async (res) => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              setError(data.error ?? (isFr ? "Commande introuvable." : "Order not found."));
+            } else {
+              setResult(data as TrackResult);
+            }
+          })
+          .catch(() => {
+            setError(isFr ? "Erreur de connexion." : "Connection error.");
+          })
+          .finally(() => setLoading(false));
+      }
+    }
+  }, [q, isFr]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

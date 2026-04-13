@@ -261,6 +261,18 @@ async function calculateCustomBuildPrice(
   if (!functionOptionId) return 0;
 
   let total = 0;
+
+  // Include the function option's own price (the client-side total includes it).
+  const { data: funcOpt } = await supabase
+    .from("configurator_options")
+    .select("price, discount_percent")
+    .eq("id", functionOptionId)
+    .single();
+  if (funcOpt) {
+    const p = Number((funcOpt as { price?: number }).price ?? 0);
+    const d = Math.min(100, Math.max(0, Number((funcOpt as { discount_percent?: number }).discount_percent ?? 0)));
+    total += d > 0 ? p * (1 - d / 100) : p;
+  }
   const sizeOptionId = typeof config.sizeOptionId === "string" && config.sizeOptionId ? config.sizeOptionId : null;
   if (sizeOptionId) {
     const { data: sizeOpt } = await supabase

@@ -185,16 +185,16 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
                     ) : (
                       <Image
                         src={
-                          item.image_url?.includes("supabase")
-                            ? "/images/hero-1.svg"
-                            : (item.image_url ?? "/images/hero-1.svg")
+                          item.image_url?.startsWith("http") || item.image_url?.startsWith("/")
+                            ? item.image_url
+                            : "/images/hero-1.svg"
                         }
                         alt={item.title ?? ""}
                         fill
                         className="object-cover"
                         sizes="80px"
                         unoptimized={
-                          (item.image_url?.startsWith("http") || item.image_url?.startsWith("data:")) &&
+                          item.image_url?.startsWith("http") &&
                           !item.image_url?.includes("supabase")
                         }
                       />

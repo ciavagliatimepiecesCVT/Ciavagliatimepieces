@@ -37,7 +37,7 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
           </div>
         </ScrollReveal>
         <ScrollReveal>
-          <ContactForm labels={t} />
+          <ContactForm labels={t} locale={locale} />
         </ScrollReveal>
       </div>
     </section>
