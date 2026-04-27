@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import { MetaPixel } from "@/components/MetaPixel";
 import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION_EN, fullUrl } from "@/lib/seo";
 
 const displayFont = Playfair_Display({
@@ -82,9 +83,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const metaPixelId = process.env.META_PIXEL_ID?.trim();
+
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body className={`${displayFont.variable} ${bodyFont.variable} antialiased`}>
+        <MetaPixel pixelId={metaPixelId} />
         {children}
       </body>
     </html>

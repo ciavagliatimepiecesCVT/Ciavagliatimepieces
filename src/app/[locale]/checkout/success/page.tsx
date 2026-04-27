@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ClearCartOnSuccess from "@/components/ClearCartOnSuccess";
+import { MetaPurchaseTracker } from "@/components/MetaPurchaseTracker";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createServerClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
@@ -21,19 +22,33 @@ async function getOrderByStripeSessionId(sessionId: string | null) {
   }
 }
 
-/** Get invoice PDF or hosted URL from completed Checkout Session (for download link). */
-async function getInvoiceUrlFromSession(sessionId: string | null): Promise<string | null> {
-  if (!sessionId?.trim()) return null;
+type CheckoutSessionInfo = {
+  invoiceUrl: string | null;
+  currency: string;
+  total: number | null;
+};
+
+/** Get Stripe session details used for the invoice link and Meta purchase event. */
+async function getCheckoutSessionInfo(sessionId: string | null): Promise<CheckoutSessionInfo> {
+  if (!sessionId?.trim()) return { invoiceUrl: null, currency: "CAD", total: null };
   try {
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.retrieve(sessionId.trim(), {
       expand: ["invoice"],
     });
-    if (session.payment_status !== "paid" || !session.invoice) return null;
+    const currency = session.currency?.toUpperCase() || "CAD";
+    const total = typeof session.amount_total === "number" ? session.amount_total / 100 : null;
+    if (session.payment_status !== "paid" || !session.invoice) {
+      return { invoiceUrl: null, currency, total };
+    }
     const invoice = session.invoice as { invoice_pdf?: string | null; hosted_invoice_url?: string | null };
-    return invoice.invoice_pdf ?? invoice.hosted_invoice_url ?? null;
+    return {
+      invoiceUrl: invoice.invoice_pdf ?? invoice.hosted_invoice_url ?? null,
+      currency,
+      total,
+    };
   } catch {
-    return null;
+    return { invoiceUrl: null, currency: "CAD", total: null };
   }
 }
 
@@ -50,11 +65,19 @@ export default async function CheckoutSuccess({
 
   const order = await getOrderByStripeSessionId(session_id ?? null);
   const verified = !!order && order.status === "paid";
-  const invoiceUrl = await getInvoiceUrlFromSession(session_id ?? null);
+  const sessionInfo = await getCheckoutSessionInfo(session_id ?? null);
+  const invoiceUrl = sessionInfo.invoiceUrl;
 
   return (
     <section className="px-6">
       <ClearCartOnSuccess sessionId={session_id ?? null} />
+      {verified && (
+        <MetaPurchaseTracker
+          sessionId={session_id ?? null}
+          total={sessionInfo.total ?? (typeof order?.total === "number" ? order.total : Number(order?.total ?? 0))}
+          currency={sessionInfo.currency}
+        />
+      )}
       <ScrollReveal>
         <div className="mx-auto max-w-3xl rounded-[32px] border border-white/70 bg-white/80 p-10 text-center text-foreground shadow-[0_24px_90px_rgba(15,20,23,0.1)]">
           {verified ? (

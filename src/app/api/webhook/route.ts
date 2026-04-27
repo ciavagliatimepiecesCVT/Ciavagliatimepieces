@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { sendOrderEmails } from "@/lib/email";
+import { sendMetaPurchaseEvent } from "@/lib/meta-conversions";
 import { createServerClient } from "@/lib/supabase/server";
-import { getStripe } from "@/lib/stripe";
+import { getSiteUrl, getStripe } from "@/lib/stripe";
+
+function getClientIp(request: NextRequest) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor?.trim()) return forwardedFor.split(",")[0].trim();
+  return request.headers.get("x-real-ip")?.trim() || null;
+}
 
 export async function POST(request: NextRequest) {
   const signature = request.headers.get("stripe-signature");
@@ -225,6 +232,23 @@ export async function POST(request: NextRequest) {
         .from("orders")
         .update({ order_number: orderNumber })
         .eq("id", insertedOrder.id);
+
+      try {
+        const siteUrl = getSiteUrl();
+        await sendMetaPurchaseEvent({
+          eventId: session.id,
+          eventSourceUrl: `${siteUrl}/${locale}/checkout/success?session_id=${encodeURIComponent(session.id)}`,
+          value: total,
+          currency: session.currency?.toUpperCase() || "CAD",
+          orderId: orderNumber,
+          email: customerEmail,
+          phone: customerPhone,
+          clientIp: getClientIp(request),
+          userAgent: request.headers.get("user-agent"),
+        });
+      } catch (metaError) {
+        console.warn("[Webhook] Meta Purchase event failed (order already created):", metaError);
+      }
 
       try {
         console.log("[Webhook] Sending order emails…");
