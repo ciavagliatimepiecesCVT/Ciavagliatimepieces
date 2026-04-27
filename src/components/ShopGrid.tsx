@@ -8,6 +8,7 @@ import ScrollReveal from "@/components/ScrollReveal";
 import { useCurrency } from "@/components/CurrencyContext";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { addGuestCartItem } from "@/lib/guest-cart";
+import { trackMetaProductEvent } from "@/lib/meta-pixel";
 
 type Watch = {
   id: string;
@@ -46,6 +47,13 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
         });
         window.dispatchEvent(new CustomEvent("cart-updated"));
         window.dispatchEvent(new CustomEvent("cart-item-added"));
+        trackMetaProductEvent("AddToCart", {
+          id: watch.id,
+          name: watch.name,
+          price: watch.price,
+          currency,
+          quantity: 1,
+        });
         return;
       }
 
@@ -67,6 +75,13 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
       });
       window.dispatchEvent(new CustomEvent("cart-updated"));
       window.dispatchEvent(new CustomEvent("cart-item-added"));
+      trackMetaProductEvent("AddToCart", {
+        id: watch.id,
+        name: watch.name,
+        price: watch.price,
+        currency,
+        quantity: 1,
+      });
     } finally {
       setLoadingId(null);
     }
@@ -74,6 +89,13 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
 
   const handleBuyNow = (watch: Watch) => {
     if ((watch.stock ?? 1) < 1) return;
+    trackMetaProductEvent("InitiateCheckout", {
+      id: watch.id,
+      name: watch.name,
+      price: watch.price,
+      currency,
+      quantity: 1,
+    });
     window.location.href = `/${activeLocale}/checkout/review?type=built&productId=${encodeURIComponent(watch.id)}`;
   };
 

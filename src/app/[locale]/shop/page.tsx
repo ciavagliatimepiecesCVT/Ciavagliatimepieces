@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import ShopGrid from "@/components/ShopGrid";
+import { MetaSearchTracker } from "@/components/MetaSearchTracker";
 import ShopSort from "@/components/ShopSort";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createServerClient } from "@/lib/supabase/server";
@@ -71,6 +72,7 @@ export default async function ShopPage({
 
   return (
     <section className="px-6">
+      <MetaSearchTracker query={searchQuery} />
       <div className="mx-auto max-w-6xl space-y-10">
         <ScrollReveal>
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">

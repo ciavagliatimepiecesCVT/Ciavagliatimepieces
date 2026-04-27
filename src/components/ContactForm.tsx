@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 type ContactLabels = {
   name: string;
@@ -41,6 +42,7 @@ export default function ContactForm({ labels, locale }: { labels: ContactLabels;
       }
 
       setSubmitted(true);
+      trackMetaEvent("Contact");
     } catch {
       setError(isFr ? "Erreur de connexion." : "Connection error. Please try again.");
     } finally {

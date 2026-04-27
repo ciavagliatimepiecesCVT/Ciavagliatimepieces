@@ -11,6 +11,7 @@ import { ShippingQuoteSection } from "@/components/shipping/ShippingQuoteSection
 import { useCurrency } from "@/components/CurrencyContext";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getGuestCart } from "@/lib/guest-cart";
+import { trackMetaEvent, trackMetaProductEvent } from "@/lib/meta-pixel";
 import type { SelectedShippingPayload } from "@/lib/shipping/types";
 import type { CartItem } from "@/components/CartView";
 
@@ -222,6 +223,23 @@ export default function ReviewOrderPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data?.url) {
+        if (checkoutType === "built") {
+          trackMetaProductEvent("InitiateCheckout", {
+            id: productIdParam,
+            name: builtProduct?.name ?? productIdParam,
+            price: builtProduct?.price ?? undefined,
+            currency,
+            quantity: 1,
+          });
+        } else {
+          trackMetaEvent("InitiateCheckout", {
+            content_ids: items.map((item) => item.product_id),
+            content_type: "product",
+            value: subtotal,
+            currency,
+            num_items: items.reduce((sum, item) => sum + item.quantity, 0),
+          });
+        }
         window.location.href = data.url as string;
         return;
       }

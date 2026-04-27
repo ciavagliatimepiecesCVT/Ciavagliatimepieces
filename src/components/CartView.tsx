@@ -14,6 +14,7 @@ import {
   updateGuestCartQuantity,
   removeGuestCartItem,
 } from "@/lib/guest-cart";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 export type CartItem = {
   id: string;
@@ -40,7 +41,7 @@ type CartLabels = {
 
 export default function CartView({ locale, labels }: { locale: string; labels: CartLabels }) {
   const pathname = usePathname();
-  const { formatPrice } = useCurrency();
+  const { currency, formatPrice } = useCurrency();
   const activeLocale = locale || pathname.split("/").filter(Boolean)[0] || "en";
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,6 +141,15 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
   }
 
   const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const trackCheckoutFromCart = () => {
+    trackMetaEvent("InitiateCheckout", {
+      content_ids: items.map((item) => item.product_id),
+      content_type: "product",
+      value: subtotal,
+      currency,
+      num_items: items.reduce((sum, item) => sum + item.quantity, 0),
+    });
+  };
 
   return (
     <section className="px-6 py-12">
@@ -313,6 +323,7 @@ export default function CartView({ locale, labels }: { locale: string; labels: C
               </p>
               <Link
                 href={`/${activeLocale}/checkout/review`}
+                onClick={trackCheckoutFromCart}
                 className="btn-hover inline-block rounded-full bg-foreground px-8 py-3 text-sm font-medium uppercase tracking-[0.2em] text-white transition hover:bg-foreground/90"
               >
                 {labels.checkout}

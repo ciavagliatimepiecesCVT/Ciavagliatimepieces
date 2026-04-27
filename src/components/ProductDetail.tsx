@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { useCurrency } from "@/components/CurrencyContext";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { addGuestCartItem } from "@/lib/guest-cart";
+import { trackMetaProductEvent } from "@/lib/meta-pixel";
 
 type ProductAddonOption = {
   id: string;
@@ -129,6 +130,15 @@ export default function ProductDetail({
   };
 
   useEffect(() => {
+    trackMetaProductEvent("ViewContent", {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      currency,
+    });
+  }, [product.id, product.name, product.price, currency]);
+
+  useEffect(() => {
     if (!lightboxOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeLightbox();
@@ -224,6 +234,13 @@ export default function ProductDetail({
         });
         window.dispatchEvent(new CustomEvent("cart-updated"));
         window.dispatchEvent(new CustomEvent("cart-item-added"));
+        trackMetaProductEvent("AddToCart", {
+          id: product.id,
+          name: product.name,
+          price: totalPrice,
+          currency,
+          quantity: 1,
+        });
         return;
       }
 
@@ -257,6 +274,13 @@ export default function ProductDetail({
       }
       window.dispatchEvent(new CustomEvent("cart-updated"));
       window.dispatchEvent(new CustomEvent("cart-item-added"));
+      trackMetaProductEvent("AddToCart", {
+        id: product.id,
+        name: product.name,
+        price: totalPrice,
+        currency,
+        quantity: 1,
+      });
     } finally {
       setLoading(false);
     }
@@ -282,6 +306,13 @@ export default function ProductDetail({
             configuration: hasConfig ? configWithAddons : undefined,
           });
           window.dispatchEvent(new CustomEvent("cart-updated"));
+          trackMetaProductEvent("AddToCart", {
+            id: product.id,
+            name: product.name,
+            price: totalPrice,
+            currency,
+            quantity: 1,
+          });
         } else {
           const { data: existing } = await supabase
             .from("cart_items")
@@ -310,11 +341,32 @@ export default function ProductDetail({
             });
           }
           window.dispatchEvent(new CustomEvent("cart-updated"));
+          trackMetaProductEvent("AddToCart", {
+            id: product.id,
+            name: product.name,
+            price: totalPrice,
+            currency,
+            quantity: 1,
+          });
         }
+        trackMetaProductEvent("InitiateCheckout", {
+          id: product.id,
+          name: product.name,
+          price: totalPrice,
+          currency,
+          quantity: 1,
+        });
         window.location.href = `/${activeLocale}/cart`;
         return;
       }
 
+      trackMetaProductEvent("InitiateCheckout", {
+        id: product.id,
+        name: product.name,
+        price: totalPrice,
+        currency,
+        quantity: 1,
+      });
       window.location.href = `/${activeLocale}/checkout/review?type=built&productId=${encodeURIComponent(product.id)}`;
       return;
     } finally {

@@ -11,6 +11,7 @@ import { useCurrency } from "@/components/CurrencyContext";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getPublicConfiguratorData, setProductConfiguratorConfig } from "@/app/[locale]/account/admin/actions";
 import { addGuestCartItem } from "@/lib/guest-cart";
+import { trackMetaProductEvent } from "@/lib/meta-pixel";
 import { ShippingQuoteSection } from "@/components/shipping/ShippingQuoteSection";
 import type { SelectedShippingPayload } from "@/lib/shipping/types";
 
@@ -647,6 +648,13 @@ export default function Configurator({
         return;
       }
       if (data?.url) {
+        trackMetaProductEvent("InitiateCheckout", {
+          id: "custom-build",
+          name: isFr ? "Montre sur mesure" : "Custom Build",
+          price: displayTotal,
+          currency,
+          quantity: 1,
+        });
         window.location.href = data.url;
       } else {
         setCheckoutError(isFr ? "Réponse inattendue. Réessayez." : "Unexpected response. Please try again.");
@@ -820,6 +828,13 @@ export default function Configurator({
             },
           })
         );
+        trackMetaProductEvent("AddToCart", {
+          id: "custom-build",
+          name: title,
+          price: displayTotal,
+          currency,
+          quantity: 1,
+        });
         setAddToCartLoading(false);
         return;
       }
@@ -871,6 +886,13 @@ export default function Configurator({
           },
         })
       );
+      trackMetaProductEvent("AddToCart", {
+        id: "custom-build",
+        name: title,
+        price: displayTotal,
+        currency,
+        quantity: 1,
+      });
     } catch {
       setAddToCartError(isFr ? "Erreur lors de l'ajout au panier." : "Failed to add to cart.");
     } finally {
