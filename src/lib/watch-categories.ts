@@ -9,6 +9,8 @@ export type WatchCategory = {
   sort_order: number;
   image_url: string | null;
   display_price: number | null;
+  show_in_navbar: boolean;
+  show_on_homepage: boolean;
 };
 
 async function getWatchCategoriesUncached(): Promise<WatchCategory[]> {
@@ -16,7 +18,7 @@ async function getWatchCategoriesUncached(): Promise<WatchCategory[]> {
     const supabase = createServerClient();
     const { data, error } = await supabase
       .from("watch_categories")
-      .select("id, slug, label_en, label_fr, sort_order, image_url, display_price")
+      .select("id, slug, label_en, label_fr, sort_order, image_url, display_price, show_in_navbar, show_on_homepage")
       .order("sort_order", { ascending: true });
     if (error) return [];
     return data ?? [];

@@ -38,11 +38,20 @@ export default function AdminCategoriesPage() {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [reorderingId, setReorderingId] = useState<string | null>(null);
-  const [categoryForm, setCategoryForm] = useState<{ slug: string; label_en: string; label_fr: string; image_url: string }>({
+  const [categoryForm, setCategoryForm] = useState<{
+    slug: string;
+    label_en: string;
+    label_fr: string;
+    image_url: string;
+    show_in_navbar: boolean;
+    show_on_homepage: boolean;
+  }>({
     slug: "",
     label_en: "",
     label_fr: "",
     image_url: "",
+    show_in_navbar: true,
+    show_on_homepage: true,
   });
   const [imageUploading, setImageUploading] = useState(false);
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -91,13 +100,20 @@ export default function AdminCategoriesPage() {
 
   const startEditCategory = (c: WatchCategoryRow) => {
     setEditingCategoryId(c.id);
-    setCategoryForm({ slug: c.slug, label_en: c.label_en, label_fr: c.label_fr, image_url: c.image_url ?? "" });
+    setCategoryForm({
+      slug: c.slug,
+      label_en: c.label_en,
+      label_fr: c.label_fr,
+      image_url: c.image_url ?? "",
+      show_in_navbar: c.show_in_navbar,
+      show_on_homepage: c.show_on_homepage,
+    });
     setError(null);
   };
 
   const cancelEditCategory = () => {
     setEditingCategoryId(null);
-    setCategoryForm({ slug: "", label_en: "", label_fr: "", image_url: "" });
+    setCategoryForm({ slug: "", label_en: "", label_fr: "", image_url: "", show_in_navbar: true, show_on_homepage: true });
   };
 
   const handleCategoryImageFileSelect = (e: React.ChangeEvent<HTMLInputElement>, setUrl: (url: string) => void) => {
@@ -115,6 +131,8 @@ export default function AdminCategoriesPage() {
         label_en: categoryForm.label_en,
         label_fr: categoryForm.label_fr,
         image_url: categoryForm.image_url || null,
+        show_in_navbar: categoryForm.show_in_navbar,
+        show_on_homepage: categoryForm.show_on_homepage,
       });
       setWatchCategories(await getAdminWatchCategories());
       cancelEditCategory();
@@ -132,10 +150,12 @@ export default function AdminCategoriesPage() {
         label_en: categoryForm.label_en,
         label_fr: categoryForm.label_fr,
         image_url: categoryForm.image_url || null,
+        show_in_navbar: categoryForm.show_in_navbar,
+        show_on_homepage: categoryForm.show_on_homepage,
       });
       setWatchCategories(await getAdminWatchCategories());
       setShowAddCategory(false);
-      setCategoryForm({ slug: "", label_en: "", label_fr: "", image_url: "" });
+      setCategoryForm({ slug: "", label_en: "", label_fr: "", image_url: "", show_in_navbar: true, show_on_homepage: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to add category");
     }
@@ -219,7 +239,7 @@ export default function AdminCategoriesPage() {
             type="button"
             onClick={() => {
               setShowAddCategory(true);
-              setCategoryForm({ slug: "", label_en: "", label_fr: "", image_url: "" });
+              setCategoryForm({ slug: "", label_en: "", label_fr: "", image_url: "", show_in_navbar: true, show_on_homepage: true });
               setError(null);
             }}
             className="rounded-full bg-foreground px-6 py-3 text-xs uppercase tracking-[0.3em] text-white"
@@ -260,12 +280,32 @@ export default function AdminCategoriesPage() {
                   </label>
                 </div>
               </div>
+              <div className="sm:col-span-2 flex flex-wrap gap-6">
+                <label className="flex items-center gap-2 text-sm text-foreground/80">
+                  <input
+                    type="checkbox"
+                    checked={categoryForm.show_in_navbar}
+                    onChange={(e) => setCategoryForm((p) => ({ ...p, show_in_navbar: e.target.checked }))}
+                    className="h-4 w-4 rounded border-foreground/30"
+                  />
+                  {isFr ? "Afficher dans la barre de navigation" : "Show in navbar"}
+                </label>
+                <label className="flex items-center gap-2 text-sm text-foreground/80">
+                  <input
+                    type="checkbox"
+                    checked={categoryForm.show_on_homepage}
+                    onChange={(e) => setCategoryForm((p) => ({ ...p, show_on_homepage: e.target.checked }))}
+                    className="h-4 w-4 rounded border-foreground/30"
+                  />
+                  {isFr ? "Afficher sur la page d'accueil" : "Show on homepage"}
+                </label>
+              </div>
             </div>
             <div className="mt-4 flex gap-3">
               <button type="button" onClick={handleAddCategory} className="btn-hover rounded-full bg-foreground px-6 py-2 text-xs uppercase tracking-[0.2em] text-white">
                 {isFr ? "Créer" : "Create"}
               </button>
-              <button type="button" onClick={() => { setShowAddCategory(false); setCategoryForm({ slug: "", label_en: "", label_fr: "", image_url: "" }); }} className="btn-hover rounded-full border border-foreground/20 px-6 py-2 text-xs uppercase tracking-[0.2em]">
+              <button type="button" onClick={() => { setShowAddCategory(false); setCategoryForm({ slug: "", label_en: "", label_fr: "", image_url: "", show_in_navbar: true, show_on_homepage: true }); }} className="btn-hover rounded-full border border-foreground/20 px-6 py-2 text-xs uppercase tracking-[0.2em]">
                 {isFr ? "Annuler" : "Cancel"}
               </button>
             </div>
@@ -303,6 +343,26 @@ export default function AdminCategoriesPage() {
                       </div>
                       {categoryForm.image_url ? <img src={categoryForm.image_url} alt="" className="mt-2 h-20 w-20 rounded-lg object-cover" /> : null}
                     </div>
+                    <div className="sm:col-span-2 flex flex-wrap gap-6">
+                      <label className="flex items-center gap-2 text-sm text-foreground/80">
+                        <input
+                          type="checkbox"
+                          checked={categoryForm.show_in_navbar}
+                          onChange={(e) => setCategoryForm((p) => ({ ...p, show_in_navbar: e.target.checked }))}
+                          className="h-4 w-4 rounded border-foreground/30"
+                        />
+                        {isFr ? "Afficher dans la barre de navigation" : "Show in navbar"}
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-foreground/80">
+                        <input
+                          type="checkbox"
+                          checked={categoryForm.show_on_homepage}
+                          onChange={(e) => setCategoryForm((p) => ({ ...p, show_on_homepage: e.target.checked }))}
+                          className="h-4 w-4 rounded border-foreground/30"
+                        />
+                        {isFr ? "Afficher sur la page d'accueil" : "Show on homepage"}
+                      </label>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button type="button" onClick={handleSaveCategory} className="btn-hover rounded-full bg-foreground px-4 py-2 text-xs uppercase tracking-[0.2em] text-white">
@@ -318,6 +378,14 @@ export default function AdminCategoriesPage() {
                   <div className="min-w-0 flex-1">
                     <h3 className="text-xl font-semibold">{cat.label_en}</h3>
                     <p className="mt-1 text-sm text-foreground/70">{cat.slug}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] ${cat.show_in_navbar ? "bg-emerald-100 text-emerald-700" : "bg-foreground/10 text-foreground/50"}`}>
+                        {isFr ? "Nav" : "Navbar"}: {cat.show_in_navbar ? (isFr ? "Oui" : "On") : (isFr ? "Non" : "Off")}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] ${cat.show_on_homepage ? "bg-emerald-100 text-emerald-700" : "bg-foreground/10 text-foreground/50"}`}>
+                        {isFr ? "Accueil" : "Homepage"}: {cat.show_on_homepage ? (isFr ? "Oui" : "On") : (isFr ? "Non" : "Off")}
+                      </span>
+                    </div>
                     <p className="mt-2 text-xs text-foreground/60">
                       {isFr ? "Montres dans cette catégorie" : "Watches in this category"}: {products.filter((p) => p.category === cat.slug).map((p) => p.name).join(", ") || "—"}
                     </p>

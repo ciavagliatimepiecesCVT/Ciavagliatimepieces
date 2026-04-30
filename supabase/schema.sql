@@ -53,6 +53,8 @@ create table if not exists watch_categories (
   label_en text not null,
   label_fr text not null,
   sort_order int default 0,
+  show_in_navbar boolean not null default true,
+  show_on_homepage boolean not null default true,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

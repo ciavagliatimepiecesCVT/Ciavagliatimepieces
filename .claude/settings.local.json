@@ -8,7 +8,12 @@
       "Bash(rm:*)",
       "Bash(npx --prefix \"C:/3-WebsiteCreation/civaglia-timepieces\" tsc --noEmit)",
       "Bash(xargs grep:*)",
-      "Bash(ls src/app/api/contact/route.ts src/app/[locale]/not-found.tsx)"
+      "Bash(ls src/app/api/contact/route.ts src/app/[locale]/not-found.tsx)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(git -C /Users/stefano/Ciavagliatimepieces status --short Ciavagliatimepieces)",
+      "Bash(git -C /Users/stefano/Ciavagliatimepieces ls-files Ciavagliatimepieces)"
     ]
   }
 }

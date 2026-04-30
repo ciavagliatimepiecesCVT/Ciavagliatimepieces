@@ -312,7 +312,7 @@ export default function NavBar({
             >
               {labels.allWatches}
             </Link>
-            {watchCategories.map((cat) => {
+            {watchCategories.filter((cat) => cat.show_in_navbar).map((cat) => {
               const label = activeLocale === "fr" ? cat.label_fr : cat.label_en;
               return (
                 <Link
@@ -409,7 +409,7 @@ export default function NavBar({
               >
                 {labels.allWatches}
               </Link>
-              {watchCategories.map((cat) => {
+              {watchCategories.filter((cat) => cat.show_in_navbar).map((cat) => {
                 const label = activeLocale === "fr" ? cat.label_fr : cat.label_en;
                 return (
                   <Link

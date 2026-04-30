@@ -447,6 +447,8 @@ export async function createWatchCategory(input: {
   sort_order?: number;
   image_url?: string | null;
   display_price?: number | null;
+  show_in_navbar?: boolean;
+  show_on_homepage?: boolean;
 }) {
   await requireAdmin();
   const slug = input.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
@@ -459,6 +461,8 @@ export async function createWatchCategory(input: {
     sort_order: input.sort_order ?? 0,
     image_url: input.image_url ?? null,
     display_price: input.display_price ?? null,
+    show_in_navbar: input.show_in_navbar ?? true,
+    show_on_homepage: input.show_on_homepage ?? true,
   });
   if (error) throw error;
   revalidateTag("watch-categories", "max");
@@ -470,7 +474,16 @@ export async function createWatchCategory(input: {
 
 export async function updateWatchCategory(
   id: string,
-  input: { slug?: string; label_en?: string; label_fr?: string; sort_order?: number; image_url?: string | null; display_price?: number | null }
+  input: {
+    slug?: string;
+    label_en?: string;
+    label_fr?: string;
+    sort_order?: number;
+    image_url?: string | null;
+    display_price?: number | null;
+    show_in_navbar?: boolean;
+    show_on_homepage?: boolean;
+  }
 ) {
   await requireAdmin();
   if (!id) throw new Error("Invalid id");
@@ -488,6 +501,8 @@ export async function updateWatchCategory(
   if (input.sort_order !== undefined) updates.sort_order = input.sort_order;
   if (input.image_url !== undefined) updates.image_url = input.image_url;
   if (input.display_price !== undefined) updates.display_price = input.display_price;
+  if (input.show_in_navbar !== undefined) updates.show_in_navbar = input.show_in_navbar;
+  if (input.show_on_homepage !== undefined) updates.show_on_homepage = input.show_on_homepage;
   const { error } = await supabase.from("watch_categories").update(updates).eq("id", id);
   if (error) throw error;
   if (oldSlug && newSlug && oldSlug !== newSlug) {
