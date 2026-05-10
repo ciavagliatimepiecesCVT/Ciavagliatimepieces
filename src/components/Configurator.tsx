@@ -1170,6 +1170,29 @@ export default function Configurator({
               layerScales={publicLayerScales}
               hideFunctionLayerWhenCaseSelected
             />
+            {(() => {
+              if (currentStepKey !== "function") return null;
+              if (!selections.function) return null;
+              const selectedFunctionOption = options.find((o) => o.id === selections.function);
+              const builtUrl = (selectedFunctionOption as { built_preview_image_url?: string | null } | undefined)?.built_preview_image_url;
+              if (!builtUrl) return null;
+              return (
+                <div
+                  className="pointer-events-none absolute inset-0 z-[100] flex items-center justify-center bg-white"
+                  aria-hidden
+                >
+                  <Image
+                    src={builtUrl}
+                    alt=""
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    className="object-contain object-center"
+                    unoptimized={builtUrl.startsWith("http")}
+                    priority={false}
+                  />
+                </div>
+              );
+            })()}
           </div>
           {selectedId && (() => {
             const opt = optionsForCurrentStep.find((o) => o.id === selectedId);

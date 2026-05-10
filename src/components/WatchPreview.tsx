@@ -170,6 +170,10 @@ export function WatchPreview({
 
         const isEditableLayer =
           editableStepKey == null || editableStepKey === "" || layer.stepKey === editableStepKey;
+        // Only block native touch behaviour when an admin actually has drag/scale handlers wired up.
+        // In the user-facing configurator both are undefined, so we leave touch-action: auto so
+        // mobile users can still pan the page vertically when their finger starts on the preview.
+        const isInteractiveLayer = !!(onLayerOffsetChange || onLayerScaleChange);
 
         const handlePointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
           if (!isEditableLayer) return;
@@ -219,26 +223,26 @@ export function WatchPreview({
         return (
           <div
             key={layer.key}
-            className="absolute inset-0 touch-none"
+            className={`absolute inset-0 ${isInteractiveLayer ? "touch-none" : ""}`}
             style={{
               zIndex: layer.zIndex,
-              pointerEvents: onLayerOffsetChange || onLayerScaleChange ? (isEditableLayer ? "auto" : "none") : "auto",
+              pointerEvents: isInteractiveLayer ? (isEditableLayer ? "auto" : "none") : "auto",
               transform:
                 offset.x || offset.y || scale !== 1
                   ? `translate(${offset.x}px, ${offset.y}px) scale(${scale})`
                   : undefined,
               transformOrigin: "center center",
               cursor:
-                (onLayerOffsetChange || onLayerScaleChange) && isEditableLayer
+                isInteractiveLayer && isEditableLayer
                   ? draggingKey === groupKey
                     ? "grabbing"
                     : "grab"
                   : "default",
             }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerEnd}
-            onPointerCancel={handlePointerEnd}
+            onPointerDown={isInteractiveLayer ? handlePointerDown : undefined}
+            onPointerMove={isInteractiveLayer ? handlePointerMove : undefined}
+            onPointerUp={isInteractiveLayer ? handlePointerEnd : undefined}
+            onPointerCancel={isInteractiveLayer ? handlePointerEnd : undefined}
           >
             <LayerImage
               src={layer.url}

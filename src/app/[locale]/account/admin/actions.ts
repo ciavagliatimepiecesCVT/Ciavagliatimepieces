@@ -1851,6 +1851,7 @@ export type ConfiguratorOptionRow = {
   discount_percent?: number | null;
   image_url: string | null;
   preview_image_url: string | null;
+  built_preview_image_url?: string | null;
   layer_image_url?: string | null;
   layer_z_index?: number;
   sort_order: number;
@@ -2216,7 +2217,7 @@ export async function getFunctionIdsForStep(stepId: string): Promise<string[]> {
 export async function getAdminConfiguratorOptions(stepId?: string | null, parentOptionId?: string | null): Promise<ConfiguratorOptionRow[]> {
   await requireAdmin();
   const supabase = createServerClient();
-  const baseSelect = "id, step_id, parent_option_id, is_visible, for_function_ids, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index, sort_order";
+  const baseSelect = "id, step_id, parent_option_id, is_visible, for_function_ids, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, built_preview_image_url, layer_image_url, layer_z_index, sort_order";
   let q = supabase.from("configurator_options").select(`${baseSelect}, option_group_en, option_group_fr, group_id`).order("sort_order", { ascending: true });
   if (stepId) q = q.eq("step_id", stepId);
   if (parentOptionId === null) q = q.is("parent_option_id", null);
@@ -2301,6 +2302,7 @@ export async function createConfiguratorOption(input: {
   discount_percent?: number | null;
   image_url?: string | null;
   preview_image_url?: string | null;
+  built_preview_image_url?: string | null;
   layer_image_url?: string | null;
   layer_z_index?: number;
   sort_order?: number;
@@ -2324,6 +2326,7 @@ export async function createConfiguratorOption(input: {
     discount_percent: discount,
     image_url: input.image_url ?? null,
     preview_image_url: input.preview_image_url ?? null,
+    built_preview_image_url: input.built_preview_image_url ?? null,
     layer_image_url: input.layer_image_url ?? null,
     layer_z_index: input.layer_z_index ?? 0,
     sort_order: input.sort_order ?? 0,
@@ -2347,6 +2350,7 @@ export async function updateConfiguratorOption(
     discount_percent?: number | null;
     image_url?: string | null;
     preview_image_url?: string | null;
+    built_preview_image_url?: string | null;
     layer_image_url?: string | null;
     layer_z_index?: number;
     sort_order?: number;
@@ -2368,6 +2372,7 @@ export async function updateConfiguratorOption(
   if (input.discount_percent !== undefined) updates.discount_percent = input.discount_percent == null ? 0 : Math.min(100, Math.max(0, Number(input.discount_percent)));
   if (input.image_url !== undefined) updates.image_url = input.image_url;
   if (input.preview_image_url !== undefined) updates.preview_image_url = input.preview_image_url;
+  if (input.built_preview_image_url !== undefined) updates.built_preview_image_url = input.built_preview_image_url;
   if (input.layer_image_url !== undefined) updates.layer_image_url = input.layer_image_url;
   if (input.layer_z_index !== undefined) updates.layer_z_index = input.layer_z_index;
   if (input.sort_order !== undefined) updates.sort_order = input.sort_order;
@@ -2840,7 +2845,7 @@ export type PublicConfiguratorData = {
   stepsMeta: { id: string; step_key: string | null; label_en: string; label_fr: string; optional: boolean; sort_order: number; image_url: string | null }[];
   functionOptions: { id: string; label_en: string; label_fr: string; letter: string; price: number; discount_percent: number }[];
   functionStepsMap: Record<string, string[]>;
-  options: { id: string; step_id: string; parent_option_id: string | null; for_function_ids?: string[] | null; label_en: string; label_fr: string; letter: string; price: number; discount_percent: number; image_url: string | null; preview_image_url: string | null; layer_image_url: string | null; layer_z_index: number; option_group_en: string | null; option_group_fr: string | null; group_id: string | null; dropdownItems?: PublicDropdownItem[] }[];
+  options: { id: string; step_id: string; parent_option_id: string | null; for_function_ids?: string[] | null; label_en: string; label_fr: string; letter: string; price: number; discount_percent: number; image_url: string | null; preview_image_url: string | null; built_preview_image_url: string | null; layer_image_url: string | null; layer_z_index: number; option_group_en: string | null; option_group_fr: string | null; group_id: string | null; dropdownItems?: PublicDropdownItem[] }[];
   optionGroups: PublicOptionGroup[];
   addons: { id: string; step_id: string; label_en: string; label_fr: string; price: number; option_ids: string[] }[];
   configuratorDiscountPercent: number;
@@ -2875,7 +2880,7 @@ async function getPublicConfiguratorDataUncached(): Promise<PublicConfiguratorDa
     const functionStep = stepsMeta.find((s) => s.step_key === "function");
     if (!functionStep) return null;
 
-    const baseSelect = "id, step_id, parent_option_id, is_visible, for_function_ids, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index";
+    const baseSelect = "id, step_id, parent_option_id, is_visible, for_function_ids, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, built_preview_image_url, layer_image_url, layer_z_index";
     const baseSelectWithoutForFunctionIds = "id, step_id, parent_option_id, is_visible, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index";
     const baseSelectLegacy = "id, step_id, parent_option_id, label_en, label_fr, letter, price, discount_percent, image_url, preview_image_url, layer_image_url, layer_z_index";
     let allOptions: (Record<string, unknown> & { id: string; step_id: string; label_en: string; label_fr: string })[] | null = null;
@@ -2940,6 +2945,7 @@ async function getPublicConfiguratorDataUncached(): Promise<PublicConfiguratorDa
         discount_percent: Number((o as { discount_percent?: number }).discount_percent ?? 0),
         image_url: (o as { image_url?: string }).image_url ?? null,
         preview_image_url: (o as { preview_image_url?: string }).preview_image_url ?? null,
+        built_preview_image_url: (o as { built_preview_image_url?: string | null }).built_preview_image_url ?? null,
         layer_image_url: (o as { layer_image_url?: string }).layer_image_url ?? null,
         layer_z_index: Number((o as { layer_z_index?: number }).layer_z_index ?? 0),
         option_group_en: (o as { option_group_en?: string | null }).option_group_en ?? null,

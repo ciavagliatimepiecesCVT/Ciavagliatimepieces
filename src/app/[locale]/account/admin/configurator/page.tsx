@@ -177,6 +177,7 @@ export default function AdminConfiguratorPage() {
     discount_percent: 0,
     image_url: "",
     preview_image_url: "",
+    built_preview_image_url: "",
     layer_image_url: "",
     layer_z_index: 0,
     option_group_en: "",
@@ -1026,6 +1027,7 @@ export default function AdminConfiguratorPage() {
         for_function_ids: optionForm.for_function_ids.length > 0 ? optionForm.for_function_ids : null,
         image_url: optionForm.image_url.trim() || null,
         preview_image_url: optionForm.preview_image_url.trim() || null,
+        built_preview_image_url: optionForm.built_preview_image_url.trim() || null,
         layer_image_url: optionForm.layer_image_url.trim() || null,
         layer_z_index: optionForm.layer_z_index,
         option_group_en: optionForm.option_group_en.trim() || null,
@@ -1052,6 +1054,7 @@ export default function AdminConfiguratorPage() {
         discount_percent: optionForm.discount_percent || null,
         image_url: optionForm.image_url.trim() || null,
         preview_image_url: optionForm.preview_image_url.trim() || null,
+        built_preview_image_url: optionForm.built_preview_image_url.trim() || null,
         layer_image_url: optionForm.layer_image_url.trim() || null,
         layer_z_index: optionForm.layer_z_index,
         option_group_en: optionForm.option_group_en.trim() || null,
@@ -1070,6 +1073,7 @@ export default function AdminConfiguratorPage() {
         discount_percent: 0,
         image_url: "",
         preview_image_url: "",
+        built_preview_image_url: "",
         layer_image_url: "",
         layer_z_index: 0,
         option_group_en: "",
@@ -2063,6 +2067,7 @@ export default function AdminConfiguratorPage() {
                           discount_percent: (opt as { discount_percent?: number }).discount_percent ?? 0,
                           image_url: (opt as { image_url?: string }).image_url ?? "",
                           preview_image_url: (opt as { preview_image_url?: string }).preview_image_url ?? "",
+                          built_preview_image_url: (opt as { built_preview_image_url?: string | null }).built_preview_image_url ?? "",
                           layer_image_url: (opt as { layer_image_url?: string }).layer_image_url ?? "",
                           layer_z_index: (opt as { layer_z_index?: number }).layer_z_index ?? 0,
                           option_group_en: (opt as { option_group_en?: string | null }).option_group_en ?? "",
@@ -2128,7 +2133,7 @@ export default function AdminConfiguratorPage() {
             {currentStepKey === "function" ? (
               <button
                 type="button"
-                onClick={() => { if (!functionStep) return; setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: functionStep.id, parent_option_id: null, for_function_ids: [], label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "", layer_image_url: "", layer_z_index: 0, option_group_en: "", option_group_fr: "" }); }}
+                onClick={() => { if (!functionStep) return; setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: functionStep.id, parent_option_id: null, for_function_ids: [], label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "", built_preview_image_url: "", layer_image_url: "", layer_z_index: 0, option_group_en: "", option_group_fr: "" }); }}
                 disabled={!functionStep}
                 className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-foreground/30 bg-white/60 p-4 text-foreground/60 transition hover:border-foreground/50 hover:bg-white/80 hover:text-foreground/80 disabled:opacity-50"
               >
@@ -2138,7 +2143,7 @@ export default function AdminConfiguratorPage() {
             ) : currentStepRow ? (
               <button
                 type="button"
-                onClick={() => { setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: currentStepRow.id, parent_option_id: null, for_function_ids: effectiveFunctionId ? [effectiveFunctionId] : [], label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "", layer_image_url: "", layer_z_index: 0, option_group_en: "", option_group_fr: "" }); }}
+                onClick={() => { setShowAddOption(true); setEditingOptionId(null); setUploadError(null); setOptionForm({ step_id: currentStepRow.id, parent_option_id: null, for_function_ids: effectiveFunctionId ? [effectiveFunctionId] : [], label_en: "", label_fr: "", letter: "A", price: 0, discount_percent: 0, image_url: "", preview_image_url: "", built_preview_image_url: "", layer_image_url: "", layer_z_index: 0, option_group_en: "", option_group_fr: "" }); }}
                 className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-foreground/30 bg-white/60 p-4 text-foreground/60 transition hover:border-foreground/50 hover:bg-white/80 hover:text-foreground/80"
               >
                 <span className="text-2xl">+</span>
@@ -2767,6 +2772,57 @@ export default function AdminConfiguratorPage() {
                     )}
                   </div>
                 </div>
+                {currentStepKey === "function" && (
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-medium uppercase tracking-wider text-foreground">{isFr ? "Aperçu de montre assemblée" : "Built watch preview"}</label>
+                    <p className="mt-0.5 text-xs text-foreground/60">
+                      {isFr
+                        ? "Photo d’inspiration d’une montre finie. Affichée dans le configurateur tant que le client est à l’étape Fonction. Disparaît dès qu’il clique sur « Continuer »."
+                        : "Inspiration photo of a finished watch. Shown in the configurator while the customer is on the Function step. Hidden as soon as they click \"Continue\"."}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="block max-w-[180px] text-xs text-foreground file:mr-2 file:rounded file:border-0 file:bg-foreground/10 file:px-2 file:py-1 file:text-xs file:text-foreground"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) openCropModalFromFileWithPreview(file, (url) => setOptionForm((p) => ({ ...p, built_preview_image_url: url })), "image");
+                          e.target.value = "";
+                        }}
+                      />
+                      <input
+                        value={optionForm.built_preview_image_url}
+                        onChange={(e) => setOptionForm((p) => ({ ...p, built_preview_image_url: e.target.value }))}
+                        placeholder={isFr ? "Ou URL" : "Or URL"}
+                        className="min-w-[200px] flex-1 rounded-lg border border-foreground/25 bg-white px-3 py-2 text-sm text-foreground placeholder:text-neutral-500"
+                      />
+                      {optionForm.built_preview_image_url && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={cropModalCapturing}
+                            onClick={() => openCropModalFromUrlWithPreview(optionForm.built_preview_image_url, (url) => setOptionForm((p) => ({ ...p, built_preview_image_url: url })), "image")}
+                            className="rounded-lg border border-foreground/25 px-3 py-1.5 text-xs text-foreground hover:bg-foreground/5"
+                          >
+                            {cropModalCapturing ? (isFr ? "Capture…" : "Capturing…") : isFr ? "Recadrer l'image" : "Crop image"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOptionForm((p) => ({ ...p, built_preview_image_url: "" }))}
+                            className="rounded-lg border border-foreground/25 px-3 py-1.5 text-xs text-foreground hover:bg-foreground/5"
+                          >
+                            {isFr ? "Retirer" : "Remove"}
+                          </button>
+                          <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded border border-foreground/15 bg-foreground/5">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={optionForm.built_preview_image_url} alt="" className="h-full w-full object-cover" />
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <label className="text-xs font-medium uppercase tracking-wider text-foreground">{isFr ? "Image couche (aperçu composite)" : "Layer image (composite preview)"}</label>
                   <p className="mt-0.5 text-xs text-foreground/60">{isFr ? "PNG avec transparence réelle (canal alpha) pour superposition. Ordre (bas → haut) : bracelet=10, boîtier=20, lunette=30, cadran=40, aiguilles=50, extra=51. Exportez avec fond transparent depuis votre outil 3D." : "PNG with real transparency (alpha channel) for stacking. Order (bottom → top): strap=10, case=20, bezel=30, dial=40, hands=50, extra=51. Export with transparent background from your 3D tool so the preview shows correctly."}</p>
