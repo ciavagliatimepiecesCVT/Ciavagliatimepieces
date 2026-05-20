@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useCurrency } from "@/components/CurrencyContext";
+import { SHIPPING_COUNTRY_OPTIONS } from "@/lib/shipping/types";
 import type { SelectedShippingPayload } from "@/lib/shipping/types";
 import type { ShippingQuoteOption } from "@/lib/shipping/types";
 
@@ -152,7 +153,7 @@ export function ShippingQuoteSection({
         />
         <input
           className="rounded-lg border border-foreground/20 px-3 py-2 text-sm"
-          placeholder={isFr ? "Province / État" : "State / Province"}
+          placeholder={isFr ? "Province / État / Comté" : "State / Province / County"}
           value={addr.state}
           onChange={(e) => setAddr((a) => ({ ...a, state: e.target.value }))}
         />
@@ -167,8 +168,11 @@ export function ShippingQuoteSection({
           value={addr.country}
           onChange={(e) => setAddr((a) => ({ ...a, country: e.target.value }))}
         >
-          <option value="CA">Canada</option>
-          <option value="US">United States</option>
+          {SHIPPING_COUNTRY_OPTIONS.map((country) => (
+            <option key={country.code} value={country.code}>
+              {country.name}
+            </option>
+          ))}
         </select>
       </div>
       <button

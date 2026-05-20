@@ -1,0 +1,20 @@
+
+> civaglia-timepieces@0.1.0 dev
+> next dev --webpack --port 3000
+
+▲ Next.js 16.1.6 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.2.55:3000
+- Environments: .env
+- Experiments (use with caution):
+  · serverActions
+
+✓ Starting...
+✓ Ready in 2.9s
+○ Compiling /[locale]/configurator ...
+ GET /en/configurator 200 in 5.9s (compile: 4.3s, proxy.ts: 212ms, generate-params: 976ms, render: 1468ms)
+ GET /en 200 in 3.5s (compile: 2.4s, proxy.ts: 13ms, generate-params: 1022ms, render: 1106ms)
+ GET /en/configurator 200 in 996ms (compile: 697ms, proxy.ts: 10ms, generate-params: 14ms, render: 289ms)
+ POST /api/checkout 200 in 6.9s (compile: 840ms, proxy.ts: 14ms, render: 6.0s)
+ GET /en/checkout/cancel 200 in 2.3s (compile: 1722ms, proxy.ts: 14ms, generate-params: 964ms, render: 580ms)
+[?25h

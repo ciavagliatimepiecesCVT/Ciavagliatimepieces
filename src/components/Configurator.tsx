@@ -81,6 +81,7 @@ export default function Configurator({
   const [sharedConfigurationLoadDone, setSharedConfigurationLoadDone] = useState(false);
 
   const [stepIndex, setStepIndex] = useState(0);
+  const [hasReachedFinalStep, setHasReachedFinalStep] = useState(false);
   const [selections, setSelections] = useState<Partial<Record<string, string>>>({});
   /** For options that have dropdown items: optionId -> selected dropdown item id. */
   const [dropdownSelections, setDropdownSelections] = useState<Record<string, string>>({});
@@ -212,6 +213,7 @@ export default function Configurator({
       setDropdownSelections(nextDropdowns);
       setCustomCheckboxSelections(nextCheckbox);
       setStepIndex(0);
+      setHasReachedFinalStep(false);
       setEditLoadDone(true);
     })();
     return () => {
@@ -271,6 +273,7 @@ export default function Configurator({
       setDropdownSelections(nextDropdowns);
       setCustomCheckboxSelections(nextCheckbox);
       setStepIndex(Math.max(0, stepsForSavedConfig.length - 1));
+      setHasReachedFinalStep(false);
       setSavedConfigurationLoadDone(true);
     })();
     return () => {
@@ -320,6 +323,7 @@ export default function Configurator({
     setDropdownSelections(nextDropdowns);
     setCustomCheckboxSelections(nextCheckbox);
     setStepIndex(Math.max(0, stepsForSharedConfig.length - 1));
+    setHasReachedFinalStep(false);
     setSharedConfigurationLoadDone(true);
   }, [editCartItemId, savedConfigurationId, sharedConfiguration, configData, sharedConfigurationLoadDone]);
 
@@ -362,6 +366,7 @@ export default function Configurator({
     setDropdownSelections(nextDropdowns);
     setCustomCheckboxSelections(nextCheckbox);
     setStepIndex(Math.max(0, stepsForPreset.length - 1));
+    setHasReachedFinalStep(false);
     setProductPresetLoadDone(true);
   }, [editCartItemId, configData, initialProductConfig, productPresetLoadDone]);
 
@@ -497,6 +502,7 @@ export default function Configurator({
         if (currentStepKey === "function") {
           setAddonChecked({});
           setDropdownSelections({});
+          setHasReachedFinalStep(false);
           return { function: optionId };
         }
         return next;
@@ -509,6 +515,7 @@ export default function Configurator({
       }
       if (currentStepKey === "function") {
         setStepIndex(0);
+        setHasReachedFinalStep(false);
       }
     },
     [currentStepKey, optionsForCurrentStep, selections]
@@ -563,8 +570,18 @@ export default function Configurator({
   }, [isOptionalStep, selectedId, checkboxSectionsForCurrentStep, customCheckboxSelections]);
 
   const handleContinue = () => {
-    if (stepIndex < stepsForFunction.length - 1) setStepIndex((s) => s + 1);
-    else setReviewModalOpen(true);
+    if (!canContinue()) return;
+    const finalIndex = stepsForFunction.length - 1;
+    if (stepIndex < finalIndex) {
+      setStepIndex((s) => {
+        const next = Math.min(finalIndex, s + 1);
+        if (next === finalIndex) setHasReachedFinalStep(true);
+        return next;
+      });
+      return;
+    }
+    setHasReachedFinalStep(true);
+    setReviewModalOpen(true);
   };
 
   const stepsPayload = useMemo(() => {
@@ -606,6 +623,14 @@ export default function Configurator({
 
   const handleReviewOrder = async () => {
     setCheckoutError(null);
+    if (!canAddToCart) {
+      setCheckoutError(
+        isFr
+          ? "Terminez toutes les étapes du configurateur avant de passer au paiement."
+          : "Complete every configurator step before checkout."
+      );
+      return;
+    }
     if (!configuratorFreeShipping && !shippingSelection) {
       setCheckoutError(
         isFr
@@ -673,6 +698,7 @@ export default function Configurator({
     setDropdownSelections({});
     setCustomCheckboxSelections({});
     setAddonChecked({});
+    setHasReachedFinalStep(false);
   };
 
   /** All steps satisfied (required options, dropdowns, mandatory checkbox sections); optional steps may be skipped per step rules. */
@@ -738,7 +764,7 @@ export default function Configurator({
   ]);
 
   const canAddToCart =
-    configurationComplete && isLastStep && total > 0;
+    configurationComplete && isLastStep && hasReachedFinalStep && total > 0;
   const isEditMode = !!editCartItemId;
 
   /** First selected layer image URL (for cart thumbnail when html2canvas fails due to cross-origin). */

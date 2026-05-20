@@ -14,9 +14,10 @@ function validateAddress(raw: unknown): ShippingAddressInput | null {
   const city = typeof o.city === "string" ? o.city.trim() : "";
   const state = typeof o.state === "string" ? o.state.trim() : "";
   const postal = typeof o.postal_code === "string" ? o.postal_code.trim() : "";
-  const country = typeof o.country === "string" ? o.country.trim() : "";
+  const country = typeof o.country === "string" ? o.country.trim().toUpperCase() : "";
   const name = typeof o.name === "string" ? o.name.trim() : "Customer";
-  if (!line1 || !city || !state || !postal || country.length !== 2) return null;
+  if (!line1 || !city || !postal || country.length !== 2) return null;
+  if ((country === "CA" || country === "US") && !state) return null;
   return {
     name,
     line1,
@@ -24,7 +25,7 @@ function validateAddress(raw: unknown): ShippingAddressInput | null {
     city,
     state,
     postal_code: postal,
-    country: country.toUpperCase(),
+    country,
     phone: typeof o.phone === "string" ? o.phone : null,
     is_commercial: typeof o.is_commercial === "boolean" ? o.is_commercial : false,
   };
@@ -50,10 +51,10 @@ export async function POST(request: NextRequest) {
   const currency = body.currency === "USD" || body.currency === "CAD" ? body.currency : "CAD";
   const to = validateAddress(body.to);
   if (!to) {
-    return bad("Invalid or incomplete shipping address (name, line1, city, state, postal_code, country required).");
+    return bad("Invalid or incomplete shipping address (name, line1, city, postal_code, country required).");
   }
   if (!(SHIPPING_ALLOWED_COUNTRIES as readonly string[]).includes(to.country)) {
-    return bad("Shipping is only available to the United States and Canada.");
+    return bad("Shipping is only available to Canada, the United States, and supported European countries.");
   }
 
   const type = body.type;

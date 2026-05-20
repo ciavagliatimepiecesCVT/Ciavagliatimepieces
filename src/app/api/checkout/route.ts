@@ -240,6 +240,151 @@ async function getCustomBuildPartsSummary(
   return parts.length ? parts.join("\n") : "Custom build";
 }
 
+type CustomBuildConfig = {
+  steps?: unknown[];
+  extras?: unknown[];
+  addonIds?: unknown[];
+  dropdownSelections?: Record<string, string>;
+  customCheckboxSelections?: Record<string, string[]>;
+  sizeOptionId?: string;
+};
+
+function customBuildIncompleteMessage(locale: "en" | "fr") {
+  return locale === "fr"
+    ? "Terminez toutes les étapes du configurateur avant de passer au paiement."
+    : "Complete every configurator step before checkout.";
+}
+
+/** Server-side completion guard for custom configurator builds. */
+async function validateCustomBuildConfiguration(
+  supabase: ReturnType<typeof createServerClient>,
+  config: CustomBuildConfig,
+  locale: "en" | "fr"
+): Promise<string | null> {
+  const incompleteMessage = customBuildIncompleteMessage(locale);
+  const stepsPayload = Array.isArray(config.steps) ? config.steps : [];
+  const functionOptionId =
+    typeof stepsPayload[0] === "string" && stepsPayload[0].trim()
+      ? stepsPayload[0].trim()
+      : null;
+
+  if (!functionOptionId) return incompleteMessage;
+
+  const { data: functionStepRows, error: functionStepsError } = await supabase
+    .from("configurator_function_steps")
+    .select("step_id, sort_order")
+    .eq("function_option_id", functionOptionId)
+    .order("sort_order", { ascending: true });
+
+  if (functionStepsError || !functionStepRows?.length) return incompleteMessage;
+
+  const stepIdsOrdered = functionStepRows.map((r: { step_id: string }) => r.step_id);
+  if (stepsPayload.length < stepIdsOrdered.length + 1) return incompleteMessage;
+
+  const { data: stepRows, error: stepRowsError } = await supabase
+    .from("configurator_steps")
+    .select("id, optional")
+    .in("id", stepIdsOrdered);
+
+  if (stepRowsError || !stepRows?.length) return incompleteMessage;
+  const stepMetaById = new Map(
+    stepRows.map((s: { id: string; optional?: boolean | null }) => [
+      s.id,
+      { optional: !!s.optional },
+    ])
+  );
+
+  let optionsRaw:
+    | { id: string; step_id: string; parent_option_id?: string | null; for_function_ids?: string[] | null; is_visible?: boolean | null }[]
+    | null = null;
+  const { data: withForFunctionIds, error: optionsError } = await supabase
+    .from("configurator_options")
+    .select("id, step_id, parent_option_id, for_function_ids, is_visible")
+    .in("step_id", stepIdsOrdered);
+  if (!optionsError && withForFunctionIds) optionsRaw = withForFunctionIds as NonNullable<typeof optionsRaw>;
+  if (optionsRaw == null) {
+    const { data: fallback } = await supabase
+      .from("configurator_options")
+      .select("id, step_id, parent_option_id")
+      .in("step_id", stepIdsOrdered);
+    optionsRaw = (fallback ?? []).map((o) => ({ ...o, for_function_ids: null, is_visible: true }));
+  }
+
+  const dropdownSelections =
+    config.dropdownSelections && typeof config.dropdownSelections === "object" && !Array.isArray(config.dropdownSelections)
+      ? config.dropdownSelections
+      : {};
+  const customCheckboxSelections =
+    config.customCheckboxSelections &&
+    typeof config.customCheckboxSelections === "object" &&
+    !Array.isArray(config.customCheckboxSelections)
+      ? config.customCheckboxSelections
+      : {};
+
+  try {
+    const { data: sectionRows } = await supabase
+      .from("configurator_step_checkbox_sections")
+      .select("id, step_id, mandatory")
+      .in("step_id", stepIdsOrdered);
+    const sectionIds = (sectionRows ?? []).map((s: { id: string }) => s.id);
+    const { data: enabledRows } = sectionIds.length
+      ? await supabase
+          .from("configurator_function_step_sections")
+          .select("section_id, function_option_id")
+          .in("section_id", sectionIds)
+      : { data: [] };
+
+    for (const section of sectionRows ?? []) {
+      const enabledForFunction = (enabledRows ?? []).some(
+        (r: { section_id: string; function_option_id: string }) =>
+          r.section_id === section.id && r.function_option_id === functionOptionId
+      );
+      if (!enabledForFunction || !section.mandatory) continue;
+      if ((customCheckboxSelections[section.id]?.length ?? 0) < 1) return incompleteMessage;
+    }
+  } catch {
+    // Older deployments may not have the optional checkbox tables yet.
+  }
+
+  for (let i = 0; i < stepIdsOrdered.length; i++) {
+    const stepId = stepIdsOrdered[i];
+    const stepMeta = stepMetaById.get(stepId);
+    if (!stepMeta) return incompleteMessage;
+
+    const rawSelectedOptionId = stepsPayload[i + 1];
+    const selectedOptionId =
+      typeof rawSelectedOptionId === "string" && rawSelectedOptionId.trim()
+        ? rawSelectedOptionId.trim()
+        : null;
+
+    if (stepMeta.optional && !selectedOptionId) continue;
+    if (!selectedOptionId) return incompleteMessage;
+
+    const optionsForStep = (optionsRaw ?? []).filter(
+      (o) =>
+        o.step_id === stepId &&
+        o.is_visible !== false &&
+        optionAppliesToFunction(o, functionOptionId)
+    );
+    const selectedOption = optionsForStep.find((o) => o.id === selectedOptionId);
+    if (!selectedOption) return incompleteMessage;
+
+    const { data: dropdownItems } = await supabase
+      .from("configurator_dropdown_items")
+      .select("id")
+      .eq("option_id", selectedOptionId);
+    if (dropdownItems?.length) {
+      const dropdownItemId = dropdownSelections[selectedOptionId];
+      const hasValidDropdown =
+        typeof dropdownItemId === "string" &&
+        dropdownItems.some((d: { id: string }) => d.id === dropdownItemId);
+      if (!hasValidDropdown) return incompleteMessage;
+    }
+  }
+
+  return null;
+}
+
 /** Calculate custom build total from DB only (do not trust client price).
  * config.steps = [functionOptionId, ...optionIds in step order for that function].
  * config.extras = optional extra-step option ids; config.addonIds = addon UUIDs (e.g. Frosted Finish).
@@ -381,7 +526,7 @@ export async function POST(request: NextRequest) {
       title?: string | null;
       configuration?: unknown;
     }>;
-    configuration?: Record<string, string | number>;
+    configuration?: Record<string, unknown>;
     productId?: string;
     /** FlagShip-selected rate from /api/shipping/quote (required when shipping is not free). */
     shippingSelection?: unknown;
@@ -443,6 +588,24 @@ export async function POST(request: NextRequest) {
 
     if (type === "custom" && body.configuration) {
       const cfg = body.configuration as Record<string, unknown>;
+      const validationError = await validateCustomBuildConfiguration(
+        supabase,
+        {
+          steps: Array.isArray(cfg.steps) ? cfg.steps : [],
+          extras: Array.isArray(cfg.extras) ? cfg.extras : [],
+          addonIds: Array.isArray(cfg.addonIds) ? cfg.addonIds : [],
+          dropdownSelections: cfg.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
+          customCheckboxSelections:
+            cfg.customCheckboxSelections && typeof cfg.customCheckboxSelections === "object"
+              ? (cfg.customCheckboxSelections as Record<string, string[]>)
+              : undefined,
+          sizeOptionId: typeof cfg.sizeOptionId === "string" && cfg.sizeOptionId ? cfg.sizeOptionId : undefined,
+        },
+        localeSegment
+      );
+      if (validationError) {
+        return NextResponse.json({ error: validationError }, { status: 400 });
+      }
       amount = await calculateCustomBuildPrice(supabase, {
         steps: Array.isArray(cfg.steps) ? cfg.steps : [],
         extras: Array.isArray(cfg.extras) ? cfg.extras : [],
@@ -567,6 +730,25 @@ export async function POST(request: NextRequest) {
         const isCustom = isConfiguratorCustom(row);
 
         if (isCustom) {
+          const cfg = row.configuration as Record<string, unknown> | undefined;
+          const validationError = await validateCustomBuildConfiguration(
+            supabase,
+            {
+              steps: Array.isArray(cfg?.steps) ? cfg.steps : [],
+              extras: Array.isArray(cfg?.extras) ? cfg.extras : [],
+              addonIds: Array.isArray(cfg?.addonIds) ? cfg.addonIds : [],
+              dropdownSelections: cfg?.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
+              customCheckboxSelections:
+                cfg?.customCheckboxSelections && typeof cfg.customCheckboxSelections === "object"
+                  ? (cfg.customCheckboxSelections as Record<string, string[]>)
+                  : undefined,
+              sizeOptionId: typeof cfg?.sizeOptionId === "string" && cfg.sizeOptionId ? cfg.sizeOptionId : undefined,
+            },
+            localeSegment
+          );
+          if (validationError) {
+            return NextResponse.json({ error: validationError }, { status: 400 });
+          }
           const unitPrice = Number(row.price) || 0;
           if (unitPrice < 0) continue;
           const customBuildItems = getCustomBuildStripeLineItems(row.configuration, unitPrice, localeSegment);
@@ -643,6 +825,24 @@ export async function POST(request: NextRequest) {
 
         if (isCustom) {
           const cfg = row.configuration as Record<string, unknown> | undefined;
+          const validationError = await validateCustomBuildConfiguration(
+            supabase,
+            {
+              steps: Array.isArray(cfg?.steps) ? cfg.steps : [],
+              extras: Array.isArray(cfg?.extras) ? cfg.extras : [],
+              addonIds: Array.isArray(cfg?.addonIds) ? cfg.addonIds : [],
+              dropdownSelections: cfg?.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
+              customCheckboxSelections:
+                cfg?.customCheckboxSelections && typeof cfg.customCheckboxSelections === "object"
+                  ? (cfg.customCheckboxSelections as Record<string, string[]>)
+                  : undefined,
+              sizeOptionId: typeof cfg?.sizeOptionId === "string" && cfg.sizeOptionId ? cfg.sizeOptionId : undefined,
+            },
+            localeSegment
+          );
+          if (validationError) {
+            return NextResponse.json({ error: validationError }, { status: 400 });
+          }
           let unitPrice = Number(row.price) || 0;
           if (unitPrice <= 0 && cfg && typeof (cfg as { price?: number }).price === "number") {
             const serverPrice = await calculateCustomBuildPrice(supabase, {
