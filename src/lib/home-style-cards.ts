@@ -15,7 +15,7 @@ export type HomeStyleCards = {
   shop: HomeStyleCard;
 };
 
-const DEFAULT_SHOP_IMAGE = "https://images.unsplash.com/photo-1612817159949-195b6eb9e31a?w=800&q=80";
+export const DEFAULT_SHOP_IMAGE = "/images/hero-1.svg";
 
 export const DEFAULT_HOME_STYLE_CARDS: HomeStyleCards = {
   custom_build: {

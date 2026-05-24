@@ -1,24 +1,24 @@
-// Real free watch images (Unsplash)
+// Local fallback images used when admin-managed products are not configured.
 export const builtWatches = [
   {
     id: "stealth",
     name: "Stealth",
     description: "Dive watch with rotating bezel and bold markers.",
     price: 12900,
-    image: "https://images.unsplash.com/photo-1612817159949-195b6eb9e31a?w=800&q=80",
+    image: "/images/hero-1.svg",
   },
   {
     id: "chronograph",
     name: "Chronograph",
     description: "Column-wheel chronograph with subdials.",
     price: 15750,
-    image: "https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e?w=800&q=80",
+    image: "/images/hero-2.svg",
   },
   {
     id: "sub-gmt",
     name: "Sub/GMT",
     description: "Dual-time with ceramic bezel.",
     price: 11800,
-    image: "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?w=800&q=80",
+    image: "/images/hero-3.svg",
   },
 ];

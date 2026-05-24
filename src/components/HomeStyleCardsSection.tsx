@@ -14,11 +14,20 @@ import {
 import type { HomeStyleCards } from "@/lib/home-style-cards";
 import type { WatchCategory } from "@/lib/watch-categories";
 
-const collectionWatchImages = [
+const collectionWatchImages = ["/images/hero-1.svg", "/images/hero-2.svg", "/images/hero-3.svg"];
+
+const legacyUnsplashFallbacks = new Set([
   "https://images.unsplash.com/photo-1612817159949-195b6eb9e31a?w=800&q=80",
   "https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e?w=800&q=80",
   "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?w=800&q=80",
-];
+]);
+
+function localFallbackImage(imageUrl: string | null | undefined, index = 0) {
+  if (!imageUrl || legacyUnsplashFallbacks.has(imageUrl)) {
+    return collectionWatchImages[index % collectionWatchImages.length];
+  }
+  return imageUrl;
+}
 
 type EditTarget =
   | { type: "custom_build" }
@@ -122,7 +131,7 @@ export default function HomeStyleCardsSection({
           ...styleCards,
           shop: {
             ...styleCards.shop,
-            image_url: imageUrl || collectionWatchImages[0],
+            image_url: localFallbackImage(imageUrl, 0),
             title_en: titleEn,
             title_fr: titleFr,
             price: price === "" ? null : Number(price) || null,
@@ -217,7 +226,7 @@ export default function HomeStyleCardsSection({
                 className="group block rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_90px_rgba(15,20,23,0.1)] transition hover:shadow-[0_28px_100px_rgba(15,20,23,0.14)]"
               >
                 <Image
-                  src={styleCards.shop.image_url || collectionWatchImages[0]}
+                  src={localFallbackImage(styleCards.shop.image_url, 0)}
                   alt={isFr ? styleCards.shop.title_fr : styleCards.shop.title_en}
                   width={320}
                   height={280}
@@ -234,7 +243,7 @@ export default function HomeStyleCardsSection({
           {/* Categories */}
           {categories.map((cat, index) => {
             const label = isFr ? cat.label_fr : cat.label_en;
-            const image = cat.image_url || collectionWatchImages[(index + 1) % collectionWatchImages.length];
+            const image = localFallbackImage(cat.image_url, index + 1);
             return (
               <ScrollReveal key={cat.id}>
                 <div className="relative">
