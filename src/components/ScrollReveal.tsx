@@ -29,10 +29,12 @@ export default function ScrollReveal({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        node.classList.toggle("is-visible", entry.isIntersecting);
+        if (!entry.isIntersecting) return;
+        node.classList.add("is-visible");
+        observer.unobserve(node);
       },
       {
-        threshold: 0.15,
+        threshold: 0.01,
         // Extend viewport downward so content below the fold (e.g. watches on mobile) reveals on load
         rootMargin: "0px 0px 30% 0px",
       }
@@ -40,7 +42,7 @@ export default function ScrollReveal({
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [disableOnMobile]);
 
   return (
     <div ref={ref} className={`reveal ${className}`}>
