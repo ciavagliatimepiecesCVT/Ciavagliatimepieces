@@ -99,46 +99,46 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
   };
 
   return (
-    <div className="grid gap-8 md:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 md:gap-8">
       {watches.map((watch, index) => (
         <div
           key={watch.id}
-          className="rounded-[28px] border border-white/70 bg-white/80 p-6 text-foreground shadow-[0_16px_48px_rgba(15,20,23,0.08)] [contain-intrinsic-size:520px] [content-visibility:auto]"
+          className="min-w-0 rounded-2xl border border-white/70 bg-white/80 p-3 text-foreground shadow-[0_12px_32px_rgba(15,20,23,0.08)] [contain-intrinsic-size:360px] [content-visibility:auto] sm:rounded-[24px] sm:p-5 md:rounded-[28px] md:p-6 md:shadow-[0_16px_48px_rgba(15,20,23,0.08)]"
         >
           <Link
             href={`/${activeLocale}/shop/product/${watch.id}`}
-            className="block focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 rounded-[22px]"
+            className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 sm:rounded-[18px] md:rounded-[22px]"
           >
             <Image
               src={watch.image}
               alt={watch.name}
               width={420}
               height={420}
-              className="h-60 w-full rounded-[22px] object-cover"
-              sizes="(max-width: 767px) calc(100vw - 72px), (max-width: 1023px) calc((100vw - 96px) / 3), 341px"
-              priority={index < 3}
-              loading={index < 3 ? undefined : "lazy"}
+              className="aspect-square h-auto w-full rounded-xl object-cover sm:rounded-[18px] md:rounded-[22px]"
+              sizes="(max-width: 767px) calc((100vw - 60px) / 2), (max-width: 1023px) calc((100vw - 96px) / 3), 341px"
+              priority={index < 4}
+              loading={index < 4 ? undefined : "lazy"}
               decoding="async"
             />
-            <h3 className="mt-6 text-2xl hover:underline">{watch.name}</h3>
+            <h3 className="mt-3 text-base leading-tight hover:underline sm:mt-5 sm:text-xl md:mt-6 md:text-2xl">{watch.name}</h3>
           </Link>
-          <p className="mt-2 line-clamp-2 text-sm text-foreground/70">{watch.description}</p>
-          <div className="mt-4 flex flex-wrap items-baseline gap-2">
+          <p className="mt-1.5 line-clamp-2 text-xs leading-snug text-foreground/70 sm:mt-2 sm:text-sm">{watch.description}</p>
+          <div className="mt-3 flex flex-wrap items-baseline gap-1.5 sm:mt-4 sm:gap-2">
             {watch.original_price != null && watch.original_price > watch.price ? (
               <>
-                <span className="rounded bg-red-600/90 px-2 py-0.5 text-xs font-medium text-white">
+                <span className="rounded bg-red-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white sm:px-2 sm:text-xs">
                   {isFr ? "Réduction" : "Discount"} {Math.round((1 - watch.price / watch.original_price) * 100)}%
                 </span>
-                <span className="text-lg font-semibold text-foreground/70 line-through">{formatPrice(watch.original_price)}</span>
-                <span className="text-lg font-semibold text-[var(--accent)]">{formatPrice(watch.price)}</span>
+                <span className="text-sm font-semibold text-foreground/70 line-through sm:text-base md:text-lg">{formatPrice(watch.original_price)}</span>
+                <span className="text-sm font-semibold text-[var(--accent)] sm:text-base md:text-lg">{formatPrice(watch.price)}</span>
               </>
             ) : (
-              <span className="text-lg font-semibold">{formatPrice(watch.price)}</span>
+              <span className="text-sm font-semibold sm:text-base md:text-lg">{formatPrice(watch.price)}</span>
             )}
           </div>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-col gap-2 sm:mt-5 sm:flex-row sm:flex-wrap sm:gap-3 md:mt-6">
             {(watch.stock ?? 1) < 1 ? (
-              <span className="rounded-full border border-foreground/20 px-4 py-2 text-xs uppercase tracking-[0.3em] text-foreground/50">
+              <span className="rounded-full border border-foreground/20 px-3 py-2 text-center text-[10px] uppercase tracking-[0.12em] text-foreground/50 sm:px-4 sm:text-xs sm:tracking-[0.2em] md:tracking-[0.3em]">
                 {isFr ? "Rupture de stock" : "Out of stock"}
               </span>
             ) : (
@@ -146,7 +146,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
                 <button
                   type="button"
                   onClick={() => handleAddToCart(watch)}
-                  className="btn-hover rounded-full border border-foreground/30 px-4 py-2 text-xs uppercase tracking-[0.3em] text-foreground/70 disabled:pointer-events-none disabled:opacity-60"
+                  className="btn-hover rounded-full border border-foreground/30 px-2.5 py-2 text-[10px] uppercase tracking-[0.12em] text-foreground/70 disabled:pointer-events-none disabled:opacity-60 sm:px-4 sm:text-xs sm:tracking-[0.2em] md:tracking-[0.3em]"
                   disabled={loadingId === watch.id}
                 >
                   {isFr ? "Ajouter" : "Add to cart"}
@@ -154,7 +154,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
                 <button
                   type="button"
                   onClick={() => handleBuyNow(watch)}
-                  className="btn-hover rounded-full bg-foreground px-4 py-2 text-xs uppercase tracking-[0.3em] text-white disabled:pointer-events-none disabled:opacity-60"
+                  className="btn-hover rounded-full bg-foreground px-2.5 py-2 text-[10px] uppercase tracking-[0.12em] text-white disabled:pointer-events-none disabled:opacity-60 sm:px-4 sm:text-xs sm:tracking-[0.2em] md:tracking-[0.3em]"
                   disabled={loadingId === watch.id}
                 >
                   {isFr ? "Acheter" : "Buy now"}
@@ -162,7 +162,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
                 {watch.hasConfiguratorPreset ? (
                   <Link
                     href={`/${activeLocale}/configurator?product=${encodeURIComponent(watch.id)}`}
-                    className="btn-hover inline-flex items-center justify-center rounded-full border border-foreground/30 px-4 py-2 text-xs uppercase tracking-[0.3em] text-foreground/70 transition hover:border-foreground/45 hover:bg-foreground/[0.04]"
+                    className="btn-hover inline-flex items-center justify-center rounded-full border border-foreground/30 px-2.5 py-2 text-center text-[10px] uppercase tracking-[0.12em] text-foreground/70 transition hover:border-foreground/45 hover:bg-foreground/[0.04] sm:px-4 sm:text-xs sm:tracking-[0.2em] md:tracking-[0.3em]"
                   >
                     {isFr ? "Personnaliser" : "Customize now"}
                   </Link>
