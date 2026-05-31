@@ -138,7 +138,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
             href={`/${activeLocale}/shop/product/${watch.id}`}
             className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 sm:rounded-[18px] md:rounded-[22px]"
           >
-            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-white sm:rounded-[18px] md:rounded-[22px]">
+            <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-[var(--logo-green)]/10 sm:rounded-[18px] md:rounded-[22px]">
               {!loadedImages[watch.id] && (
                 <div className="absolute inset-0 flex items-center justify-center bg-[var(--logo-green)]/10" aria-hidden>
                   <span className="h-7 w-7 animate-spin rounded-full border-2 border-foreground/15 border-t-[var(--accent)]" />
@@ -148,7 +148,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
                 src={shopCardImageSrc(watch.image)}
                 alt={watch.name}
                 fill
-                className={`object-contain transition-opacity duration-300 ${loadedImages[watch.id] ? "opacity-100" : "opacity-0"}`}
+                className={`object-cover transition-opacity duration-300 ${loadedImages[watch.id] ? "opacity-100" : "opacity-0"}`}
                 sizes="(max-width: 767px) calc((100vw - 60px) / 2), (max-width: 1023px) calc((100vw - 96px) / 3), 341px"
                 priority={index < 6}
                 loading={index < 6 ? undefined : "lazy"}
