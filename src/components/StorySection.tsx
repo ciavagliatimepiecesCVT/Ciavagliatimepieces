@@ -32,16 +32,43 @@ export default function StorySection({
   useEffect(() => {
     const content = contentRef.current;
     if (!content || typeof window === "undefined") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      content.classList.add("story-visible");
+    const reveal = () => content.classList.add("story-visible");
+
+    // No observer support or reduced motion: just show it.
+    if (
+      typeof IntersectionObserver === "undefined" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      reveal();
       return;
     }
+
+    // Failsafe for the mobile Safari bug where IntersectionObserver doesn't fire
+    // its initial callback for on-screen elements until the first scroll. If the
+    // section is already within (or just below) the viewport, reveal it directly.
+    const fallback = window.setTimeout(() => {
+      const rect = content.getBoundingClientRect();
+      if (rect.top < window.innerHeight * 1.2 && rect.bottom > 0) {
+        reveal();
+      }
+    }, 1000);
+
+    // Reveal once and stay visible. threshold 0 fires as soon as any pixel is in
+    // view, and the downward rootMargin reveals just-below-the-fold sections on load.
     const observer = new IntersectionObserver(
-      ([entry]) => content.classList.toggle("story-visible", entry.isIntersecting),
-      { threshold: 0.12, rootMargin: "0px 0px -5% 0px" }
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        reveal();
+        observer.disconnect();
+        window.clearTimeout(fallback);
+      },
+      { threshold: 0, rootMargin: "0px 0px 20% 0px" }
     );
     observer.observe(content);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(fallback);
+    };
   }, []);
 
   useEffect(() => {

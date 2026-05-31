@@ -27,11 +27,27 @@ export default function ScrollReveal({
       return;
     }
 
+    if (typeof IntersectionObserver === "undefined") {
+      node.classList.add("is-visible");
+      return;
+    }
+
+    // Failsafe for the mobile Safari bug where IntersectionObserver doesn't fire
+    // its initial callback for on-screen elements until the first scroll. If the
+    // element is already within (or just below) the viewport, reveal it directly.
+    const fallback = window.setTimeout(() => {
+      const rect = node.getBoundingClientRect();
+      if (rect.top < window.innerHeight * 1.3 && rect.bottom > 0) {
+        node.classList.add("is-visible");
+      }
+    }, 1000);
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return;
         node.classList.add("is-visible");
         observer.unobserve(node);
+        window.clearTimeout(fallback);
       },
       {
         threshold: 0.01,
@@ -41,7 +57,10 @@ export default function ScrollReveal({
     );
 
     observer.observe(node);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(fallback);
+    };
   }, [disableOnMobile]);
 
   return (

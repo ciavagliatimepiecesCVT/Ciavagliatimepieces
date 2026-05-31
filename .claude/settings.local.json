@@ -13,7 +13,20 @@
       "Bash(npm run *)",
       "Bash(npm install *)",
       "Bash(git -C /Users/stefano/Ciavagliatimepieces status --short Ciavagliatimepieces)",
-      "Bash(git -C /Users/stefano/Ciavagliatimepieces ls-files Ciavagliatimepieces)"
+      "Bash(git -C /Users/stefano/Ciavagliatimepieces ls-files Ciavagliatimepieces)",
+      "Bash(curl -s http://localhost:3000/en)",
+      "Bash(curl -s -o /tmp/en.html -w \"HTTP %{http_code}, %{size_download} bytes\\\\n\" http://localhost:3000/en)",
+      "Read(//tmp/**)",
+      "Bash(ls -a | grep -i env; echo \"---\"; npm run dev > /tmp/devserver.log 2>&1 & *)",
+      "Bash(curl -s -o /tmp/shop.html -w \"HTTP %{http_code}, %{size_download} bytes\\\\n\" http://localhost:3000/en/shop)",
+      "WebFetch(domain:ciavagliatimepieces.ca)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill -9)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
     ]
   }
 }
