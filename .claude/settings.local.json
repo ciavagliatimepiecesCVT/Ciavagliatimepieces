@@ -23,7 +23,20 @@
       "Bash(echo \"exit: $?\")",
       "Bash(pkill -f \"next dev\")",
       "Bash(lsof -ti:3000)",
-      "Bash(xargs kill -9)"
+      "Bash(xargs kill -9)",
+      "Bash(npm ls *)",
+      "Bash(git submodule *)",
+      "Bash(git --no-pager diff -- src/components/ScrollReveal.tsx)",
+      "Bash(git hash-object *)",
+      "Bash(echo \"disk:  $\\(git hash-object src/components/ScrollReveal.tsx\\)\")",
+      "Bash(npm init *)",
+      "Bash(npx playwright *)",
+      "Bash(echo \"install exit: $?\")",
+      "Bash(node repro.mjs)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'Show watch cards immediately on mobile instead of scroll-revealing *)",
+      "Bash(git push *)",
+      "Bash(node verify.mjs)"
     ],
     "additionalDirectories": [
       "/tmp"

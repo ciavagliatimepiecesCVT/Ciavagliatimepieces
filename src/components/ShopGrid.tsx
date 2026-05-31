@@ -117,8 +117,9 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
               className="aspect-square h-auto w-full rounded-xl object-cover sm:rounded-[18px] md:rounded-[22px]"
               sizes="(max-width: 767px) calc((100vw - 60px) / 2), (max-width: 1023px) calc((100vw - 96px) / 3), 341px"
               priority={index < 6}
-              loading={index < 6 ? undefined : "lazy"}
+              loading={index < 6 ? undefined : "eager"}
               decoding="async"
+              style={{ backgroundColor: "rgba(26, 77, 46, 0.08)" }}
             />
             <h3 className="mt-3 text-base leading-tight hover:underline sm:mt-5 sm:text-xl md:mt-6 md:text-2xl">{watch.name}</h3>
           </Link>

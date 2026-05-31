@@ -64,7 +64,7 @@ export default async function ShopCategoryPage({
   }));
 
   return (
-    <section className="px-6">
+    <section className="min-h-[100svh] bg-[var(--logo-green)] px-6 pb-12">
       <div className="mx-auto max-w-6xl space-y-10">
         <ScrollReveal>
           <div>

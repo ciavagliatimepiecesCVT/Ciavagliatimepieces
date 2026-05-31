@@ -71,7 +71,7 @@ export default async function ShopPage({
   }
 
   return (
-    <section className="px-6">
+    <section className="min-h-[100svh] bg-[var(--logo-green)] px-6 pb-12">
       <MetaSearchTracker query={searchQuery} />
       <div className="mx-auto max-w-6xl space-y-10">
         <ScrollReveal>
