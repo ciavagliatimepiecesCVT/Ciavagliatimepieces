@@ -79,15 +79,13 @@ export default async function ShopCategoryPage({
             </p>
           </div>
         </ScrollReveal>
-        <ScrollReveal>
-          {watches.length === 0 ? (
-            <p className="rounded-[28px] border border-white/70 bg-white/80 p-10 text-center text-foreground text-foreground/70">
-              {isFr ? "Aucune piece dans cette collection pour le moment." : "No pieces in this collection yet."}
-            </p>
-          ) : (
-            <ShopGrid watches={watches} locale={locale} />
-          )}
-        </ScrollReveal>
+        {watches.length === 0 ? (
+          <p className="rounded-[28px] border border-white/70 bg-white/80 p-10 text-center text-foreground text-foreground/70">
+            {isFr ? "Aucune piece dans cette collection pour le moment." : "No pieces in this collection yet."}
+          </p>
+        ) : (
+          <ShopGrid watches={watches} locale={locale} />
+        )}
       </div>
     </section>
   );
