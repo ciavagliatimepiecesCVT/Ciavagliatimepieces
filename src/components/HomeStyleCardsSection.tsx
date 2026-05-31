@@ -11,6 +11,7 @@ import {
   uploadHomeCardImage,
   uploadCategoryImage,
 } from "@/app/[locale]/account/admin/actions";
+import { prepareImageForUpload } from "@/lib/prepareImageForUpload";
 import type { HomeStyleCards } from "@/lib/home-style-cards";
 import type { WatchCategory } from "@/lib/watch-categories";
 
@@ -98,8 +99,9 @@ export default function HomeStyleCardsSection({
       if (!file) return;
       setUploading(true);
       try {
+        const uploadFile = await prepareImageForUpload(file, { maxDimension: 1200, quality: 0.8 });
         const fd = new FormData();
-        fd.set("image", file);
+        fd.set("image", uploadFile);
         const { url } = isCategory ? await uploadCategoryImage(fd) : await uploadHomeCardImage(fd);
         setImageUrl(url);
       } finally {

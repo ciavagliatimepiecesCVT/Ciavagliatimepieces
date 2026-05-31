@@ -8,6 +8,7 @@ import ScrollReveal from "@/components/ScrollReveal";
 import { setHomeBestOf, uploadHomeCardImage } from "@/app/[locale]/account/admin/actions";
 import type { HomeBestOfItem } from "@/app/[locale]/account/admin/actions";
 import { useCurrency } from "@/components/CurrencyContext";
+import { prepareImageForUpload } from "@/lib/prepareImageForUpload";
 
 type Props = {
   locale: string;
@@ -52,8 +53,9 @@ export default function HomeBestOfSection({
       if (!file) return;
       setUploading(true);
       try {
+        const uploadFile = await prepareImageForUpload(file, { maxDimension: 1200, quality: 0.8 });
         const fd = new FormData();
-        fd.set("image", file);
+        fd.set("image", uploadFile);
         const { url } = await uploadHomeCardImage(fd);
         setForm((p) => ({ ...p, image: url }));
       } finally {

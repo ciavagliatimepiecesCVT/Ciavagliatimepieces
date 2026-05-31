@@ -20,12 +20,14 @@ export async function getCroppedImageBlob(
   _rotation = 0,
   mimeType: string = "image/jpeg",
   quality = 0.9,
-  backgroundColor?: string
+  backgroundColor?: string,
+  maxOutputDimension = 1920
 ): Promise<Blob> {
   const image = await loadImage(imageSrc);
   const canvas = document.createElement("canvas");
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
+  const scale = Math.min(1, maxOutputDimension / Math.max(pixelCrop.width, pixelCrop.height));
+  canvas.width = Math.max(1, Math.round(pixelCrop.width * scale));
+  canvas.height = Math.max(1, Math.round(pixelCrop.height * scale));
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2d not available");
   if (backgroundColor) {
@@ -40,8 +42,8 @@ export async function getCroppedImageBlob(
     pixelCrop.height,
     0,
     0,
-    pixelCrop.width,
-    pixelCrop.height
+    canvas.width,
+    canvas.height
   );
   return new Promise((resolve, reject) => {
     canvas.toBlob(

@@ -226,7 +226,7 @@ export async function uploadProductImage(formData: FormData): Promise<{ url: str
 
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGES_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: true });
+    .upload(path, file, { contentType: file.type, cacheControl: "31536000", upsert: true });
 
   if (error) throw new Error(error.message);
 
@@ -257,7 +257,7 @@ export async function uploadCategoryImage(formData: FormData): Promise<{ url: st
   }
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGES_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: true });
+    .upload(path, file, { contentType: file.type, cacheControl: "31536000", upsert: true });
   if (error) throw new Error(error.message);
   const { data: urlData } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
   return { url: urlData.publicUrl };
@@ -282,7 +282,7 @@ export async function uploadJournalImage(formData: FormData): Promise<{ url: str
   }
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGES_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: true });
+    .upload(path, file, { contentType: file.type, cacheControl: "31536000", upsert: true });
   if (error) throw new Error(error.message);
   const { data: urlData } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
   return { url: urlData.publicUrl };
@@ -326,7 +326,7 @@ export async function uploadAboutImage(formData: FormData): Promise<{ url: strin
   }
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGES_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: true });
+    .upload(path, file, { contentType: file.type, cacheControl: "31536000", upsert: true });
   if (error) throw new Error(error.message);
   const { data: urlData } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
   return { url: urlData.publicUrl };
@@ -1575,7 +1575,7 @@ export async function uploadHomeCardImage(formData: FormData): Promise<{ url: st
   }
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGES_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: true });
+    .upload(path, file, { contentType: file.type, cacheControl: "31536000", upsert: true });
   if (error) throw new Error(error.message);
   const { data: urlData } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
   return { url: urlData.publicUrl };

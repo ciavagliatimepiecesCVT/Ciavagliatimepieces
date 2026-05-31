@@ -29,7 +29,12 @@ function shopCardImageSrc(src: string) {
         "/storage/v1/object/public/",
         "/storage/v1/render/image/public/"
       );
+      // Square center-crop. Passing width alone leaves the source height
+      // untouched, which stretches the photo into a tall sliver — we must
+      // give both dimensions plus an explicit resize mode.
       url.searchParams.set("width", "560");
+      url.searchParams.set("height", "560");
+      url.searchParams.set("resize", "cover");
       url.searchParams.set("quality", "76");
       return url.toString();
     }
@@ -138,7 +143,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
             href={`/${activeLocale}/shop/product/${watch.id}`}
             className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 sm:rounded-[18px] md:rounded-[22px]"
           >
-            <div className="relative w-full">
+            <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-white/45 sm:rounded-[18px] md:rounded-[22px]">
               {!loadedImages[watch.id] && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[var(--logo-green)]/10 sm:rounded-[18px] md:rounded-[22px]" aria-hidden>
                   <span className="h-7 w-7 animate-spin rounded-full border-2 border-foreground/15 border-t-[var(--accent)]" />
@@ -149,7 +154,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
                 alt={watch.name}
                 width={420}
                 height={420}
-                className={`h-60 w-full rounded-xl object-cover transition-opacity duration-300 sm:rounded-[18px] md:rounded-[22px] ${loadedImages[watch.id] ? "opacity-100" : "opacity-0"}`}
+                className={`h-full w-full object-cover transition-opacity duration-300 ${loadedImages[watch.id] ? "opacity-100" : "opacity-0"}`}
                 sizes="(max-width: 767px) calc((100vw - 60px) / 2), (max-width: 1023px) calc((100vw - 96px) / 3), 341px"
                 priority={index < 6}
                 loading={index < 6 ? undefined : "lazy"}

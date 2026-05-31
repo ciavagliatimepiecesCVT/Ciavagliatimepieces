@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { submitReview } from "@/app/[locale]/reviews/actions";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { prepareImageForUpload } from "@/lib/prepareImageForUpload";
 
 type Product = { id: string; name: string };
 
@@ -67,11 +68,12 @@ export default function ReviewForm({ productId, productName, products = [], loca
 
       if (imageFile) {
         const supabase = createBrowserClient();
-        const ext = imageFile.name.split(".").pop() ?? "jpg";
+        const uploadFile = await prepareImageForUpload(imageFile, { maxDimension: 1200, quality: 0.8 });
+        const ext = uploadFile.name.split(".").pop() ?? "jpg";
         const path = `${crypto.randomUUID()}.${ext}`;
         const { error: uploadError } = await supabase.storage
           .from("review-images")
-          .upload(path, imageFile, { cacheControl: "3600", upsert: false });
+          .upload(path, uploadFile, { cacheControl: "31536000", contentType: uploadFile.type, upsert: false });
         if (uploadError) throw new Error(uploadError.message);
         const { data: { publicUrl } } = supabase.storage.from("review-images").getPublicUrl(path);
         uploadedImageUrl = publicUrl;

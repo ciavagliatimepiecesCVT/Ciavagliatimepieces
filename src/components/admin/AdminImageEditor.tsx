@@ -44,7 +44,7 @@ export default function AdminImageEditor({
   minZoom = DEFAULT_MIN_ZOOM,
   maxZoom = DEFAULT_MAX_ZOOM,
   outputMimeType = "image/jpeg",
-  outputQuality = 0.9,
+  outputQuality = 0.82,
   fillBackgroundColor,
 }: AdminImageEditorProps) {
   const isFr = locale === "fr";
