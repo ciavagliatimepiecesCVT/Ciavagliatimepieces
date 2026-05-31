@@ -51,6 +51,7 @@ export default function NavBar({
   const [user, setUser] = useState<User | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileOpenRef = useRef(false);
   /** On mobile: navbar stays hidden until user taps the menu button; scroll (any direction) hides it again. */
   const [mobileNavRevealed, setMobileNavRevealed] = useState(false);
   const lastScrollY = useRef(0);
@@ -70,7 +71,7 @@ export default function NavBar({
 
   useEffect(() => {
     if (!user) {
-      setCartCount(getGuestCartCount());
+      queueMicrotask(() => setCartCount(getGuestCartCount()));
       return;
     }
     const supabase = createBrowserClient();
@@ -108,7 +109,9 @@ export default function NavBar({
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       if (isMobileRef.current) {
-        setMobileNavRevealed(false);
+        if (!mobileOpenRef.current && Math.abs(currentScrollY - lastScrollY.current) > scrollThreshold) {
+          setMobileNavRevealed(false);
+        }
       } else {
         if (currentScrollY > lastScrollY.current && currentScrollY > scrollThreshold) {
           setHidden(true);
@@ -123,8 +126,14 @@ export default function NavBar({
   }, []);
 
   useEffect(() => {
-    setMobileOpen(false);
-    setMobileNavRevealed(false);
+    mobileOpenRef.current = mobileOpen;
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setMobileOpen(false);
+      setMobileNavRevealed(false);
+    });
   }, [pathname]);
 
   useEffect(() => {
@@ -153,7 +162,10 @@ export default function NavBar({
       {/* Mobile: floating menu button when navbar is hidden */}
       <button
         type="button"
-        onClick={() => setMobileNavRevealed(true)}
+        onClick={() => {
+          setMobileNavRevealed(true);
+          setMobileOpen(true);
+        }}
         className={`fixed top-4 right-4 z-[110] flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-[var(--logo-green)] text-white shadow-lg transition hover:border-white hover:text-white md:hidden ${headerHidden ? "" : "hidden"}`}
         aria-label="Open menu"
       >
@@ -212,7 +224,10 @@ export default function NavBar({
           </Link>
           <button
             type="button"
-            onClick={() => setMobileOpen((prev) => !prev)}
+            onClick={() => {
+              setMobileNavRevealed(true);
+              setMobileOpen((prev) => !prev);
+            }}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-white/40 text-white/90 transition hover:border-white hover:text-white md:hidden"
             aria-label="Toggle menu"
             aria-expanded={mobileOpen}
