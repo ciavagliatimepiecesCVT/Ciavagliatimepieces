@@ -22,7 +22,11 @@ export default function ScrollReveal({
       return;
     }
 
-    if (disableOnMobile && window.matchMedia("(max-width: 767px)").matches) {
+    // On mobile, scroll-reveal causes content (e.g. watches below the fold) to sit
+    // invisible until the reveal lags into view — it reads as "not loading". Skip the
+    // animation on mobile and show everything immediately. `disableOnMobile` is kept
+    // for back-compat but the mobile behavior is now unconditional.
+    if (window.matchMedia("(max-width: 767px)").matches) {
       node.classList.add("is-visible");
       return;
     }
@@ -32,9 +36,8 @@ export default function ScrollReveal({
       return;
     }
 
-    // Failsafe for the mobile Safari bug where IntersectionObserver doesn't fire
-    // its initial callback for on-screen elements until the first scroll. If the
-    // element is already within (or just below) the viewport, reveal it directly.
+    // Desktop failsafe: reveal on-screen content even if IntersectionObserver's
+    // initial callback never fires (a known Safari quirk).
     const fallback = window.setTimeout(() => {
       const rect = node.getBoundingClientRect();
       if (rect.top < window.innerHeight * 1.3 && rect.bottom > 0) {

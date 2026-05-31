@@ -34,10 +34,13 @@ export default function StorySection({
     if (!content || typeof window === "undefined") return;
     const reveal = () => content.classList.add("story-visible");
 
-    // No observer support or reduced motion: just show it.
+    // On mobile, show content immediately rather than gating it behind scroll-reveal
+    // (a tall section can otherwise stay invisible / lag into view, reading as broken).
+    // Also covers no-observer support and reduced-motion preferences.
     if (
       typeof IntersectionObserver === "undefined" ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      window.matchMedia("(max-width: 767px)").matches
     ) {
       reveal();
       return;
