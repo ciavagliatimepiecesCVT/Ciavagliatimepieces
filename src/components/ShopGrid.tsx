@@ -103,7 +103,7 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
       {watches.map((watch, index) => (
         <div
           key={watch.id}
-          className="min-w-0 rounded-2xl border border-white/70 bg-white/80 p-3 text-foreground shadow-[0_12px_32px_rgba(15,20,23,0.08)] [contain-intrinsic-size:360px] [content-visibility:auto] sm:rounded-[24px] sm:p-5 md:rounded-[28px] md:p-6 md:shadow-[0_16px_48px_rgba(15,20,23,0.08)]"
+          className="min-w-0 rounded-2xl border border-white/70 bg-white/80 p-3 text-foreground shadow-[0_12px_32px_rgba(15,20,23,0.08)] sm:rounded-[24px] sm:p-5 md:rounded-[28px] md:p-6 md:shadow-[0_16px_48px_rgba(15,20,23,0.08)]"
         >
           <Link
             href={`/${activeLocale}/shop/product/${watch.id}`}
@@ -116,8 +116,8 @@ export default function ShopGrid({ watches, locale }: { watches: Watch[]; locale
               height={420}
               className="aspect-square h-auto w-full rounded-xl object-cover sm:rounded-[18px] md:rounded-[22px]"
               sizes="(max-width: 767px) calc((100vw - 60px) / 2), (max-width: 1023px) calc((100vw - 96px) / 3), 341px"
-              priority={index < 4}
-              loading={index < 4 ? undefined : "lazy"}
+              priority={index < 6}
+              loading={index < 6 ? undefined : "lazy"}
               decoding="async"
             />
             <h3 className="mt-3 text-base leading-tight hover:underline sm:mt-5 sm:text-xl md:mt-6 md:text-2xl">{watch.name}</h3>
