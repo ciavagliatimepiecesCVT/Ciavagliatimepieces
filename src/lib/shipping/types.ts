@@ -131,6 +131,9 @@ export type ShippingQuoteOption = {
   price: number;
   currency: "CAD";
   raw_service_code: string;
+  /** Server HMAC over (courier, service, price, exp); checkout rejects unsigned selections. */
+  sig?: string;
+  exp?: number;
 };
 
 /** Persisted in Stripe metadata and replayed into orders after payment. */
@@ -143,6 +146,9 @@ export type SelectedShippingPayload = {
   price: number;
   currency: "CAD";
   estimated_delivery: string | null;
+  /** Server HMAC issued with the quote; verified again at checkout. */
+  sig?: string;
+  exp?: number;
 };
 
 export type ShippingAddressInput = {

@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 
+/** Full HTML entity escaping for user-supplied values rendered in the email body. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function POST(request: NextRequest) {
   let body: { name?: string; email?: string; message?: string };
   try {
@@ -9,12 +19,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  const email = typeof body.email === "string" ? body.email.trim() : "";
+  // Strip CR/LF from single-line fields so they can never reach an email header.
+  const name = typeof body.name === "string" ? body.name.replace(/[\r\n]+/g, " ").trim() : "";
+  const email = typeof body.email === "string" ? body.email.replace(/[\r\n]+/g, "").trim() : "";
   const message = typeof body.message === "string" ? body.message.trim() : "";
 
   if (!name || !email || !message) {
     return NextResponse.json({ error: "All fields are required" }, { status: 400 });
+  }
+  if (name.length > 200 || email.length > 320 || message.length > 5000) {
+    return NextResponse.json({ error: "Message is too long" }, { status: 400 });
   }
 
   // Basic email format check
@@ -49,15 +63,15 @@ export async function POST(request: NextRequest) {
       <table style="border-collapse:collapse;width:100%;">
         <tr>
           <td style="padding:8px 12px;font-weight:600;color:#333;vertical-align:top;">Name</td>
-          <td style="padding:8px 12px;color:#444;">${name.replace(/</g, "&lt;")}</td>
+          <td style="padding:8px 12px;color:#444;">${escapeHtml(name)}</td>
         </tr>
         <tr>
           <td style="padding:8px 12px;font-weight:600;color:#333;vertical-align:top;">Email</td>
-          <td style="padding:8px 12px;color:#444;"><a href="mailto:${email.replace(/"/g, "&quot;")}">${email.replace(/</g, "&lt;")}</a></td>
+          <td style="padding:8px 12px;color:#444;"><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></td>
         </tr>
         <tr>
           <td style="padding:8px 12px;font-weight:600;color:#333;vertical-align:top;">Message</td>
-          <td style="padding:8px 12px;color:#444;white-space:pre-line;">${message.replace(/</g, "&lt;")}</td>
+          <td style="padding:8px 12px;color:#444;white-space:pre-line;">${escapeHtml(message)}</td>
         </tr>
       </table>
     </div>
@@ -68,7 +82,7 @@ export async function POST(request: NextRequest) {
       from,
       to: contactTo,
       replyTo: email,
-      subject: `Contact form: ${name}`,
+      subject: `Contact form: ${name.slice(0, 80)}`,
       html,
     });
     console.log("[Contact] Message sent from", email);

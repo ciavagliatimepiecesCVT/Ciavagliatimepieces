@@ -85,6 +85,16 @@ async function requireAdmin() {
   return { supabase, user };
 }
 
+/** Server-side admin check for gating admin UI (every mutation still re-verifies via requireAdmin). */
+export async function checkAdminAccess(): Promise<boolean> {
+  try {
+    await requireAdmin();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function getAdminProducts() {
   await requireAdmin();
   const supabase = createServerClient();

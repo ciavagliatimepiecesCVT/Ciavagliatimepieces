@@ -32,9 +32,11 @@ This document outlines the security measures in place to protect the Ciavaglia T
 
 ### 4. **Payment Security (Stripe)**
 - ✅ **Webhook signature verification** – Stripe webhooks are verified with `STRIPE_WEBHOOK_SECRET`
-- ✅ **Server-side price fetching** – Prices come from Supabase, not client input
-- ✅ **Stock validation** – Checkout blocks purchases when stock < 1
-- ✅ **No client-side price manipulation** – Client never sends price; server fetches from DB
+- ✅ **Server-side price recomputation** – Every checkout path (single product, logged-in cart, guest cart, custom builds, add-ons) recomputes prices from the database; client/cart-stored prices are never trusted
+- ✅ **Fail-closed custom pricing** – If a custom build can't be priced server-side, checkout is rejected (no client-price fallback)
+- ✅ **HMAC-signed shipping quotes** – `/api/shipping/quote` signs each rate (price + carrier + 30-min expiry); checkout rejects unsigned/tampered/expired selections
+- ✅ **Session-derived identity** – Checkout takes the user ID from the auth cookie, never from the request body
+- ✅ **Stock validation** – Checkout blocks purchases when stock < quantity
 - ✅ **Stripe handles PCI compliance** – No credit card data touches your server
 
 ### 5. **API Security**
@@ -58,9 +60,12 @@ This document outlines the security measures in place to protect the Ciavaglia T
 
 ### Implemented (Hardening)
 
-1. **Rate Limiting** (`src/middleware.ts`)
+1. **Rate Limiting** (`src/proxy.ts`)
    - **Checkout:** 15 requests/minute per IP
-   - **Track order:** 60 requests/minute per IP
+   - **Track order:** 20 requests/minute per IP
+   - **Contact form:** 5 requests/minute per IP
+   - **Shipping quotes:** 20 requests/minute per IP
+   - **Exchange rate / share-image:** 30–60 requests/minute per IP
    - **Login / Sign-up pages:** 30 requests/minute per IP (limits automated probing)
    - Uses in-memory store per Edge instance; for strict cross-instance limits, add Upstash Redis
 
@@ -89,6 +94,21 @@ This document outlines the security measures in place to protect the Ciavaglia T
 4. **Backup Strategy**
    - Enable Supabase automatic backups
    - Export product data regularly
+
+### Hardening pass (June 2026)
+
+- **Checkout**: all prices (cart, guest cart, add-ons, custom builds) recomputed server-side; client-sent `userId` ignored in favor of the session cookie; shipping selections must carry a valid server HMAC signature.
+- **Order tracking** (`/api/track-order`): now requires the order number AND the purchase email; identical 404 for unknown order vs. email mismatch so order numbers can't be enumerated.
+- **Contact form**: full HTML entity escaping, CR/LF stripped from header-bound fields, length limits (name 200, email 320, message 5000).
+- **Share-image endpoint**: UUID format enforced; redirect restricted to same-site paths (was an open redirect via user-supplied `image_url`).
+- **Admin**: `/account/admin` layout verifies admin status server-side (all server actions already did); `/api/test-email` additionally requires an admin session.
+- **Login**: redirect parameter restricted to same-site paths (blocks `//evil.com`).
+- **CSP**: `'unsafe-eval'` only emitted in development; Meta pixel ID validated as numeric before being inlined in a script.
+- **Database** (`supabase/migrations/security_hardening_rls.sql` — ⚠️ must be run in the Supabase SQL editor):
+  - `site_settings` had no RLS (anyone could change the configurator discount) → RLS enabled, read-only for clients.
+  - `addon_templates` / `addon_template_options` were writable by **anonymous** visitors → read-only for clients.
+  - Six configurator content tables were writable by any signed-in customer → read-only for clients (admin writes use the service role).
+  - `review-images` storage bucket capped at 5 MB and image MIME types only.
 
 ## 🚨 Security Checklist Before Going Live
 

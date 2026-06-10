@@ -11,7 +11,10 @@ declare global {
   }
 }
 
-export function MetaPixel({ pixelId }: { pixelId?: string }) {
+export function MetaPixel({ pixelId: rawPixelId }: { pixelId?: string }) {
+  // Pixel IDs are numeric; anything else is dropped so the inline script
+  // below can never be a script-injection vector.
+  const pixelId = rawPixelId && /^\d{1,20}$/.test(rawPixelId) ? rawPixelId : undefined;
   const pathname = usePathname();
   const hasMounted = useRef(false);
 

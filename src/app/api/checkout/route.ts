@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
-import { createServerClient } from "@/lib/supabase/server";
+import { createAuthServerClient, createServerClient } from "@/lib/supabase/server";
 import { getUsdToCadRate } from "@/lib/currency";
 import { optionAppliesToFunction } from "@/lib/configurator-constants";
 import { getSiteUrl, getStripe } from "@/lib/stripe";
 import { parseShippingSelection } from "@/lib/shipping/parse-selection";
+import { verifyShippingSelectionSignature } from "@/lib/shipping/quote-signature";
 import { SHIPPING_ALLOWED_COUNTRIES, type SelectedShippingPayload } from "@/lib/shipping/types";
 
 /** Stripe line item name: include chosen variant so checkout clearly shows what they're buying. */
@@ -502,6 +503,51 @@ async function calculateCustomBuildPrice(
   return total;
 }
 
+/** Server-side unit price for a built product: live base price + DB prices of selected
+ * add-on options. Cart rows store a client-computed price; it is never trusted here. */
+async function computeBuiltUnitPrice(
+  supabase: ReturnType<typeof createServerClient>,
+  basePrice: number,
+  configuration: unknown
+): Promise<number> {
+  let total = Number(basePrice) || 0;
+  if (!configuration || typeof configuration !== "object") return total;
+  const addons = (configuration as { addons?: unknown }).addons;
+  if (!Array.isArray(addons) || addons.length === 0) return total;
+  const optionIds = [
+    ...new Set(
+      addons
+        .map((a) => (a && typeof a === "object" ? (a as { option_id?: unknown }).option_id : null))
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+    ),
+  ];
+  if (optionIds.length === 0) return total;
+  const { data: optionRows } = await supabase
+    .from("product_addon_options")
+    .select("id, price")
+    .in("id", optionIds);
+  const priceById = new Map(
+    (optionRows ?? []).map((r) => [r.id as string, Number((r as { price: number }).price) || 0])
+  );
+  for (const a of addons) {
+    const optionId = a && typeof a === "object" ? (a as { option_id?: unknown }).option_id : null;
+    if (typeof optionId === "string") total += priceById.get(optionId) ?? 0;
+  }
+  return total;
+}
+
+/** Site-wide configurator discount percent (0–100) from site_settings. */
+async function getConfiguratorDiscountPercent(
+  supabase: ReturnType<typeof createServerClient>
+): Promise<number> {
+  const { data: discountRow } = await supabase
+    .from("site_settings")
+    .select("value")
+    .eq("key", "configurator_discount_percent")
+    .single();
+  return Math.min(100, Math.max(0, Number((discountRow as { value?: string } | null)?.value ?? 0)));
+}
+
 export async function POST(request: NextRequest) {
   let payload: unknown;
   try {
@@ -532,8 +578,20 @@ export async function POST(request: NextRequest) {
     shippingSelection?: unknown;
   };
   const body = payload as CheckoutPayload;
-  const { locale, type, userId } = body;
+  const { locale, type } = body;
   const currency = body.currency === "CAD" ? "cad" : "usd";
+
+  // Identify the user from the session cookie only — never trust a client-sent userId.
+  let userId: string | null = null;
+  try {
+    const authClient = await createAuthServerClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+    userId = user?.id ?? null;
+  } catch {
+    userId = null;
+  }
 
   if (!locale || typeof locale !== "string") {
     return NextResponse.json({ error: "Missing locale" }, { status: 400 });
@@ -613,15 +671,13 @@ export async function POST(request: NextRequest) {
         dropdownSelections: cfg.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
         sizeOptionId: typeof cfg.sizeOptionId === "string" && cfg.sizeOptionId ? cfg.sizeOptionId : undefined,
       });
-      if (amount === 0 && typeof cfg.price === "number" && cfg.price > 0) {
-        amount = cfg.price;
+      if (amount <= 0) {
+        return NextResponse.json(
+          { error: "Unable to price this configuration. Please rebuild your watch and try again." },
+          { status: 400 }
+        );
       }
-      const { data: discountRow } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "configurator_discount_percent")
-        .single();
-      const discountPercent = Math.min(100, Math.max(0, Number((discountRow as { value?: string } | null)?.value ?? 0)));
+      const discountPercent = await getConfiguratorDiscountPercent(supabase);
       if (discountPercent > 0) {
         amount = amount * (1 - discountPercent / 100);
       }
@@ -749,8 +805,23 @@ export async function POST(request: NextRequest) {
           if (validationError) {
             return NextResponse.json({ error: validationError }, { status: 400 });
           }
-          const unitPrice = Number(row.price) || 0;
-          if (unitPrice < 0) continue;
+          let unitPrice = await calculateCustomBuildPrice(supabase, {
+            steps: Array.isArray(cfg?.steps) ? cfg.steps : [],
+            extras: Array.isArray(cfg?.extras) ? cfg.extras : [],
+            addonIds: Array.isArray(cfg?.addonIds) ? cfg.addonIds : [],
+            dropdownSelections: cfg?.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
+            sizeOptionId: typeof cfg?.sizeOptionId === "string" && cfg.sizeOptionId ? cfg.sizeOptionId : undefined,
+          });
+          const cartDiscountPercent = await getConfiguratorDiscountPercent(supabase);
+          if (cartDiscountPercent > 0) {
+            unitPrice = unitPrice * (1 - cartDiscountPercent / 100);
+          }
+          if (unitPrice <= 0) {
+            return NextResponse.json(
+              { error: "Unable to price a custom build in your cart. Please remove and rebuild it." },
+              { status: 400 }
+            );
+          }
           const customBuildItems = getCustomBuildStripeLineItems(row.configuration, unitPrice, localeSegment);
           for (const li of customBuildItems) {
             lineItems.push({ ...li, quantity: Math.max(1, Math.floor(li.quantity * qty)) });
@@ -773,7 +844,7 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        const unitPrice = Number(row.price ?? product.price);
+        const unitPrice = await computeBuiltUnitPrice(supabase, Number(product.price), row.configuration);
         const baseName = row.title ?? product.name;
         const configDescription = row.configuration
           ? getBuiltProductConfigDescription(row.configuration, localeSegment)
@@ -843,22 +914,26 @@ export async function POST(request: NextRequest) {
           if (validationError) {
             return NextResponse.json({ error: validationError }, { status: 400 });
           }
-          let unitPrice = Number(row.price) || 0;
-          if (unitPrice <= 0 && cfg && typeof (cfg as { price?: number }).price === "number") {
-            const serverPrice = await calculateCustomBuildPrice(supabase, {
-              steps: Array.isArray(cfg?.steps) ? cfg.steps : [],
-              extras: Array.isArray(cfg?.extras) ? cfg.extras : [],
-              addonIds: Array.isArray(cfg?.addonIds) ? cfg.addonIds : [],
-              dropdownSelections: cfg?.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
-              sizeOptionId: typeof cfg.sizeOptionId === "string" && cfg.sizeOptionId ? cfg.sizeOptionId : undefined,
-            });
-            if (serverPrice > 0) unitPrice = serverPrice;
+          let unitPrice = await calculateCustomBuildPrice(supabase, {
+            steps: Array.isArray(cfg?.steps) ? cfg.steps : [],
+            extras: Array.isArray(cfg?.extras) ? cfg.extras : [],
+            addonIds: Array.isArray(cfg?.addonIds) ? cfg.addonIds : [],
+            dropdownSelections: cfg?.dropdownSelections && typeof cfg.dropdownSelections === "object" ? (cfg.dropdownSelections as Record<string, string>) : undefined,
+            sizeOptionId: typeof cfg?.sizeOptionId === "string" && cfg.sizeOptionId ? cfg.sizeOptionId : undefined,
+          });
+          const guestDiscountPercent = await getConfiguratorDiscountPercent(supabase);
+          if (guestDiscountPercent > 0) {
+            unitPrice = unitPrice * (1 - guestDiscountPercent / 100);
           }
-          if (unitPrice > 0) {
-            const customBuildItems = getCustomBuildStripeLineItems(row.configuration, unitPrice, localeSegment);
-            for (const li of customBuildItems) {
-              lineItems.push({ ...li, quantity: Math.max(1, Math.floor(li.quantity * qty)) });
-            }
+          if (unitPrice <= 0) {
+            return NextResponse.json(
+              { error: "Unable to price a custom build in your cart. Please remove and rebuild it." },
+              { status: 400 }
+            );
+          }
+          const customBuildItems = getCustomBuildStripeLineItems(row.configuration, unitPrice, localeSegment);
+          for (const li of customBuildItems) {
+            lineItems.push({ ...li, quantity: Math.max(1, Math.floor(li.quantity * qty)) });
           }
           cartProductQuantities.push({ product_id: row.product_id, quantity: qty });
           continue;
@@ -878,7 +953,7 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        const unitPrice = Number(row.price ?? product.price);
+        const unitPrice = await computeBuiltUnitPrice(supabase, Number(product.price), row.configuration);
         const baseName = row.title ?? product.name;
         const configDescription = row.configuration
           ? getBuiltProductConfigDescription(row.configuration, localeSegment)
@@ -930,6 +1005,13 @@ export async function POST(request: NextRequest) {
             error:
               "Please complete shipping: open checkout, enter your address, choose a carrier, then pay.",
           },
+          { status: 400 }
+        );
+      }
+      // The price was set by /api/shipping/quote and must come back unmodified.
+      if (!verifyShippingSelectionSignature(paidShipping, paidShipping.sig, paidShipping.exp)) {
+        return NextResponse.json(
+          { error: "Your shipping quote has expired or is invalid. Please re-enter your address and choose a carrier again." },
           { status: 400 }
         );
       }
