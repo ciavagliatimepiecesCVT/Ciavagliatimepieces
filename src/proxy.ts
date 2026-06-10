@@ -55,7 +55,11 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 // Limits: [path pattern, request limit per minute]
 const RATE_LIMITS: { path: string; limit: number; method?: string }[] = [
   { path: "/api/checkout", limit: 15, method: "POST" },
-  { path: "/api/track-order", limit: 60, method: "GET" },
+  { path: "/api/track-order", limit: 20, method: "GET" },
+  { path: "/api/contact", limit: 5, method: "POST" },
+  { path: "/api/shipping/quote", limit: 20, method: "POST" },
+  { path: "/api/exchange-rate", limit: 30 },
+  { path: "/api/configurator/share-image", limit: 60, method: "GET" },
   { path: "/en/account/login", limit: 30 },
   { path: "/fr/account/login", limit: 30 },
   { path: "/en/account/sign-up", limit: 30 },

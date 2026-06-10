@@ -21,6 +21,8 @@ function optionToSelected(o: ShippingQuoteOption): SelectedShippingPayload {
     price: o.price,
     currency: "CAD",
     estimated_delivery: o.estimated_delivery,
+    sig: o.sig,
+    exp: o.exp,
   };
 }
 

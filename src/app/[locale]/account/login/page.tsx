@@ -57,7 +57,8 @@ export default function LoginPage() {
         }
       }
 
-      if (redirectTo && redirectTo.startsWith("/")) {
+      // Same-site paths only: "//host" and "/\host" are protocol-relative redirects.
+      if (redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//") && !redirectTo.startsWith("/\\")) {
         router.push(redirectTo);
         return;
       }

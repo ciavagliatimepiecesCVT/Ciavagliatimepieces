@@ -4,6 +4,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checkAdminAccess } from "./actions";
 
 const navItems = [
   { href: "orders", labelEn: "Orders", labelFr: "Commandes" },
@@ -29,9 +30,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     const supabase = createBrowserClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) {
         router.replace(`/${locale}/account/login`);
+        return;
+      }
+      // Server-side check: signed-in users who are not admins are sent home.
+      const allowed = await checkAdminAccess();
+      if (!allowed) {
+        router.replace(`/${locale}`);
         return;
       }
       setChecked(true);

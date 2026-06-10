@@ -4,8 +4,8 @@ import { createServerClient } from "@/lib/supabase/server";
 /** Public OG image endpoint for shared configurator builds. */
 export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id")?.trim();
-  if (!id) {
-    return new NextResponse("Missing id", { status: 400 });
+  if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return new NextResponse("Missing or invalid id", { status: 400 });
   }
 
   const supabase = createServerClient();
@@ -36,6 +36,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const fallbackImageUrl = (data as { image_url?: string | null }).image_url || "/images/configurator.svg";
+  // Only redirect to same-site paths — image_url is user-supplied at insert time
+  // and an absolute URL here would be an open redirect.
+  const rawImageUrl = (data as { image_url?: string | null }).image_url ?? "";
+  const fallbackImageUrl =
+    rawImageUrl.startsWith("/") && !rawImageUrl.startsWith("//") ? rawImageUrl : "/images/configurator.svg";
   return NextResponse.redirect(new URL(fallbackImageUrl, request.nextUrl.origin));
 }

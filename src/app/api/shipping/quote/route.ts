@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFlagshipToken } from "@/lib/shipping/env";
 import { getShippingQuotes } from "@/lib/shipping/flagship-service";
+import { signShippingSelection } from "@/lib/shipping/quote-signature";
 import { SHIPPING_ALLOWED_COUNTRIES, type ShippingAddressInput, type ShippingQuoteRequest } from "@/lib/shipping/types";
 
 function bad(msg: string, status = 400) {
@@ -94,8 +95,28 @@ export async function POST(request: NextRequest) {
 
   try {
     const { options, used_fallback_dimensions } = await getShippingQuotes(req, to);
+    const signedOptions = options.map((o) => {
+      let courier_name = "";
+      let courier_code = "";
+      try {
+        const raw = JSON.parse(o.raw_service_code) as { courier_name?: string; courier_code?: string };
+        courier_name = raw.courier_name ?? "";
+        courier_code = raw.courier_code ?? "";
+      } catch {
+        // leave unsigned; checkout will reject it
+      }
+      if (!courier_name || !courier_code) return o;
+      const { sig, exp } = signShippingSelection({
+        carrier: o.carrier,
+        service_name: o.service_name,
+        courier_name,
+        courier_code,
+        price: o.price,
+      });
+      return { ...o, sig, exp };
+    });
     return NextResponse.json({
-      options,
+      options: signedOptions,
       used_fallback_dimensions,
     });
   } catch (e) {

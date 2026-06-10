@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { sendOrderEmails } from "@/lib/email";
+import { requireAdminApi } from "@/lib/shipping/require-admin-api";
 
 /**
  * Dev-only: test that order emails work without going through Stripe.
  * POST /api/test-email — sends a test "New order" to ORDER_NOTIFY_EMAIL (or info@spaxio.ca).
- * Only works when NODE_ENV === "development".
+ * Only works when NODE_ENV === "development" AND the caller is an admin.
  */
 export async function POST() {
   if (process.env.NODE_ENV !== "development") {
     return NextResponse.json({ error: "Not available in production" }, { status: 404 });
   }
+  const auth = await requireAdminApi();
+  if (!auth.ok) return auth.response;
 
   const to = process.env.ORDER_NOTIFY_EMAIL ?? "info@spaxio.ca";
   try {

@@ -35,43 +35,29 @@ export default function TrackOrderPage() {
   const isFr = locale === "fr";
   const q = searchParams.get("order_number")?.trim() ?? "";
   const [orderNumber, setOrderNumber] = useState("");
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TrackResult | null>(null);
 
   useEffect(() => {
-    if (q) {
-      setOrderNumber(q);
-      // Auto-search when arriving with a query param (e.g. from email link)
-      const num = q.trim().toUpperCase();
-      if (num) {
-        setLoading(true);
-        fetch(`/api/track-order?order_number=${encodeURIComponent(num)}`)
-          .then(async (res) => {
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-              setError(data.error ?? (isFr ? "Commande introuvable." : "Order not found."));
-            } else {
-              setResult(data as TrackResult);
-            }
-          })
-          .catch(() => {
-            setError(isFr ? "Erreur de connexion." : "Connection error.");
-          })
-          .finally(() => setLoading(false));
-      }
-    }
-  }, [q, isFr]);
+    // Pre-fill the order number from email links; the customer still confirms
+    // with the email address used at purchase before any data is shown.
+    if (q) setOrderNumber(q);
+  }, [q]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const num = orderNumber.trim().toUpperCase();
-    if (!num) return;
+    const mail = email.trim();
+    if (!num || !mail) return;
     setError(null);
     setResult(null);
     setLoading(true);
     try {
-      const res = await fetch(`/api/track-order?order_number=${encodeURIComponent(num)}`);
+      const res = await fetch(
+        `/api/track-order?order_number=${encodeURIComponent(num)}&email=${encodeURIComponent(mail)}`
+      );
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? (isFr ? "Commande introuvable." : "Order not found."));
@@ -98,8 +84,8 @@ export default function TrackOrderPage() {
             </h1>
             <p className="mt-4 text-white/80">
               {isFr
-                ? "Entrez le numéro de commande indiqué dans votre e-mail de confirmation."
-                : "Enter the order number from your confirmation email."}
+                ? "Entrez le numéro de commande et l'adresse e-mail utilisée lors de l'achat."
+                : "Enter your order number and the email address used at purchase."}
             </p>
           </div>
         </ScrollReveal>
@@ -117,6 +103,20 @@ export default function TrackOrderPage() {
                 placeholder="CT-XXXXXXXX"
                 className="w-full rounded-lg border border-foreground/20 bg-white px-4 py-3 text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-foreground/30"
                 disabled={loading}
+              />
+            </label>
+            <label className="flex-1">
+              <span className="mb-1 block text-sm font-medium text-foreground/80">
+                {isFr ? "Adresse e-mail" : "Email address"}
+              </span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={isFr ? "vous@exemple.com" : "you@example.com"}
+                className="w-full rounded-lg border border-foreground/20 bg-white px-4 py-3 text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-foreground/30"
+                disabled={loading}
+                required
               />
             </label>
             <button

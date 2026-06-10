@@ -23,5 +23,7 @@ export function parseShippingSelection(raw: unknown): SelectedShippingPayload | 
     price: Math.round(price * 100) / 100,
     currency: "CAD",
     estimated_delivery,
+    sig: typeof o.sig === "string" ? o.sig : undefined,
+    exp: Number.isFinite(Number(o.exp)) ? Number(o.exp) : undefined,
   };
 }
